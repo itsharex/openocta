@@ -1,3 +1,6 @@
 ./ui/node_modules
 ./dist
 ./ui/.idea
+./src/.claude
+./src/.idea
+./src/.claude-trace
