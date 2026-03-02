@@ -173,6 +173,8 @@ func ConfigSetHandler(opts HandlerOpts) error {
 		}, nil)
 		return nil
 	}
+	// Update context.Config.
+	opts.Context.Config = &cfg
 	opts.Respond(true, map[string]interface{}{
 		"ok":     true,
 		"path":   snap.Path,
