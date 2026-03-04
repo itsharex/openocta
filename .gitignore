@@ -16,3 +16,5 @@
 ./openocta
 ./.DS_Store
 ./src/.DS_Store
+./docs/
+./src/embed/skills/.DS_Store
