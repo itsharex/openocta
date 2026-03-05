@@ -8,7 +8,7 @@ project_name: openocta
 
 # snapshot 版本不包含 git commit 号，便于安装包/压缩包命名简洁
 snapshot:
-  version_template: "{{ incpatch .Version }}-SNAPSHOT"
+  version_template: "{{ .Version }}-SNAPSHOT"
 
 before:
   hooks:
