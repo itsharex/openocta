@@ -38,6 +38,7 @@ import (
 	"github.com/openocta/openocta/pkg/gateway/handlers"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
 	"github.com/openocta/openocta/pkg/gateway/ws"
+	initpkg "github.com/openocta/openocta/pkg/init"
 	"github.com/openocta/openocta/pkg/outbound"
 	"github.com/openocta/openocta/pkg/paths"
 )
@@ -111,6 +112,11 @@ func NewServer(addr string, version string) *Server {
 				os.Setenv(k, v)
 			}
 		}
+	}
+
+	// Initialize built-in employees (e.g. skill-creator) if not already present in state dir
+	if err := initpkg.InitEmployee(cfg); err != nil {
+		slog.Warn("init employees at startup failed", "error", err)
 	}
 
 	// MCP: connect to configured MCP servers and expose tools to the agent

@@ -207,6 +207,9 @@ export type AppViewState = {
   skillsUploadBusy: boolean;
   skillsViewMode: "list" | "card";
   skillsSelectedSkillKey: string | null;
+  skillsSkillDocContent: string | null;
+  skillsSkillDocLoading: boolean;
+  skillsSkillDocError: string | null;
   // MCP
   mcpSelectedKey: string | null;
   mcpViewMode: "list" | "card";
@@ -230,6 +233,12 @@ export type AppViewState = {
   llmTraceSearch: string;
   llmTraceEnabled: boolean;
   llmTraceSaving: boolean;
+  // Sandbox
+  sandboxForm: import("./controllers/sandbox.js").SandboxConfigForm | Record<string, unknown> | null;
+  // Approvals
+  approvalsLoading: boolean;
+  approvalsResult: import("./controllers/approvals.js").ApprovalsListResult | null;
+  approvalsError: string | null;
   // Models
   modelsSelectedProvider: string | null;
   modelsViewMode: "list" | "card";
@@ -250,6 +259,8 @@ export type AppViewState = {
   // Digital employees
   digitalEmployeesLoading: boolean;
   digitalEmployeesError: string | null;
+  digitalEmployeesFilter: string;
+  digitalEmployeesViewMode: "list" | "card";
   digitalEmployees: {
     id: string;
     name: string;

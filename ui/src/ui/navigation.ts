@@ -8,7 +8,7 @@ export function getTabGroups() {
       label: t("tabGroupControl"),
       tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"] as const,
     },
-    { label: t("tabGroupAgent"), tabs: ["models", "skills", "mcp", "llmTrace"] as const },
+    { label: t("tabGroupAgent"), tabs: ["models", "skills", "mcp", "llmTrace", "sandbox"] as const },
     { label: t("tabGroupSettings"), tabs: ["config", "envVars", "logs"] as const },
   ];
 }
@@ -32,7 +32,8 @@ export type Tab =
   | "models"
   | "debug"
   | "logs"
-  | "llmTrace";
+  | "llmTrace"
+  | "sandbox";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -54,6 +55,7 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   llmTrace: "/llm-trace",
+  sandbox: "/sandbox",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -165,6 +167,8 @@ export function iconForTab(tab: Tab): IconName {
       return "folder";
     case "llmTrace":
       return "scrollText";
+    case "sandbox":
+      return "sandbox";
     case "nodes":
       return "monitor";
     case "config":
@@ -204,6 +208,8 @@ export function titleForTab(tab: Tab) {
       return t("navTitleMcp");
     case "llmTrace":
       return t("navTitleLlmTrace");
+    case "sandbox":
+      return t("navTitleSandbox");
     case "nodes":
       return t("navTitleNodes");
     case "chat":
@@ -249,6 +255,8 @@ export function subtitleForTab(tab: Tab) {
       return t("subtitleMcp");
     case "llmTrace":
       return t("subtitleLlmTrace");
+    case "sandbox":
+      return t("subtitleSandbox");
     case "nodes":
       return t("subtitleNodes");
     case "chat":

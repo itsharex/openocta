@@ -345,15 +345,16 @@ func (s *Server) handleEmployeeSkillsUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	// Reuse skillNameRe for a conservative, cross-platform-safe employee ID (no dots in employeeId).
-	if !skillNameRe.MatchString(employeeIDRaw) || strings.Contains(employeeIDRaw, "..") {
-		writeSkillsUploadError(
-			w,
-			http.StatusBadRequest,
-			"employeeId must be 1-64 chars, English letters, numbers, hyphens, underscores",
-			"",
-		)
-		return
-	}
+	// TODO:忽略非法 employee Id
+	//if !skillNameRe.MatchString(employeeIDRaw) || strings.Contains(employeeIDRaw, "..") {
+	//	writeSkillsUploadError(
+	//		w,
+	//		http.StatusBadRequest,
+	//		"employeeId must be 1-64 chars, English letters, numbers, hyphens, underscores",
+	//		"",
+	//	)
+	//	return
+	//}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {

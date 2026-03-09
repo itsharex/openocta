@@ -24,6 +24,8 @@ import { loadSessions } from "./controllers/sessions.ts";
 import { loadDigitalEmployees } from "./controllers/digital-employees.ts";
 import { loadTraceList } from "./controllers/llm-trace.ts";
 import { syncLlmTraceFromConfig } from "./app-llm-trace.ts";
+import { syncSandboxFromConfig } from "./app-sandbox.ts";
+import { loadApprovalsList } from "./controllers/approvals.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import {
   inferBasePathFromPathname,
@@ -200,6 +202,11 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadConfig(host as unknown as OpenClawApp);
     syncLlmTraceFromConfig(host as unknown as OpenClawApp);
     await loadTraceList(host as unknown as OpenClawApp);
+  }
+  if (host.tab === "sandbox") {
+    await loadConfig(host as unknown as OpenClawApp);
+    host.sandboxForm = syncSandboxFromConfig(host as unknown as OpenClawApp);
+    await loadApprovalsList(host as unknown as OpenClawApp);
   }
   if (host.tab === "digitalEmployee") {
     await loadDigitalEmployees(host as unknown as OpenClawApp);

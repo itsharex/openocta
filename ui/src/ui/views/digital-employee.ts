@@ -13,11 +13,17 @@ export type DigitalEmployee = {
   mcpServerKeys?: string[];
 };
 
+export type DigitalEmployeeViewMode = "list" | "card";
+
 export type DigitalEmployeeProps = {
   loading: boolean;
   employees: DigitalEmployee[];
   error: string | null;
+  filter: string;
+  viewMode: DigitalEmployeeViewMode;
   onRefresh: () => void;
+  onFilterChange: (next: string) => void;
+  onViewModeChange: (mode: DigitalEmployeeViewMode) => void;
   onOpenEmployee: (employeeId: string) => void;
   // 创建
   createModalOpen: boolean;
@@ -69,6 +75,12 @@ export type DigitalEmployeeProps = {
 
 export function renderDigitalEmployee(props: DigitalEmployeeProps) {
   const list = props.employees ?? [];
+  const filter = props.filter.trim().toLowerCase();
+  const filtered = filter
+    ? list.filter((emp) =>
+        [emp.name, emp.id, emp.description].join(" ").toLowerCase().includes(filter),
+      )
+    : list;
   const rawName = props.createName?.trim() ?? "";
   const employeeIdPreview = deriveEmployeeIdFromName(rawName);
   return html`
@@ -80,7 +92,37 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
             提供不同垂直场景的对话模版，点击任一数字员工即可开启新的会话。
           </div>
         </div>
-        <div class="row" style="gap: 8px;">
+        <div class="row" style="gap: 8px; align-items: center;">
+          <div class="row" style="gap: 4px;" title=${t("mcpViewList")}>
+            <button
+              type="button"
+              class="btn ${props.viewMode === "list" ? "primary" : ""}"
+              style="padding: 6px 10px;"
+              @click=${() => props.onViewModeChange("list")}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="btn ${props.viewMode === "card" ? "primary" : ""}"
+              style="padding: 6px 10px;"
+              @click=${() => props.onViewModeChange("card")}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+              </svg>
+            </button>
+          </div>
           <button class="btn primary" ?disabled=${props.loading} @click=${props.onCreateOpen}>
             ${t("skillsAdd")}
           </button>
@@ -96,67 +138,43 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
           : nothing
       }
 
+      <div class="filters" style="margin-top: 14px;">
+        <label class="field" style="flex: 1;">
+          <span>${t("commonFilter")}</span>
+          <input
+            .value=${props.filter}
+            @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
+            placeholder="搜索名称/ID/描述"
+          />
+        </label>
+        <div class="muted">${filtered.length} 个</div>
+      </div>
+
       ${
-        !props.loading && list.length === 0
-          ? html`<div class="muted" style="margin-top: 16px;">暂无数字员工，可稍后在配置中添加。</div>`
+        !props.loading && filtered.length === 0
+          ? html`<div class="muted" style="margin-top: 16px;">暂无匹配的数字员工。</div>`
           : html`
-              <div class="list" style="margin-top: 16px;">
-                ${list.map((emp) => {
-                  const title = emp.name || emp.id;
-                  const desc = emp.description || (emp.builtin ? "内置数字员工" : "自定义数字员工");
-                  const created =
-                    typeof emp.createdAt === "number" && emp.createdAt > 0
-                      ? new Date(emp.createdAt).toLocaleString()
-                      : emp.builtin
-                        ? "内置"
-                        : "";
-                  const enabled = emp.enabled !== false;
-                  return html`
-                    <div
-                      class="list-item list-item--row"
-                      style="width: 100%; text-align: left;"
-                    >
-                      <div class="list-main">
-                        <div class="list-title">
-                          ${title}
-                          ${emp.builtin
-                            ? html`<span class="chip" style="margin-left: 8px;">内置</span>`
-                            : nothing}
-                        </div>
-                        <div class="list-sub">${desc}</div>
-                        <div class="list-sub muted" style="margin-top: 4px;">
-                          ${created ? html`<span>创建时间：${created}</span>` : nothing}
-                          <span style="margin-left: 12px;">
-                            状态：${enabled ? "启用" : "禁用"}
-                          </span>
-                          ${renderSkillMcpHint(emp)}
-                        </div>
+              ${
+                props.viewMode === "list"
+                  ? html`
+                      <div class="list" style="margin-top: 16px;">
+                        ${filtered.map((emp) => renderEmployeeListRow(emp, props))}
                       </div>
-                      <div class="row" style="gap: 8px; align-items: center; justify-content: flex-end;">
-                        <button
-                          class="btn btn--sm primary"
-                          @click=${() => props.onOpenEmployee(emp.id)}
-                        >
-                          会话
-                        </button>
-                        <button
-                          class="btn btn--sm"
-                          @click=${() => props.onEdit(emp.id)}
-                          ?disabled=${emp.builtin}
-                        >
-                          修改
-                        </button>
-                        <button
-                          class="btn btn--sm danger"
-                          @click=${() => props.onDelete(emp.id)}
-                        >
-                          ${t("skillsDelete")}
-                        </button>
+                    `
+                  : html`
+                      <div
+                        class="employees-card-grid"
+                        style="
+                          display: grid;
+                          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                          gap: 12px;
+                          margin-top: 16px;
+                        "
+                      >
+                        ${filtered.map((emp) => renderEmployeeCard(emp, props))}
                       </div>
-                    </div>
-                  `;
-                })}
-              </div>
+                    `
+              }
             `
       }
 
@@ -440,6 +458,88 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
           : nothing
       }
     </section>
+  `;
+}
+
+function renderEmployeeListRow(emp: DigitalEmployee, props: DigitalEmployeeProps) {
+  const title = emp.name || emp.id;
+  const desc = emp.description || (emp.builtin ? "内置数字员工" : "自定义数字员工");
+  const created =
+    typeof emp.createdAt === "number" && emp.createdAt > 0
+      ? new Date(emp.createdAt).toLocaleString()
+      : emp.builtin
+        ? "内置"
+        : "";
+  const enabled = emp.enabled !== false;
+  return html`
+    <div class="list-item list-item--row" style="width: 100%; text-align: left;">
+      <div class="list-main">
+        <div class="list-title">
+          ${title}
+          ${emp.builtin ? html`<span class="chip" style="margin-left: 8px;">内置</span>` : nothing}
+        </div>
+        <div class="list-sub">${desc}</div>
+        <div class="list-sub muted" style="margin-top: 4px;">
+          ${created ? html`<span>创建时间：${created}</span>` : nothing}
+          <span style="margin-left: 12px;">状态：${enabled ? "启用" : "禁用"}</span>
+          ${renderSkillMcpHint(emp)}
+        </div>
+      </div>
+      <div class="row" style="gap: 8px; align-items: center; justify-content: flex-end;">
+        <button class="btn btn--sm primary" @click=${() => props.onOpenEmployee(emp.id)}>会话</button>
+        <button class="btn btn--sm" @click=${() => props.onEdit(emp.id)}>
+          修改
+        </button>
+        <button class="btn btn--sm danger" @click=${() => props.onDelete(emp.id)}>
+          ${t("skillsDelete")}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderEmployeeCard(emp: DigitalEmployee, props: DigitalEmployeeProps) {
+  const title = emp.name || emp.id;
+  const desc = emp.description || (emp.builtin ? "内置数字员工" : "自定义数字员工");
+  const created =
+    typeof emp.createdAt === "number" && emp.createdAt > 0
+      ? new Date(emp.createdAt).toLocaleString()
+      : emp.builtin
+        ? "内置"
+        : "";
+  const enabled = emp.enabled !== false;
+  return html`
+    <div class="skills-server-card" style="cursor: pointer;" @click=${() => props.onOpenEmployee(emp.id)}>
+      <div class="skills-server-card__header">
+        <div class="skills-server-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="skills-server-card__title-row" style="min-width: 0;">
+          <span class="skills-server-card__name">${title}</span>
+          ${emp.builtin ? html`<span class="chip" style="font-size: 11px;">内置</span>` : nothing}
+          <span class="chip ${enabled ? "chip-ok" : "chip-warn"}" style="font-size: 11px;">
+            ${enabled ? "启用" : "禁用"}
+          </span>
+        </div>
+      </div>
+      <div class="skills-server-card__sub muted" style="font-size: 12px;">
+        <div>${desc}</div>
+        ${created ? html`<div style="margin-top: 6px;">创建时间：${created}</div>` : nothing}
+        ${renderSkillMcpHint(emp)}
+      </div>
+      <div class="skills-server-card__footer" @click=${(e: Event) => e.stopPropagation()}>
+        <button class="btn btn--sm primary" @click=${() => props.onOpenEmployee(emp.id)}>会话</button>
+        <button class="btn btn--sm" @click=${() => props.onEdit(emp.id)}>
+          修改
+        </button>
+        <button class="btn btn--sm danger" @click=${() => props.onDelete(emp.id)}>
+          ${t("skillsDelete")}
+        </button>
+      </div>
+    </div>
   `;
 }
 

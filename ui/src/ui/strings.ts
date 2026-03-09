@@ -63,7 +63,11 @@ type Strings = {
   navTitleDebug: string;
   navTitleLogs: string;
   navTitleLlmTrace: string;
+  navTitleSandbox: string;
+  navTitleApprovals: string;
   navTitleControl: string;
+  subtitleSandbox: string;
+  subtitleApprovals: string;
   // Overview
   overviewGatewayAccess: string;
   overviewGatewayAccessSub: string;
@@ -156,6 +160,51 @@ type Strings = {
   llmTraceFileSize: string;
   llmTraceView: string;
   llmTraceNoEntries: string;
+  sandboxEnabled: string;
+  sandboxDisabled: string;
+  sandboxActionEnable: string;
+  sandboxActionDisable: string;
+  sandboxAllowedPaths: string;
+  sandboxNetworkAllow: string;
+  sandboxHooks: string;
+  sandboxHookBeforeAgent: string;
+  sandboxHookBeforeModel: string;
+  sandboxHookAfterModel: string;
+  sandboxHookBeforeTool: string;
+  sandboxHookAfterTool: string;
+  sandboxHookAfterAgent: string;
+  sandboxHookDescBeforeAgent: string;
+  sandboxHookDescBeforeModel: string;
+  sandboxHookDescAfterModel: string;
+  sandboxHookDescBeforeTool: string;
+  sandboxHookDescAfterTool: string;
+  sandboxHookDescAfterAgent: string;
+  sandboxValidator: string;
+  sandboxResourceLimit: string;
+  sandboxMaxCPUPercent: string;
+  sandboxMaxMemoryBytes: string;
+  sandboxMaxDiskBytes: string;
+  sandboxSecretPatterns: string;
+  sandboxSecretPatternsHint: string;
+  sandboxBanCommands: string;
+  sandboxBanArguments: string;
+  sandboxBanFragments: string;
+  sandboxSectionConfig: string;
+  sandboxSectionApprovals: string;
+  approvalsList: string;
+  approvalsId: string;
+  approvalsSessionKey: string;
+  approvalsSessionId: string;
+  approvalsCommand: string;
+  approvalsTimeout: string;
+  approvalsTTL: string;
+  approvalsStatus: string;
+  approvalsApprove: string;
+  approvalsDeny: string;
+  approvalsExpired: string;
+  approvalsPending: string;
+  approvalsNoEntries: string;
+  approvalsViewSession: string;
   modelsViewList: string;
   modelsViewCard: string;
   modelsTableName: string;
@@ -626,6 +675,7 @@ type Strings = {
   skillsDeleteConfirm: string;
   skillsSource: string;
   skillsPath: string;
+  skillsNoDoc: string;
   skillsEligible: string;
   skillsDisabled: string;
   skillsRequiresBins: string;
@@ -872,6 +922,8 @@ const EN: Strings = {
   subtitleDebug: "Gateway snapshots, events, and manual RPC calls.",
   subtitleLogs: "Live tail of the gateway file logs.",
   subtitleLlmTrace: "View LLM trace details for sessions.",
+  subtitleSandbox: "Filesystem, network, commands, and security hooks.",
+  subtitleApprovals: "Command approval queue; approve or deny by session.",
   navTitleAgents: "Agents",
   navTitleOverview: "Overview",
   navTitleChannels: "Channels",
@@ -892,6 +944,8 @@ const EN: Strings = {
   navTitleDebug: "Debug",
   navTitleLogs: "Logs",
   navTitleLlmTrace: "LLM Trace",
+  navTitleSandbox: "Sandbox",
+  navTitleApprovals: "Approvals",
   navTitleControl: "Control",
   overviewGatewayAccess: "Gateway Access",
   overviewGatewayAccessSub: "Where the dashboard connects and how it authenticates.",
@@ -983,6 +1037,51 @@ const EN: Strings = {
   llmTraceFileSize: "Size",
   llmTraceView: "View",
   llmTraceNoEntries: "No trace entries.",
+  sandboxEnabled: "Enabled",
+  sandboxDisabled: "Disabled",
+  sandboxActionEnable: "Enable",
+  sandboxActionDisable: "Disable",
+  sandboxAllowedPaths: "Allowed paths",
+  sandboxNetworkAllow: "Network allowlist",
+  sandboxHooks: "Security hooks",
+  sandboxHookBeforeAgent: "BeforeAgent",
+  sandboxHookBeforeModel: "BeforeModel",
+  sandboxHookAfterModel: "AfterModel",
+  sandboxHookBeforeTool: "BeforeTool",
+  sandboxHookAfterTool: "AfterTool",
+  sandboxHookAfterAgent: "AfterAgent",
+  sandboxHookDescBeforeAgent: "Request validation: session abuse (DoS), long prompts, malicious IPs",
+  sandboxHookDescBeforeModel: "Prompt safety: prompt injection, sensitive data leakage, control chars",
+  sandboxHookDescAfterModel: "Output review: dangerous commands, secret leakage, malicious URLs",
+  sandboxHookDescBeforeTool: "Permission check: tool permission, param validation, path validation",
+  sandboxHookDescAfterTool: "Result review: secret leakage, error sanitization, output truncation",
+  sandboxHookDescAfterAgent: "Audit logging, compliance checks",
+  sandboxValidator: "Command validator",
+  sandboxResourceLimit: "Resource limits",
+  sandboxMaxCPUPercent: "Max CPU %",
+  sandboxMaxMemoryBytes: "Max memory",
+  sandboxMaxDiskBytes: "Max disk",
+  sandboxSecretPatterns: "Secret leakage patterns (regex)",
+  sandboxSecretPatternsHint: "One regex per line. Built-in patterns (API keys, tokens, etc.) are also applied.",
+  sandboxBanCommands: "Ban commands",
+  sandboxBanArguments: "Ban arguments",
+  sandboxBanFragments: "Ban fragments",
+  sandboxSectionConfig: "Sandbox config",
+  sandboxSectionApprovals: "Approval queue",
+  approvalsList: "Approval queue",
+  approvalsId: "ID",
+  approvalsSessionKey: "Session Key",
+  approvalsSessionId: "Session ID",
+  approvalsCommand: "Command",
+  approvalsTimeout: "Timeout",
+  approvalsTTL: "TTL",
+  approvalsStatus: "Status",
+  approvalsApprove: "Approve",
+  approvalsDeny: "Deny",
+  approvalsExpired: "Expired",
+  approvalsPending: "Pending",
+  approvalsNoEntries: "No approval requests.",
+  approvalsViewSession: "View session",
   modelsViewList: "List view",
   modelsViewCard: "Card view",
   modelsTableName: "Name",
@@ -1451,6 +1550,7 @@ const EN: Strings = {
   skillsDeleteConfirm: "Delete this skill?",
   skillsSource: "Source",
   skillsPath: "Path",
+  skillsNoDoc: "No documentation available.",
   skillsEligible: "Eligible",
   skillsDisabled: "Disabled",
   skillsRequiresBins: "Requires bins",
@@ -1692,6 +1792,8 @@ const ZH: Strings = {
   subtitleDebug: "网关快照、事件与手动 RPC 调用。",
   subtitleLogs: "网关日志实时查看。",
   subtitleLlmTrace: "查看会话的 LLM trace 详情。",
+  subtitleSandbox: "文件系统、网络、命令与安全钩子配置。",
+  subtitleApprovals: "命令审批队列；按会话批准或拒绝。",
   navTitleAgents: "代理",
   navTitleOverview: "概览",
   navTitleChannels: "通道",
@@ -1702,7 +1804,7 @@ const ZH: Strings = {
   navTitleSkills: "技能",
   navTitleMcp: "MCP",
   navTitleNodes: "节点",
-  navTitleChat: "Chat",
+  navTitleChat: "聊天",
   navTitleDigitalEmployee: "数字员工",
   navTitleAgentSwarm: "Agent Swarm",
   agentSwarmDevBadge: "开发中",
@@ -1712,6 +1814,8 @@ const ZH: Strings = {
   navTitleDebug: "测试",
   navTitleLogs: "日志",
   navTitleLlmTrace: "LLM Trace",
+  navTitleSandbox: "沙箱",
+  navTitleApprovals: "审批队列",
   navTitleControl: "控制",
   overviewGatewayAccess: "网关访问",
   overviewGatewayAccessSub: "控制台连接地址与认证方式。",
@@ -1803,6 +1907,51 @@ const ZH: Strings = {
   llmTraceFileSize: "大小",
   llmTraceView: "查看",
   llmTraceNoEntries: "暂无 trace 记录。",
+  sandboxEnabled: "已开启",
+  sandboxDisabled: "已关闭",
+  sandboxActionEnable: "开启",
+  sandboxActionDisable: "关闭",
+  sandboxAllowedPaths: "允许路径",
+  sandboxNetworkAllow: "网络白名单",
+  sandboxHooks: "安全钩子",
+  sandboxHookBeforeAgent: "BeforeAgent",
+  sandboxHookBeforeModel: "BeforeModel",
+  sandboxHookAfterModel: "AfterModel",
+  sandboxHookBeforeTool: "BeforeTool",
+  sandboxHookAfterTool: "AfterTool",
+  sandboxHookAfterAgent: "AfterAgent",
+  sandboxHookDescBeforeAgent: "请求验证：拦截会话滥用（DoS）、过长提示、恶意 IP",
+  sandboxHookDescBeforeModel: "即时安全：提示注入、敏感数据泄露、控制字符",
+  sandboxHookDescAfterModel: "输出评测：危险命令、秘密泄露、恶意网址",
+  sandboxHookDescBeforeTool: "权限校验：工具权限、参数校验、路径校验",
+  sandboxHookDescAfterTool: "结果审查：秘密泄露、错误脱敏、输出截断",
+  sandboxHookDescAfterAgent: "审计日志、合规检查",
+  sandboxValidator: "命令校验",
+  sandboxResourceLimit: "资源限制",
+  sandboxMaxCPUPercent: "最大 CPU 利用率 (%)",
+  sandboxMaxMemoryBytes: "最大内存",
+  sandboxMaxDiskBytes: "最大磁盘",
+  sandboxSecretPatterns: "秘密泄露检测正则",
+  sandboxSecretPatternsHint: "每行一个正则。系统内置模式（API Key、令牌等）会一并生效。",
+  sandboxBanCommands: "禁止命令",
+  sandboxBanArguments: "禁止参数",
+  sandboxBanFragments: "禁止片段",
+  sandboxSectionConfig: "沙箱配置",
+  sandboxSectionApprovals: "审批队列",
+  approvalsList: "审批队列",
+  approvalsId: "ID",
+  approvalsSessionKey: "Session Key",
+  approvalsSessionId: "Session ID",
+  approvalsCommand: "命令",
+  approvalsTimeout: "超时",
+  approvalsTTL: "TTL",
+  approvalsStatus: "状态",
+  approvalsApprove: "批准",
+  approvalsDeny: "拒绝",
+  approvalsExpired: "已过期",
+  approvalsPending: "待审批",
+  approvalsNoEntries: "暂无审批请求。",
+  approvalsViewSession: "查看会话",
   modelsViewList: "列表",
   modelsViewCard: "卡片",
   modelsTableName: "名称",
@@ -2267,6 +2416,7 @@ const ZH: Strings = {
   skillsDeleteConfirm: "确定删除此技能？",
   skillsSource: "来源",
   skillsPath: "路径",
+  skillsNoDoc: "暂无文档。",
   skillsEligible: "可用",
   skillsDisabled: "已禁用",
   skillsRequiresBins: "需要命令",

@@ -11,6 +11,10 @@ export type SkillsState = {
   skillEdits: Record<string, string>;
   skillMessages: SkillMessageMap;
   gatewayUrl?: string;
+  // Skill detail doc (SKILL.md content)
+  skillsSkillDocContent?: string | null;
+  skillsSkillDocLoading?: boolean;
+  skillsSkillDocError?: string | null;
 };
 
 export type SkillMessage = {
@@ -214,5 +218,27 @@ export async function deleteSkill(state: SkillsState, skillKey: string): Promise
     state.skillsError = getErrorMessage(err);
   } finally {
     state.skillsBusyKey = null;
+  }
+}
+
+export async function loadSkillDoc(
+  state: SkillsState,
+  skillKey: string,
+): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  state.skillsSkillDocLoading = true;
+  state.skillsSkillDocError = null;
+  state.skillsSkillDocContent = null;
+  try {
+    const res = await state.client.request<{ content?: string }>("skills.getDoc", {
+      skillKey,
+    });
+    state.skillsSkillDocContent = res?.content ?? null;
+  } catch (err) {
+    state.skillsSkillDocError = getErrorMessage(err);
+  } finally {
+    state.skillsSkillDocLoading = false;
   }
 }

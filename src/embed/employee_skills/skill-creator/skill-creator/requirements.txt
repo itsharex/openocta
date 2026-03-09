@@ -1,0 +1,2 @@
+# Dependencies for skill-creator scripts (init_skill, package_skill, quick_validate, install_skill)
+PyYAML>=6.0

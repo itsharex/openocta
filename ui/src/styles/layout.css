@@ -454,7 +454,8 @@
   justify-content: space-between;
   gap: 16px;
   padding: 4px 8px;
-  overflow: hidden;
+  /* Avoid clipping large page titles (e.g. Chinese glyph ascenders) */
+  overflow: visible;
   transform-origin: top center;
   transition:
     opacity var(--shell-focus-duration) var(--shell-focus-ease),

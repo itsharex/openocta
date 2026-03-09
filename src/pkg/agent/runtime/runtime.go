@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cexll/agentsdk-go/pkg/api"
+	agentsdkConfg "github.com/cexll/agentsdk-go/pkg/config"
 	"github.com/cexll/agentsdk-go/pkg/model"
 	"github.com/cexll/agentsdk-go/pkg/sandbox"
 	"github.com/cexll/agentsdk-go/pkg/tool"
@@ -46,6 +47,11 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	}
 	if len(opts.MCPServers) > 0 {
 		apiOpts.MCPServers = opts.MCPServers
+		if opts.Config != nil && opts.Config.Mcp != nil {
+			if mcpOverrides := buildMCPConfigOverrides(opts.Config.Mcp); mcpOverrides != nil {
+				apiOpts.SettingsOverrides.MCP = mcpOverrides
+			}
+		}
 	}
 	apiOpts.TokenTracking = opts.TokenTracking
 	if apiOpts.TokenTracking && opts.TokenCallback != nil {
@@ -65,8 +71,19 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	if opts.EnableSubagents && len(opts.Subagents) > 0 {
 		apiOpts.Subagents = opts.Subagents
 	}
-	if opts.EnableSandbox {
-		apiOpts.Sandbox = buildSandboxOptions(projectRoot, opts.Sandbox)
+	sandboxOpts := opts.Sandbox
+	if opts.Config != nil && opts.Config.Sandbox != nil {
+		fromConfig := buildSandboxOptsFromConfig(opts.Config.Sandbox, projectRoot)
+		if fromConfig != nil {
+			sandboxOpts = mergeSandboxOpts(fromConfig, sandboxOpts)
+		}
+	}
+	enableSandbox := opts.EnableSandbox
+	if opts.Config != nil && opts.Config.Sandbox != nil && opts.Config.Sandbox.Enabled != nil {
+		enableSandbox = *opts.Config.Sandbox.Enabled
+	}
+	if enableSandbox {
+		apiOpts.Sandbox = buildSandboxOptions(projectRoot, sandboxOpts)
 	}
 	if opts.EnableSystemPrompt {
 		if opts.SystemPromptOverrides != "" {
@@ -92,6 +109,8 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	//	ServiceName: "openclaw",
 	//	Endpoint:    "http://192.168.50.254:14318",
 	//}
+	// Security middleware (BeforeAgent, BeforeModel, AfterModel, BeforeTool, AfterTool, AfterAgent) can be
+	// appended from opts.Config.Sandbox.Hooks when the SDK exposes these hook points.
 	// Trace middleware: enabled only when gateway.llmTrace.enabled is true (default: false)
 	if opts.Config != nil && opts.Config.Gateway != nil && opts.Config.Gateway.LlmTrace != nil &&
 		opts.Config.Gateway.LlmTrace.Enabled != nil && *opts.Config.Gateway.LlmTrace.Enabled {
@@ -152,6 +171,59 @@ type SandboxOpts struct {
 	AllowedPaths  []string
 	NetworkAllow  []string
 	ResourceLimit sandbox.ResourceLimits
+}
+
+// buildSandboxOptsFromConfig builds SandboxOpts from root-level sandbox config.
+func buildSandboxOptsFromConfig(c *config.SandboxConfig, projectRoot string) *SandboxOpts {
+	if c == nil {
+		return nil
+	}
+	o := &SandboxOpts{}
+	if c.Root != nil && strings.TrimSpace(*c.Root) != "" {
+		o.Root = *c.Root
+	}
+	if len(c.AllowedPaths) > 0 {
+		o.AllowedPaths = append([]string{}, c.AllowedPaths...)
+	}
+	if len(c.NetworkAllow) > 0 {
+		o.NetworkAllow = append([]string{}, c.NetworkAllow...)
+	}
+	if c.ResourceLimit != nil {
+		if c.ResourceLimit.MaxCPUPercent != nil {
+			o.ResourceLimit.MaxCPUPercent = *c.ResourceLimit.MaxCPUPercent
+		}
+		if c.ResourceLimit.MaxMemoryBytes != nil {
+			o.ResourceLimit.MaxMemoryBytes = *c.ResourceLimit.MaxMemoryBytes
+		}
+		if c.ResourceLimit.MaxDiskBytes != nil {
+			o.ResourceLimit.MaxDiskBytes = *c.ResourceLimit.MaxDiskBytes
+		}
+	}
+	return o
+}
+
+// mergeSandboxOpts merges override into base; base may be nil (then override is returned).
+func mergeSandboxOpts(base, override *SandboxOpts) *SandboxOpts {
+	if base == nil {
+		return override
+	}
+	if override == nil {
+		return base
+	}
+	out := *base
+	if override.Root != "" {
+		out.Root = override.Root
+	}
+	if len(override.AllowedPaths) > 0 {
+		out.AllowedPaths = override.AllowedPaths
+	}
+	if len(override.NetworkAllow) > 0 {
+		out.NetworkAllow = override.NetworkAllow
+	}
+	if override.ResourceLimit.MaxCPUPercent > 0 || override.ResourceLimit.MaxMemoryBytes > 0 || override.ResourceLimit.MaxDiskBytes > 0 {
+		out.ResourceLimit = override.ResourceLimit
+	}
+	return &out
 }
 
 func buildSandboxOptions(projectRoot string, overrides *SandboxOpts) api.SandboxOptions {
@@ -243,4 +315,18 @@ func historySessionFileName(sessionID string) string {
 		return fallback
 	}
 	return sanitized
+}
+
+// buildMCPConfigOverrides builds agentsdk-go MCPConfig overrides from OpenOcta MCP config.
+// NOTE: 当前引入的 agentsdk-go 版本的 MCPConfig 暂未暴露超时等可覆盖字段，
+// 这里预留扩展点，后续 SDK 增加字段后可以在此处进行映射。
+func buildMCPConfigOverrides(c *config.McpConfig) *agentsdkConfg.MCPConfig {
+	if c == nil {
+		return nil
+	}
+	// 目前先不返回覆盖配置，以避免与 SDK 内部默认行为产生不兼容。
+	// 将来如果 MCPConfig 新增可配置字段（例如 TimeoutSeconds、ToolTimeoutSeconds），
+	// 可以在这里从 c 中读取并写入到返回值中。
+	_ = c
+	return nil
 }

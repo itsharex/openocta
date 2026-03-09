@@ -1,8 +1,23 @@
 import { html, nothing } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { SkillMessageMap } from "../controllers/skills.ts";
 import type { SkillStatusEntry, SkillStatusReport } from "../types.ts";
 import { clampText } from "../format.ts";
 import { t } from "../strings.js";
+import { toSanitizedMarkdownHtml } from "../markdown.ts";
+
+/** Strip YAML frontmatter (--- ... ---) from the start of markdown so it is not displayed. */
+function stripFrontmatter(text: string): string {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith("---")) return text;
+  const afterFirst = trimmed.slice(3);
+  const newlineIdx = afterFirst.search(/\r?\n/);
+  if (newlineIdx === -1) return text;
+  const rest = afterFirst.slice(newlineIdx + (afterFirst[newlineIdx] === "\r" ? 2 : 1));
+  const closeMatch = rest.match(/\r?\n\s*---\s*\r?\n?/);
+  if (!closeMatch) return text;
+  return rest.slice(closeMatch.index! + closeMatch[0].length).trimStart();
+}
 
 type SkillGroup = {
   id: string;
@@ -77,6 +92,9 @@ export type SkillsProps = {
   onInstall: (skillKey: string, name: string, installId: string) => void;
   onDelete: (skillKey: string) => void;
   selectedSkillKey: string | null;
+  skillDocContent: string | null;
+  skillDocLoading: boolean;
+  skillDocError: string | null;
   onSkillDetailClick: (skillKey: string | null) => void;
 };
 
@@ -239,7 +257,12 @@ export function renderSkills(props: SkillsProps) {
           ? (() => {
               const skill = skills.find((s) => s.skillKey === props.selectedSkillKey);
               return skill
-                ? renderSkillDetailModal(skill, () => props.onSkillDetailClick(null))
+                ? renderSkillDetailModal(skill, {
+                    content: props.skillDocContent,
+                    loading: props.skillDocLoading,
+                    error: props.skillDocError,
+                    onClose: () => props.onSkillDetailClick(null),
+                  })
                 : nothing;
             })()
           : nothing
@@ -606,88 +629,53 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
   `;
 }
 
-function renderSkillDetailModal(skill: SkillStatusEntry, onClose: () => void) {
-  const missing = [
-    ...skill.missing.bins.map((b) => `bin:${b}`),
-    ...skill.missing.env.map((e) => `env:${e}`),
-    ...skill.missing.config.map((c) => `config:${c}`),
-    ...skill.missing.os.map((o) => `os:${o}`),
-  ];
+type SkillDetailModalProps = {
+  content: string | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+};
+
+function renderSkillDetailModal(
+  skill: SkillStatusEntry,
+  props: SkillDetailModalProps,
+) {
+  const { content, loading, error, onClose } = props;
   return html`
     <div class="modal-overlay" @click=${onClose}>
-      <div class="modal card" style="max-width: 480px;" @click=${(e: Event) => e.stopPropagation()}>
-        <div class="row" style="justify-content: space-between; align-items: center;">
+      <div
+        class="modal card skill-detail-modal"
+        style="
+          width: min(900px, 90vw);
+          height: 85vh;
+          max-width: 90vw;
+          max-height: 90vh;
+          min-width: 380px;
+          min-height: 320px;
+          resize: both;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        "
+        @click=${(e: Event) => e.stopPropagation()}
+      >
+        <div class="row" style="justify-content: space-between; align-items: center; flex-shrink: 0;">
           <div class="card-title">${skill.emoji ? `${skill.emoji} ` : ""}${skill.name}</div>
           <button class="btn" @click=${onClose}>×</button>
         </div>
-        <div class="card-sub" style="margin-top: 4px;">${skill.description}</div>
-        <div class="status-list" style="margin-top: 16px;">
-          <div>
-            <span class="label">${t("skillsSource")}</span>
-            <span>${skill.source}</span>
-          </div>
-          <div>
-            <span class="label">${t("skillsPath")}</span>
-            <span class="monospace" style="font-size: 12px;">${skill.filePath}</span>
-          </div>
-          <div>
-            <span class="label">${t("skillsEligible")}</span>
-            <span>${skill.eligible ? t("commonYes") : t("commonNo")}</span>
-          </div>
-          <div>
-            <span class="label">${t("skillsDisabled")}</span>
-            <span>${skill.disabled ? t("commonYes") : t("commonNo")}</span>
-          </div>
-          ${
-            skill.requirements.bins.length > 0
-              ? html`
-                  <div>
-                    <span class="label">${t("skillsRequiresBins")}</span>
-                    <span>${skill.requirements.bins.join(", ")}</span>
-                  </div>
-                `
-              : nothing
-          }
-          ${
-            skill.requirements.env.length > 0
-              ? html`
-                  <div>
-                    <span class="label">${t("skillsRequiresEnv")}</span>
-                    <span>${skill.requirements.env.join(", ")}</span>
-                  </div>
-                `
-              : nothing
-          }
-          ${
-            skill.requirements.config.length > 0
-              ? html`
-                  <div>
-                    <span class="label">${t("skillsRequiresConfig")}</span>
-                    <span>${skill.requirements.config.join(", ")}</span>
-                  </div>
-                `
-              : nothing
-          }
-          ${
-            missing.length > 0
-              ? html`
-                  <div>
-                    <span class="label">${t("skillsMissing")}</span>
-                    <span>${missing.join(", ")}</span>
-                  </div>
-                `
-              : nothing
-          }
+        <div class="card-sub" style="margin-top: 4px; flex-shrink: 0;">${skill.description}</div>
+        <div
+          class="skill-doc-body"
+          style="margin-top: 16px; overflow: auto; flex: 1; min-height: 0; padding-right: 4px;"
+        >
+          ${loading
+            ? html`<div class="muted">${t("commonLoading")}</div>`
+            : error
+              ? html`<div class="callout danger">${error}</div>`
+              : content
+                ? html`<div class="sidebar-markdown">${unsafeHTML(toSanitizedMarkdownHtml(stripFrontmatter(content)))}</div>`
+                : html`<div class="muted">${t("skillsNoDoc")}</div>`}
         </div>
-        ${
-          skill.homepage
-            ? html`
-                <div style="margin-top: 12px;">
-                  <a href=${skill.homepage} target="_blank" rel="noopener noreferrer">${skill.homepage}</a>
-                </div>
-              `
-            : nothing
-        }
       </div>
     </div>
   `;

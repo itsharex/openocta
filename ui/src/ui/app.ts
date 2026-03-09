@@ -214,6 +214,10 @@ export class OpenClawApp extends LitElement {
   @state() llmTraceSearch = "";
   @state() llmTraceEnabled = false;
   @state() llmTraceSaving = false;
+  @state() sandboxForm: import("./controllers/sandbox.js").SandboxConfigForm | Record<string, unknown> | null = null;
+  @state() approvalsLoading = false;
+  @state() approvalsResult: import("./controllers/approvals.js").ApprovalsListResult | null = null;
+  @state() approvalsError: string | null = null;
   @state() modelsSelectedProvider: string | null = null;
   @state() modelsViewMode: "list" | "card" = "card";
   @state() modelsFormDirty = false;
@@ -237,6 +241,9 @@ export class OpenClawApp extends LitElement {
   @state() modelsUseModelModalProvider: string | null = null;
   @state() modelsSaveError: string | null = null;
   @state() skillsSelectedSkillKey: string | null = null;
+  @state() skillsSkillDocContent: string | null = null;
+  @state() skillsSkillDocLoading = false;
+  @state() skillsSkillDocError: string | null = null;
   @state() skillsViewMode: "list" | "card" = "card";
 
   @state() presenceLoading = false;
@@ -353,6 +360,8 @@ export class OpenClawApp extends LitElement {
 
   @state() digitalEmployeesLoading = false;
   @state() digitalEmployeesError: string | null = null;
+  @state() digitalEmployeesFilter = "";
+  @state() digitalEmployeesViewMode: "list" | "card" = "list";
   @state() digitalEmployees: {
     id: string;
     name: string;

@@ -404,7 +404,7 @@ func buildSkillsSnapshotForEmployee(projectRoot string, cfg *config.OpenOctaConf
 	// 员工 manifest：若不存在则只依赖内置目录。
 	m, _ := employees.LoadManifest(employeeID, env)
 
-	// 1) embed/agents_skills/<employeeID>
+	// 1) embed/employee_skills/<employeeID>
 	if fsys, err := embed.AgentsSkillsFS(); err == nil {
 		if entries, err := agentSkills.LoadEntriesFromFS(fsys, employeeID, "employee-embedded"); err == nil {
 			for _, e := range entries {

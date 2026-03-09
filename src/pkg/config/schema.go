@@ -52,6 +52,45 @@ type OpenOctaConfig struct {
 	Gateway     *GatewayConfig     `json:"gateway,omitempty"`
 	Memory      *MemoryConfig      `json:"memory,omitempty"`
 	Mcp         *McpConfig         `json:"mcp,omitempty"`
+	Sandbox     *SandboxConfig     `json:"sandbox,omitempty"`
+}
+
+// SandboxConfig is root-level sandbox configuration for agent execution.
+type SandboxConfig struct {
+	Enabled       *bool                   `json:"enabled,omitempty"`
+	AllowedPaths  []string                `json:"allowedPaths,omitempty"`
+	NetworkAllow  []string                `json:"networkAllow,omitempty"`
+	Root          *string                 `json:"root,omitempty"`
+	ResourceLimit *SandboxResourceLimit   `json:"resourceLimit,omitempty"`
+	Hooks         *SandboxHooksConfig     `json:"hooks,omitempty"`
+	Validator     *SandboxValidatorConfig `json:"validator,omitempty"`
+	ApprovalStore *string                 `json:"approvalStore,omitempty"` // default: stateDir/agents/approvals
+}
+
+// SandboxResourceLimit holds optional resource limits for the sandbox.
+type SandboxResourceLimit struct {
+	MaxCPUPercent  *float64 `json:"maxCpuPercent,omitempty"`
+	MaxMemoryBytes *uint64  `json:"maxMemoryBytes,omitempty"`
+	MaxDiskBytes   *uint64  `json:"maxDiskBytes,omitempty"`
+}
+
+// SandboxHooksConfig toggles for the six security checkpoints.
+type SandboxHooksConfig struct {
+	BeforeAgent *bool `json:"beforeAgent,omitempty"` // request validation, IP blacklist, rate limit
+	BeforeModel *bool `json:"beforeModel,omitempty"` // prompt injection, sensitive words
+	AfterModel  *bool `json:"afterModel,omitempty"`  // output review, dangerous commands
+	BeforeTool  *bool `json:"beforeTool,omitempty"`  // tool permission, param validation
+	AfterTool   *bool `json:"afterTool,omitempty"`   // result review, secret leakage
+	AfterAgent  *bool `json:"afterAgent,omitempty"`  // audit logging
+}
+
+// SandboxValidatorConfig for command validation.
+type SandboxValidatorConfig struct {
+	BanCommands    []string `json:"banCommands,omitempty"`
+	BanArguments   []string `json:"banArguments,omitempty"`
+	BanFragments   []string `json:"banFragments,omitempty"`
+	MaxLength      *int     `json:"maxLength,omitempty"`
+	SecretPatterns []string `json:"secretPatterns,omitempty"` // custom regex for secret leakage detection (built-in patterns also applied)
 }
 
 // McpConfig holds MCP (Model Context Protocol) server connections for agent tools.
@@ -61,6 +100,10 @@ type McpConfig struct {
 	// Servers maps server key (e.g. "prometheus", "elasticsearch") to connection config.
 	// Keys are used as tool name prefix when multiple servers expose same tool names.
 	Servers map[string]McpServerEntry `json:"servers,omitempty"`
+	// TimeoutSeconds overrides the default MCP request timeout (in seconds) for all servers.
+	TimeoutSeconds *int `json:"timeoutSeconds,omitempty"`
+	// ToolTimeoutSeconds overrides the default MCP tool invocation timeout (in seconds) for all servers.
+	ToolTimeoutSeconds *int `json:"toolTimeoutSeconds,omitempty"`
 }
 
 // McpServerEntry configures one MCP server connection. Exactly one of the following applies:

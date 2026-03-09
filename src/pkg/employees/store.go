@@ -11,34 +11,15 @@ import (
 	"github.com/openocta/openocta/pkg/paths"
 )
 
-// ListSummaries 返回所有内置与用户自建数字员工的概要信息。
+// ListSummaries 返回所有数字员工的概要信息（内置 + 用户自建）。
 // env 通常为 os.Getenv。
 func ListSummaries(env func(string) string) ([]Summary, error) {
 	var out []Summary
 
-	//// 1. 内置数字员工：来自 embed/agents_skills 下的一级子目录。
-	//if agentsFS, err := embed.AgentsSkillsFS(); err == nil {
-	//	if entries, err := fs.ReadDir(agentsFS, "."); err == nil {
-	//		for _, e := range entries {
-	//			if !e.IsDir() {
-	//				continue
-	//			}
-	//			id := strings.TrimSpace(e.Name())
-	//			if id == "" || strings.HasPrefix(id, ".") {
-	//				continue
-	//			}
-	//			out = append(out, Summary{
-	//				ID:          id,
-	//				Name:        id,
-	//				Description: "",
-	//				Builtin:     true,
-	//				SkillIDs:    nil,
-	//			})
-	//		}
-	//	}
-	//}
+	// 先加载内置员工（Builtin=true），保证列表中内置排在前面；
+	// 若用户在 ~/.openocta/employees 下创建了同 ID 的自建员工，则会覆盖内置条目的展示与行为。
+	builtinIndexByID := make(map[string]int)
 
-	// 2. 用户自建数字员工：~/.openocta/employees/<id>/manifest.json
 	root := ResolveEmployeesDir(env)
 	if fi, err := os.Stat(root); err == nil && fi.IsDir() {
 		entries, err := os.ReadDir(root)
@@ -68,7 +49,7 @@ func ListSummaries(env func(string) string) ([]Summary, error) {
 					}
 				}
 				sort.Strings(mcpKeys)
-				out = append(out, Summary{
+				s := Summary{
 					ID:            m.ID,
 					Name:          coalesce(m.Name, m.ID),
 					Description:   m.Description,
@@ -79,55 +60,41 @@ func ListSummaries(env func(string) string) ([]Summary, error) {
 					SkillIDs:      append([]string(nil), m.SkillIDs...),
 					SkillNames:    skillNames,
 					McpServerKeys: mcpKeys,
-				})
+				}
+				if idx, ok := builtinIndexByID[s.ID]; ok {
+					out[idx] = s
+					continue
+				}
+				out = append(out, s)
 			}
 		}
 	}
 
-	// 稳定排序，内置在前、再按 ID 排序。
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Builtin != out[j].Builtin {
-			return out[i].Builtin && !out[j].Builtin
-		}
-		return out[i].ID < out[j].ID
-	})
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
 
-// LoadManifest 加载指定 ID 的数字员工 manifest。
-// 若不存在用户 manifest 而 embed 中存在同名目录，则返回合成的内置 manifest。
+// LoadManifest 从 ~/.openocta/employees/<id>/manifest.json 加载指定 ID 的数字员工 manifest；
+// 若不存在则回退到 embed/employees 中的内置 manifest。
 func LoadManifest(id string, env func(string) string) (*Manifest, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, os.ErrNotExist
 	}
-
-	// 用户 manifest 优先
 	root := ResolveEmployeesDir(env)
 	manifestPath := filepath.Join(root, id, "manifest.json")
-	if data, err := os.ReadFile(manifestPath); err == nil {
-		var m Manifest
-		if err := json.Unmarshal(data, &m); err == nil {
-			if m.ID == "" {
-				m.ID = id
-			}
-			return &m, nil
-		}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, os.ErrNotExist
 	}
-
-	// 退回到内置：检查 embed/agents_skills/<id>
-	//if agentsFS, err := embed.AgentsSkillsFS(); err == nil {
-	//	if fi, err := fs.Stat(agentsFS, id); err == nil && fi.IsDir() {
-	//		return &Manifest{
-	//			ID:          id,
-	//			Name:        id,
-	//			Description: "",
-	//			Builtin:     true,
-	//		}, nil
-	//	}
-	//}
-
-	return nil, os.ErrNotExist
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, os.ErrNotExist
+	}
+	if m.ID == "" {
+		m.ID = id
+	}
+	return &m, nil
 }
 
 // SaveManifest 在 ~/.openocta/employees/<id>/ 下写入 manifest.json。

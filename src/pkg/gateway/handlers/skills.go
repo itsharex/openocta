@@ -982,6 +982,123 @@ func SkillsStatusHandler(opts HandlerOpts) error {
 	return nil
 }
 
+// SkillsGetDocParams holds parameters for skills.getDoc.
+type SkillsGetDocParams struct {
+	SkillKey string
+	AgentID  string
+}
+
+func parseSkillsGetDocParams(params map[string]interface{}) (*SkillsGetDocParams, error) {
+	p := &SkillsGetDocParams{}
+	skillKey, ok := params["skillKey"].(string)
+	if !ok || strings.TrimSpace(skillKey) == "" {
+		return nil, fmt.Errorf("skillKey is required")
+	}
+	p.SkillKey = strings.TrimSpace(skillKey)
+	if agentID, ok := params["agentId"].(string); ok {
+		p.AgentID = strings.TrimSpace(agentID)
+	}
+	return p, nil
+}
+
+// SkillsGetDocHandler handles "skills.getDoc". Returns the SKILL.md content for the given skill
+// (from disk or embedded). Used by the UI to show skill documentation in the detail modal.
+func SkillsGetDocHandler(opts HandlerOpts) error {
+	params, err := parseSkillsGetDocParams(opts.Params)
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: fmt.Sprintf("invalid skills.getDoc params: %v", err),
+		}, nil)
+		return nil
+	}
+
+	env := func(k string) string { return os.Getenv(k) }
+	cfg, err := config.Load(env)
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: "failed to load config: " + err.Error(),
+		}, nil)
+		return nil
+	}
+
+	agentID := params.AgentID
+	if agentID == "" {
+		agentID = resolveDefaultAgentID(cfg)
+	} else {
+		agentID = normalizeAgentID(agentID)
+		knownAgents := listAgentIDs(cfg)
+		found := false
+		for _, id := range knownAgents {
+			if id == agentID {
+				found = true
+				break
+			}
+		}
+		if !found && params.AgentID != "" {
+			opts.Respond(false, nil, &protocol.ErrorShape{
+				Code:    protocol.ErrCodeInvalidRequest,
+				Message: fmt.Sprintf("unknown agent id \"%s\"", params.AgentID),
+			}, nil)
+			return nil
+		}
+	}
+
+	workspaceDir := resolveAgentWorkspaceDir(cfg, agentID, env)
+	optsLoader := &agentSkills.LoadOptions{
+		Config:           cfg,
+		ManagedSkillsDir: "",
+		BundledSkillsDir: "",
+	}
+	entries, err := agentSkills.LoadWorkspaceEntries(workspaceDir, optsLoader)
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: "failed to load skills: " + err.Error(),
+		}, nil)
+		return nil
+	}
+
+	skillKey := params.SkillKey
+	var content []byte
+	for _, e := range entries {
+		match := e.Name == skillKey
+		if !match && e.Metadata != nil && e.Metadata.SkillKey != "" {
+			match = e.Metadata.SkillKey == skillKey
+		}
+		if !match {
+			continue
+		}
+		if len(e.EmbeddedContent) > 0 {
+			content = e.EmbeddedContent
+			break
+		}
+		content, err = os.ReadFile(e.FilePath)
+		if err != nil {
+			opts.Respond(false, nil, &protocol.ErrorShape{
+				Code:    protocol.ErrCodeInternal,
+				Message: "failed to read skill file: " + err.Error(),
+			}, nil)
+			return nil
+		}
+		break
+	}
+
+	if content == nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: fmt.Sprintf("skill not found: %s", skillKey),
+		}, nil)
+		return nil
+	}
+
+	opts.Respond(true, map[string]interface{}{
+		"content": string(content),
+	}, nil, nil)
+	return nil
+}
+
 // SkillsBinsHandler handles "skills.bins".
 func SkillsBinsHandler(opts HandlerOpts) error {
 	// Load config

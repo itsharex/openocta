@@ -156,7 +156,7 @@ MCP 配置样例,允许配置多个：
 数字员工会话的 Skills 按以下顺序加载并合并（后加载覆盖先加载）：
 
 1. **Workspace Skills**（基础池，供 manifest.skillIds 过滤）
-2. **embed/agents_skills/<员工ID>**（内置员工技能，若构建时已嵌入）
+2. **embed/employee_skills/<员工ID>**（内置员工技能，若构建时已嵌入）
 3. **~/.openocta/employees/<员工ID>/skills**（旧路径，兼容）
 4. **~/.openocta/employee_skills/<员工ID>**（新路径，上传的专属技能）
 

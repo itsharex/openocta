@@ -45,6 +45,7 @@ import { loadPresence } from "./controllers/presence.ts";
 import { deleteSession, deleteSessions, loadSessions, patchSession } from "./controllers/sessions.ts";
 import {
   deleteSkill,
+  loadSkillDoc,
   installSkill,
   loadSkills,
   saveSkillApiKey,
@@ -54,7 +55,7 @@ import {
 } from "./controllers/skills.ts";
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons } from "./icons.ts";
-import { normalizeBasePath, getTabGroups, subtitleForTab, titleForTab } from "./navigation.ts";
+import { normalizeBasePath, getTabGroups, pathForTab, subtitleForTab, titleForTab } from "./navigation.ts";
 
 // Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
 let usageDateDebounceTimeout: number | null = null;
@@ -91,6 +92,7 @@ import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderMcp } from "./views/mcp.ts";
 import { renderLlmTrace } from "./views/llm-trace.ts";
+import { renderSandbox } from "./views/sandbox.ts";
 import { renderModels } from "./views/models.ts";
 import { renderUsage } from "./views/usage.ts";
 import {
@@ -120,6 +122,18 @@ import {
   handleLlmTraceToggleEnabled,
   handleLlmTraceView,
 } from "./app-llm-trace.ts";
+import {
+  syncSandboxFromConfig,
+  handleSandboxToggleEnabled,
+  handleSandboxPatch,
+  handleSandboxSave,
+} from "./app-sandbox.ts";
+import { getSandboxFromConfig } from "./controllers/sandbox.ts";
+import {
+  loadApprovalsList,
+  approveApproval,
+  denyApproval,
+} from "./controllers/approvals.ts";
 import {
   handleModelsAddProvider,
   handleModelsAddProviderModalClose,
@@ -277,11 +291,10 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "agentSwarm" ? "content--agent-swarm" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""}">
         <section class="content-header">
           <div>
             ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
-            ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
           </div>
           <div class="page-meta">
             ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
@@ -1138,7 +1151,18 @@ export function renderApp(state: AppViewState) {
                   installSkill(state, skillKey, name, installId),
                 onDelete: (skillKey) => deleteSkill(state, skillKey),
                 selectedSkillKey: state.skillsSelectedSkillKey,
-                onSkillDetailClick: (key) => (state.skillsSelectedSkillKey = key),
+                skillDocContent: state.skillsSkillDocContent,
+                skillDocLoading: state.skillsSkillDocLoading,
+                skillDocError: state.skillsSkillDocError,
+                onSkillDetailClick: (key) => {
+                  state.skillsSelectedSkillKey = key;
+                  if (key) {
+                    loadSkillDoc(state, key);
+                  } else {
+                    state.skillsSkillDocContent = null;
+                    state.skillsSkillDocError = null;
+                  }
+                },
               })
             : nothing
         }
@@ -1204,6 +1228,39 @@ export function renderApp(state: AppViewState) {
                 onSearchChange: (value) => handleLlmTraceSearchChange(state, value),
                 onToggleEnabled: () => handleLlmTraceToggleEnabled(state),
                 onView: (sessionId) => handleLlmTraceView(state, sessionId),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "sandbox"
+            ? renderSandbox({
+                sandbox:
+                  state.sandboxForm ??
+                  getSandboxFromConfig(state) ??
+                  {},
+                saving: state.configSaving,
+                onToggleEnabled: () => handleSandboxToggleEnabled(state),
+                onPatch: (path, value) => {
+                  if (!state.sandboxForm) {
+                    state.sandboxForm = syncSandboxFromConfig(state) ?? {};
+                  }
+                  handleSandboxPatch(state, state.sandboxForm as Record<string, unknown>, path, value);
+                },
+                onSave: () =>
+                  handleSandboxSave(
+                    state,
+                    state.sandboxForm ?? getSandboxFromConfig(state) ?? {},
+                  ),
+                approvalsLoading: state.approvalsLoading,
+                approvalsResult: state.approvalsResult,
+                approvalsError: state.approvalsError,
+                onApprovalsRefresh: () => loadApprovalsList(state),
+                onApprove: (requestId, ttlSeconds) =>
+                  approveApproval(state, requestId, "ui", ttlSeconds),
+                onDeny: (requestId, reason) =>
+                  denyApproval(state, requestId, "ui", reason),
+                pathForTab: (tab) => pathForTab(tab, state.basePath),
               })
             : nothing
         }
@@ -1372,6 +1429,8 @@ export function renderApp(state: AppViewState) {
                 loading: state.digitalEmployeesLoading,
                 employees: state.digitalEmployees,
                 error: state.digitalEmployeesError,
+                filter: state.digitalEmployeesFilter,
+                viewMode: state.digitalEmployeesViewMode,
                 onRefresh: () => loadDigitalEmployees(state),
                 createModalOpen: state.digitalEmployeeCreateModalOpen,
                 createName: state.digitalEmployeeCreateName,
@@ -1381,6 +1440,12 @@ export function renderApp(state: AppViewState) {
                 createBusy: state.digitalEmployeeCreateBusy,
                 advancedOpen: state.digitalEmployeeAdvancedOpen,
                 mcpJson: state.digitalEmployeeCreateMcpJson,
+                onFilterChange: (next) => {
+                  state.digitalEmployeesFilter = next;
+                },
+                onViewModeChange: (mode) => {
+                  state.digitalEmployeesViewMode = mode;
+                },
                 onMcpJsonChange: (value) => {
                   state.digitalEmployeeCreateMcpJson = value;
                 },
@@ -1542,12 +1607,6 @@ export function renderApp(state: AppViewState) {
                   }
                 },
               })
-            : nothing
-        }
-
-        ${
-          state.tab === "agentSwarm"
-            ? renderAgentSwarm()
             : nothing
         }
 
