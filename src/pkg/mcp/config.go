@@ -3,7 +3,6 @@
 package mcp
 
 import (
-	"os"
 	"strings"
 
 	"github.com/openocta/openocta/pkg/config"
@@ -52,12 +51,16 @@ func entryToSpec(name string, e *config.McpServerEntry) string {
 	if strings.TrimSpace(e.Command) != "" {
 		cmd := strings.TrimSpace(e.Command)
 		args := strings.TrimSpace(strings.Join(e.Args, " "))
-		envPrefix := buildEnvPrefixForSpec(e.Env, cmd)
 		base := cmd
 		if args != "" {
 			base = cmd + " " + args
 		}
-		return "stdio://" + envPrefix + base
+		// 根据文档约定，这里仅生成 stdio://<command> <args...>，不在 spec 中拼接 env。
+		// env 由 acp/mcp.Manager 在启动进程时负责注入；agentsdk-go 的 MCPServers 目前
+		// 也不原生支持从 spec 里拆分 env，因此避免构造诸如
+		//   stdio://env VAR=val npx ...
+		// 这种容易出错的 command。
+		return "stdio://" + base
 	}
 	// 2) URL (SSE/HTTP)
 	if strings.TrimSpace(e.URL) != "" {
@@ -73,38 +76,16 @@ func entryToSpec(name string, e *config.McpServerEntry) string {
 	return ""
 }
 
-// buildEnvPrefixForSpec 将 env 转为可嵌入 stdio spec 的前缀。
-// agentsdk-go 的 stdio spec 不支持单独传 env，故用 env VAR=val command 形式注入。
-// 展开 $VAR 引用。注意：值含空格时可能被 strings.Fields 拆分，建议用 URL 编码等避免。
-func buildEnvPrefixForSpec(env map[string]string, command string) string {
-	if len(env) == 0 {
-		return ""
-	}
-	var parts []string
-	for k, v := range env {
-		k = strings.TrimSpace(k)
-		if k == "" {
-			continue
-		}
-		expanded := os.Expand(v, func(name string) string { return os.Getenv(name) })
-		parts = append(parts, k+"="+expanded)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	// 使用 npx 时添加 NPM 静默配置，减少 npm 输出污染 stdio 通道（见 MCP servers #2895）
-	if strings.Contains(strings.ToLower(command), "npx") {
-		parts = append(parts, "NPM_CONFIG_LOGLEVEL=error", "NPM_CONFIG_AUDIT=false")
-	}
-	return "env " + strings.Join(parts, " ") + " "
-}
-
 func serviceToStdioSpec(service, backendURL string) string {
 	switch service {
 	case "prometheus":
-		// 必须注入 PROMETHEUS_URL，否则 prometheus-mcp 无法连接后端
-		envPrefix := buildEnvPrefixForSpec(map[string]string{"PROMETHEUS_URL": backendURL}, "npx")
-		return "stdio://" + envPrefix + "npx -y prometheus-mcp-server"
+		// 根据文档约定，Service 模式仅在 spec 中声明 stdio 命令：
+		//   stdio://npx -y prometheus-mcp-server
+		// 实际连接 Prometheus 时所需的 PROMETHEUS_URL 等环境变量，
+		// 由 acp/mcp.Manager.resolveServiceServer 在启动进程时注入，
+		// 避免把 env 拼进 spec 造成命令解析错误。
+		_ = backendURL // 当前 spec 构建阶段不在字符串中使用该 URL。
+		return "stdio://npx -y prometheus-mcp-server"
 	default:
 		return ""
 	}

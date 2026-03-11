@@ -96,7 +96,9 @@ export class GatewayBrowserClient {
     }
     this.ws = new WebSocket(this.opts.url);
     this.ws.addEventListener("open", () => this.queueConnect());
-    this.ws.addEventListener("message", (ev) => this.handleMessage(String(ev.data ?? "")));
+    this.ws.addEventListener("message", (ev) => {
+      void this.handleWsMessage(ev.data);
+    });
     this.ws.addEventListener("close", (ev) => {
       const reason = String(ev.reason ?? "");
       this.ws = null;
@@ -107,6 +109,32 @@ export class GatewayBrowserClient {
     this.ws.addEventListener("error", () => {
       // ignored; close handler will fire
     });
+  }
+
+  private async handleWsMessage(data: unknown) {
+    try {
+      if (typeof data === "string") {
+        this.handleMessage(data);
+        return;
+      }
+      // Some browsers / servers may deliver text frames as Blob/ArrayBuffer.
+      if (typeof Blob !== "undefined" && data instanceof Blob) {
+        this.handleMessage(await data.text());
+        return;
+      }
+      if (data instanceof ArrayBuffer) {
+        this.handleMessage(new TextDecoder().decode(data));
+        return;
+      }
+      if (ArrayBuffer.isView(data)) {
+        const view = data as ArrayBufferView;
+        this.handleMessage(new TextDecoder().decode(view.buffer.slice(0)));
+        return;
+      }
+      this.handleMessage(String(data ?? ""));
+    } catch {
+      // Ignore malformed frames; connection will recover via reconnect/backoff.
+    }
   }
 
   private scheduleReconnect() {
