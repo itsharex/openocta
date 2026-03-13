@@ -6,20 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"io/fs"
-	"log"
-	"log/slog"
-	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/cexll/agentsdk-go/pkg/middleware"
-	"github.com/cexll/agentsdk-go/pkg/tool"
 	"github.com/google/uuid"
 	"github.com/openocta/openocta/embed"
 	"github.com/openocta/openocta/pkg/acp/mcp"
@@ -41,6 +28,19 @@ import (
 	initpkg "github.com/openocta/openocta/pkg/init"
 	"github.com/openocta/openocta/pkg/outbound"
 	"github.com/openocta/openocta/pkg/paths"
+	"io"
+	"io/fs"
+	"log"
+	"log/slog"
+	"net/http"
+	"net/http/pprof"
+	_ "net/http/pprof"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Server is the Gateway HTTP server.
@@ -120,15 +120,15 @@ func NewServer(addr string, version string) *Server {
 	}
 
 	// MCP: connect to configured MCP servers and expose tools to the agent
-	var mcpManager *mcp.Manager
-	if cfg != nil && cfg.Mcp != nil && len(cfg.Mcp.Servers) > 0 {
-		mgr, err := mcp.NewManager(context.Background(), cfg)
-		if err != nil {
-			slog.Warn("mcp: failed to start MCP manager, agent will run without MCP tools", "error", err)
-		} else {
-			mcpManager = mgr
-		}
-	}
+	//var mcpManager *mcp.Manager
+	//if cfg != nil && cfg.Mcp != nil && len(cfg.Mcp.Servers) > 0 {
+	//	mgr, err := mcp.NewManager(context.Background(), cfg)
+	//	if err != nil {
+	//		slog.Warn("mcp: failed to start MCP manager, agent will run without MCP tools", "error", err)
+	//	} else {
+	//		mcpManager = mgr
+	//	}
+	//}
 	ctx := &handlers.Context{
 		Version:             version,
 		GetStatusSummary:    func() (interface{}, error) { return handlers.DefaultStatusSummary(), nil },
@@ -164,12 +164,12 @@ func NewServer(addr string, version string) *Server {
 			// For now, just broadcast to all clients
 			hub.Broadcast(event, payload, nil)
 		},
-		MCPTools: func(ctx context.Context) ([]tool.Tool, error) {
-			if mcpManager == nil {
-				return nil, nil
-			}
-			return mcpManager.Tools(ctx)
-		},
+		//MCPTools: func(ctx context.Context) ([]tool.Tool, error) {
+		//	if mcpManager == nil {
+		//		return nil, nil
+		//	}
+		//	return mcpManager.Tools(ctx)
+		//},
 	}
 
 	// Update hub with context and create registry
@@ -301,12 +301,12 @@ func NewServer(addr string, version string) *Server {
 	}()
 
 	s := &Server{
-		addr:       addr,
-		version:    version,
-		mux:        mux,
-		hub:        hub,
-		ctx:        ctx,
-		mcpManager: mcpManager,
+		addr:    addr,
+		version: version,
+		mux:     mux,
+		hub:     hub,
+		ctx:     ctx,
+		//mcpManager: mcpManager,
 	}
 	s.registerRoutes()
 	return s
@@ -360,6 +360,13 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /ws", s.handleWSUpgrade)
 	s.mux.HandleFunc("POST /hooks/", s.handleHooks)
 	s.mux.HandleFunc("POST /hooks", s.handleHooks)
+	s.mux.HandleFunc("GET /debug/pprof/", pprof.Index)
+
+	// 为了支持 cmdline 和 profile 等特定功能，建议也显式注册这几个（Index 里其实包含了大部分，但显式注册更稳妥）
+	s.mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+	s.mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+	s.mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+	s.mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 }
 
 // resolveDistDirFile resolves the frontend dist directory from the file system.

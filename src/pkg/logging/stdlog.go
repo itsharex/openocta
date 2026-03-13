@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"io"
 	"log"
 	"strings"
 )
@@ -31,5 +30,5 @@ func (w *stdLogWriter) Write(p []byte) (n int, err error) {
 // into the global logger at the given level. Should be called after InitGlobal.
 func RedirectStdLog(level int) {
 	log.SetFlags(0)
-	log.SetOutput(io.Discard)
+	//log.SetOutput(io.Discard)
 }

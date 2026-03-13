@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -57,6 +58,7 @@ func ValidateCommandWithConfig(command string, cfg *config.SandboxValidatorConfi
 				continue
 			}
 			if strings.Contains(lower, strings.ToLower(frag)) {
+				log.Println("xxxxxxxxxxxxxx")
 				return fmt.Errorf("command fragment %q is banned", frag)
 			}
 		}

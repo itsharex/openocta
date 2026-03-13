@@ -54,14 +54,14 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 		Tools:        tools,
 		ProjectRoot:  projectRoot,
 	}
-	if len(opts.MCPServers) > 0 {
-		apiOpts.MCPServers = opts.MCPServers
-		if opts.Config != nil && opts.Config.Mcp != nil {
-			if mcpOverrides := buildMCPConfigOverrides(opts.Config.Mcp); mcpOverrides != nil {
-				apiOpts.SettingsOverrides.MCP = mcpOverrides
-			}
-		}
-	}
+	//if len(opts.MCPServers) > 0 {
+	//	apiOpts.MCPServers = opts.MCPServers
+	//	if opts.Config != nil && opts.Config.Mcp != nil {
+	//		if mcpOverrides := buildMCPConfigOverrides(opts.Config.Mcp); mcpOverrides != nil {
+	//			apiOpts.SettingsOverrides.MCP = mcpOverrides
+	//		}
+	//	}
+	//}
 	apiOpts.TokenTracking = opts.TokenTracking
 	if apiOpts.TokenTracking && opts.TokenCallback != nil {
 		apiOpts.TokenCallback = opts.TokenCallback
@@ -135,6 +135,12 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 		apiOpts.SettingsOverrides.Sandbox = &agentsdkConfg.SandboxConfig{
 			Enabled:                  &enableSandbox,
 			AutoAllowBashIfSandboxed: &enableSandbox, // enableSandbox 为true之后，默认允许命令在沙箱内运行且符合沙箱规则，直接执行，无需用户确认
+			AllowUnsandboxedCommands: &enableSandbox,
+			ExcludedCommands:         []string{},
+		}
+	} else {
+		apiOpts.SettingsOverrides.Sandbox = &agentsdkConfg.SandboxConfig{
+			Enabled: &enableSandbox,
 		}
 	}
 
@@ -168,11 +174,27 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 				}
 				// 可选：配置 PermissionRequestHandler 用于自定义审批处理
 				apiOpts.PermissionRequestHandler = func(ctx context.Context, req api.PermissionRequest) (events.PermissionDecisionType, error) {
-					// 自定义处理逻辑
-					// 返回 PermissionAllow 表示允许
-					// 返回 PermissionDeny 表示拒绝
-					// 返回 PermissionAsk 表示需要人工审批（会进入 ApprovalQueue）
-					return events.PermissionAsk, nil
+					// 如果没有审批记录，默认进入人工审批
+					if req.Approval == nil {
+						return events.PermissionAsk, nil
+					}
+
+					// 如果审批已过期，则再次进入人工审批
+					if req.Approval.IsExpired(time.Now()) {
+						return events.PermissionAsk, nil
+					}
+					// 根据审批状态直接返回权限决策
+					switch string(req.Approval.State) {
+					case "approved":
+						return events.PermissionAllow, nil
+					case "denied":
+						return events.PermissionDeny, nil
+					case "pending":
+						return events.PermissionAsk, nil
+					default:
+						// 未知状态，出于安全考虑，仍然要求人工审批
+						return events.PermissionAsk, nil
+					}
 				}
 			} else {
 				log.Errorf("Warning: failed to create approval queue: %v", err)
