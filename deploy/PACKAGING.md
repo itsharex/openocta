@@ -35,7 +35,8 @@
 
 - **Wails CLI**：`go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 - **macOS**：Xcode Command Line Tools、`hdiutil`（系统自带）
-- **Windows**：需在 **Windows 环境** 下执行 `wails build`；NSIS 由 Wails 自动处理（含 WebView2 运行时检测）
+- **Windows**：需在 **Windows 环境** 下执行 `wails build`。
+- **Windows 安装器（NSIS）**：需安装 [NSIS](https://nsis.sourceforge.io/Download)。Wails 通过 `makensis.exe` 打安装包；若找不到会**静默跳过**，只产出 `OpenOcta.exe`。在 **Git Bash** 下若已装 NSIS 仍报 `makensis not found`，多半是 MSYS 传给 Windows 进程的 `PATH` 格式问题——请使用本仓库的 `./build.sh wails-nsis`（脚本会用 `cygpath` 把 `PATH` 转成 Windows 分号列表并把 NSIS 目录提前），或将 `C:\Program Files (x86)\NSIS` 加入**系统/用户环境变量 PATH** 后用 **cmd / PowerShell** 执行 `wails build`。
 
 ### 3. 版本号
 
@@ -50,7 +51,7 @@
 
 ### 3.1 资源嵌入顺序
 
-Wails 构建前会执行 `make embed`（由 `wails.json` 的 `preBuildHooks` 触发）：
+Wails 构建前会执行 `make embed`（由 `wails.json` 的 `preBuildHooks` 触发；hook 运行在 **`src/build/bin`**，故使用 `make -C ../../.. embed` 回到仓库根目录再执行）：
 
 ```
 make embed
@@ -105,19 +106,18 @@ make wails-dmg
 
 #### 方式一：build.sh wails-nsis（推荐）
 
+在 **Git Bash 或 MSYS2** 下执行（勿在纯 WSL Linux 内执行本命令）：
+
 ```bash
 ./build.sh wails-nsis
 ```
 
-等价于：
+或 `make wails-nsis`（即调用上述脚本）。
 
-```bash
-make embed
-cd src && wails build -platform windows/amd64 -nsis -skipbindings && cd ..
-```
+脚本会：检测/补全 **NSIS `makensis`** → `make embed` → `wails build -platform windows/amd64 -nsis -skipbindings` → 校验已生成 `src/build/bin/*-installer.exe` 并复制 `*.exe` 到 `dist/`。
 
-- 使用 Wails 内置 NSIS 模板（`src/build/windows/installer/project.nsi`）
-- 产物：`src/build/bin/OpenOcta-amd64-installer.exe`
+- 使用 Wails / 项目 NSIS 模板（`src/build/windows/installer/project.nsi`）
+- 产物名由模板定义，一般为 **`src/build/bin/OpenOcta-amd64-installer.exe`**
 - 安装器会检测/安装 WebView2 运行时
 
 #### 方式二：仅构建 .exe（不生成安装器）
@@ -206,11 +206,15 @@ GoReleaser（`.goreleaser.yaml`）仅构建 **Linux** 服务端二进制；Windo
 
 确保 `make embed` 已成功执行（或由 `make wails` 自动触发），且 `src/embed/frontend` 存在。
 
+### Q: 加了 `-nsis` 但只有 OpenOcta.exe，没有 `*-installer.exe`？
+
+Wails 依赖系统命令 **`makensis`**。未安装 NSIS 或未加入 PATH 时，Wails 只会打印 *Warning: makensis not found* 并跳过安装包。请安装 NSIS 后重试，或使用 `./build.sh wails-nsis`（会事先检查并在常见路径下尝试找到 `makensis.exe`）。
+
 ### Q: Windows 安装器需要用户安装 WebView2 吗？
 
 Wails 内置 NSIS 会检测 WebView2；若未安装，安装器会引导用户安装。
 
 ### Q: 如何修改应用图标？
 
-- macOS：替换 `ui/public/favicon.ico`、`favicon-32.png`，Makefile 的 `wails` 目标会复制到 `src/build/`
-- Windows：在 `wails.json` 或 Wails 构建配置中指定 icon 路径
+- **Windows 桌面 / 安装向导**：品牌图稿为 `imgs/openocta_logo.png`。构建时 `make prepare-wails-icons` 会将其缩小为 `imgs/openocta_logo_wails.png`（最长边 256，满足 ICO 限制），再生成 `src/build/appicon.ico`（嵌入 `OpenOcta.exe`）与 `src/build/windows/icon.ico`（NSIS `MUI_ICON` / 卸载向导）。更新 logo 后：在 macOS 上执行一次 `make imgs/openocta_logo_wails.png` 以刷新缩放图并提交；其他平台若无 `sips` 需依赖仓库中已提交的 `imgs/openocta_logo_wails.png`。
+- **macOS**：仍可替换 `ui/public/favicon.ico`、`favicon-32.png` 等用于 Web；若需与品牌统一，可自行将同一套 ICO/ICNS 接到 `deploy/macos` 流程。

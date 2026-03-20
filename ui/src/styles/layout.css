@@ -381,15 +381,20 @@
   height: 12px;
 }
 
-.topbar-status .pill a.topbar-link {
+.topbar-status .pill .topbar-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: inherit;
   text-decoration: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
 }
 
-.topbar-status .pill a.topbar-link:hover {
+.topbar-status .pill .topbar-link:hover {
   text-decoration: underline;
 }
 
@@ -627,6 +632,15 @@
     border-color var(--duration-fast) ease,
     background var(--duration-fast) ease,
     color var(--duration-fast) ease;
+}
+
+/* 桌面 WebView 上 http(s) 的 <a> 可能与 openExternal 并行导航；侧栏外链使用 button.nav-item */
+button.nav-item {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
 }
 
 .nav-item__icon {

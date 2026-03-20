@@ -7,7 +7,7 @@ export function getTabGroups() {
     { label: t("tabGroupChat"), tabs: ["chat", "digitalEmployee"] as const },
     { label: t("tabGroupControl"), tabs: ["overview", "cron", "cronHistory"] as const },
     { label: t("tabGroupAgent"), tabs: ["skills", "mcp"] as const },
-    { label: t("tabGroupSettings"), tabs: ["config"] as const },
+    { label: t("tabGroupSettings"), tabs: ["config", "envVars", "logs"] as const },
   ];
 }
 

@@ -1,7 +1,7 @@
 # OpenOcta 构建
 # 构建顺序：前端 -> 复制 embed 资源 -> 后端
 
-.PHONY: ui embed go launcher build clean release snapshot docker run run-ui wails wails-dmg wails-dev
+.PHONY: ui embed go launcher build clean release snapshot docker run run-ui prepare-wails-icons wails wails-nsis wails-dmg wails-dev
 
 # 构建前端（输出到 src/embed/frontend）
 ui:
@@ -49,12 +49,27 @@ run: build
 run-ui:
 	cd ui && npm run dev
 
+# 将横版 logo 缩放到最长边 ≤256（ICO 单字节尺寸限制）。有 macOS sips 时自动更新；否则依赖已提交的 png。
+imgs/openocta_logo_wails.png: imgs/openocta_logo.png
+	@if command -v sips >/dev/null 2>&1; then \
+		sips -Z 256 "$(CURDIR)/imgs/openocta_logo.png" --out "$(CURDIR)/imgs/openocta_logo_wails.png"; \
+	else \
+		test -f "$(CURDIR)/imgs/openocta_logo_wails.png" || (echo "ERROR: 缺少 imgs/openocta_logo_wails.png。请在 macOS 执行: sips -Z 256 imgs/openocta_logo.png --out imgs/openocta_logo_wails.png"; exit 1); \
+	fi
+
+# OpenOcta 品牌：生成 Wails appicon.ico 与 NSIS 使用的 src/build/windows/icon.ico
+prepare-wails-icons: imgs/openocta_logo_wails.png
+	@mkdir -p src/build src/build/windows
+	node "$(CURDIR)/scripts/png-to-ico.mjs" "$(CURDIR)/imgs/openocta_logo_wails.png" "$(CURDIR)/src/build/appicon.ico"
+	@cp "$(CURDIR)/src/build/appicon.ico" "$(CURDIR)/src/build/windows/icon.ico"
+
 # Wails 桌面应用（单二进制，内嵌 Gateway，端口 18900）
-wails: embed
-	@mkdir -p src/build
-	@cp ui/public/favicon.ico src/build/appicon.ico 2>/dev/null || true
-	@cp ui/public/favicon-32.png src/build/appicon.png 2>/dev/null || true
+wails: embed prepare-wails-icons
 	cd src && wails build -skipbindings
+
+# Windows NSIS 安装器（需在 Windows + NSIS 环境；逻辑见 ./build.sh wails-nsis）
+wails-nsis:
+	./build.sh wails-nsis
 
 # Wails + 打包 .dmg（macOS），产物在 dist/OpenOcta.app 和 dist/OpenOcta-<version>.dmg
 wails-dmg: wails

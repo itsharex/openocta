@@ -229,6 +229,8 @@ export function renderApp(state: AppViewState) {
   const isConfigArea =
     state.tab === "config" ||
     state.tab === "envVars" ||
+    state.tab === "debug" ||
+    state.tab === "logs" ||
     state.tab === "models" ||
     state.tab === "overview" ||
     state.tab === "channels" ||
@@ -280,21 +282,18 @@ export function renderApp(state: AppViewState) {
             if ((item as any).href) {
               const extHref = String((item as any).href);
               return html`
-                <a
+                <button
+                  type="button"
                   class="top-tab top-tab--link"
-                  href=${extHref}
-                  rel="noreferrer"
-                  @click=${(e: Event) => {
-                    e.preventDefault();
+                  @click=${() =>
                     void openExternalUrl(extHref, {
                       gatewayHost: state.settings.gatewayUrl,
                       gatewayToken: state.settings.token,
-                    });
-                  }}
+                    })}
                 >
                   ${iconEl}
                   ${(item as any).label}
-                </a>
+                </button>
               `;
             }
             const active =
@@ -321,36 +320,30 @@ export function renderApp(state: AppViewState) {
             <span class="mono">${state.configSchemaVersion ?? "---"}</span>
           </div>
           <div class="pill">
-            <a
-              href="https://github.com/openocta/openocta.git"
-              rel="noreferrer"
+            <button
+              type="button"
               title="GitHub 仓库（新窗口打开）"
               class="topbar-link"
-              @click=${(e: Event) => {
-                e.preventDefault();
+              @click=${() =>
                 void openExternalUrl("https://github.com/openocta/openocta.git", {
                   gatewayHost: state.settings.gatewayUrl,
                   gatewayToken: state.settings.token,
-                });
-              }}
+                })}
             >
               <span class="topbar-link__icon" aria-hidden="true">${icons.github}</span>
               <span>GitHub</span>
-            </a>
+            </button>
           </div>
           <div class="pill">
-            <a
-              href="https://www.openocta.com/"
-              rel="noreferrer"
+            <button
+              type="button"
               title="OpenOcta 官网（新窗口打开）"
               class="topbar-link"
-              @click=${(e: Event) => {
-                e.preventDefault();
+              @click=${() =>
                 void openExternalUrl("https://www.openocta.com/", {
                   gatewayHost: state.settings.gatewayUrl,
                   gatewayToken: state.settings.token,
-                });
-              }}
+                })}
             >
               <img
                 src=${basePath ? `${basePath}/favicon.ico` : "/favicon.ico"}
@@ -360,7 +353,7 @@ export function renderApp(state: AppViewState) {
                 height="16"
               />
               <span>官网</span>
-            </a>
+            </button>
           </div>
           <div class="pill">
             <span class="statusDot ${state.connected ? "ok" : ""}"></span>
@@ -536,6 +529,7 @@ export function renderApp(state: AppViewState) {
                       <div class="nav-group__items">
                         ${renderTab(state, "config")}
                         ${renderTab(state, "envVars")}
+                        ${renderTab(state, "logs")}
                       </div>
                     </div>
                     <div class="nav-group">
@@ -543,22 +537,19 @@ export function renderApp(state: AppViewState) {
                         <span class="nav-label__text">资源</span>
                       </button>
                       <div class="nav-group__items">
-                        <a
+                        <button
+                          type="button"
                           class="nav-item"
-                          href="https://www.openocta.com/docs"
-                          rel="noreferrer"
                           title="在线文档（新窗口打开）"
-                          @click=${(e: Event) => {
-                            e.preventDefault();
+                          @click=${() =>
                             void openExternalUrl("https://www.openocta.com/docs", {
                               gatewayHost: state.settings.gatewayUrl,
                               gatewayToken: state.settings.token,
-                            });
-                          }}
+                            })}
                         >
                           <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
                           <span class="nav-item__text">在线文档</span>
-                        </a>
+                        </button>
                         ${renderTab(state, "aboutUs")}
                       </div>
                     </div>

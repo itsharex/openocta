@@ -15,6 +15,6 @@
   "assetdir": "wails-bootstrap",
   "build:dir": "build",
   "preBuildHooks": {
-    "*/*": "cd .. && make embed"
+    "*/*": "make -C ../../.. embed"
   }
 }

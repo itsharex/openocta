@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/openocta/openocta/embed"
@@ -37,6 +38,14 @@ func Load(env EnvGetter) (*OpenOctaConfig, error) {
 			example, eErr := embed.ConfigExampleJSON()
 			if eErr == nil && len(example) > 0 {
 				if mkErr := os.MkdirAll(stateDir, 0700); mkErr == nil {
+					var ex OpenOctaConfig
+					if json.Unmarshal(example, &ex) == nil {
+						if normalizeDesktopGatewayAuth(&ex, env) {
+							if b, mErr := json.MarshalIndent(&ex, "", "  "); mErr == nil {
+								example = b
+							}
+						}
+					}
 					_ = os.WriteFile(canonicalPath, example, 0600)
 				}
 				data = example
@@ -54,6 +63,11 @@ func Load(env EnvGetter) (*OpenOctaConfig, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	if normalizeDesktopGatewayAuth(&cfg, env) {
+		if out, mErr := json.MarshalIndent(&cfg, "", "  "); mErr == nil {
+			_ = os.WriteFile(configPath, out, 0600)
+		}
+	}
 	return &cfg, nil
 }
 
@@ -61,7 +75,47 @@ func Load(env EnvGetter) (*OpenOctaConfig, error) {
 // Frontend uses the same value when user does not fill in the gateway token.
 const DefaultGatewayToken = "edc146993b5ae0b1544c3137cc888f94436cf11e1952cff6"
 
-// EnsureDefaultConfig ensures ~/.openclaw/openclaw.json exists; if not, creates the dir and writes minimal default config with DefaultGatewayToken.
+// normalizeDesktopGatewayAuth forces gateway.auth.token to DefaultGatewayToken in desktop run mode
+// when using token auth (not password). Existing non-default tokens are overwritten; persists via Load.
+func normalizeDesktopGatewayAuth(cfg *OpenOctaConfig, env EnvGetter) bool {
+	if env == nil {
+		env = DefaultEnv
+	}
+	var modePtr *string
+	if cfg != nil && cfg.Gateway != nil {
+		modePtr = cfg.Gateway.Mode
+	}
+	if paths.ResolveRunMode(env, modePtr) != "desktop" {
+		return false
+	}
+	if cfg == nil {
+		return false
+	}
+	if cfg.Gateway == nil {
+		cfg.Gateway = &GatewayConfig{}
+	}
+	if cfg.Gateway.Auth == nil {
+		cfg.Gateway.Auth = &GatewayAuthConfig{}
+	}
+	if cfg.Gateway.Auth.Mode != nil {
+		if strings.EqualFold(strings.TrimSpace(*cfg.Gateway.Auth.Mode), "password") {
+			return false
+		}
+	}
+	changed := false
+	if cfg.Gateway.Auth.Token != DefaultGatewayToken {
+		cfg.Gateway.Auth.Token = DefaultGatewayToken
+		changed = true
+	}
+	if cfg.Gateway.Auth.Mode == nil || strings.TrimSpace(*cfg.Gateway.Auth.Mode) == "" {
+		m := "token"
+		cfg.Gateway.Auth.Mode = &m
+		changed = true
+	}
+	return changed
+}
+
+// EnsureDefaultConfig ensures ~/.openocta/openocta.json exists; if not, creates the dir and writes minimal default config with DefaultGatewayToken.
 func EnsureDefaultConfig(env EnvGetter) error {
 	if env == nil {
 		env = DefaultEnv
