@@ -12,7 +12,7 @@ import (
 
 // Assets embeds frontend, config-schema, openocta.json.example, .env.
 //
-//go:embed frontend openocta.json.example .env
+//go:embed frontend .env
 var assets embed.FS
 
 func init() {
