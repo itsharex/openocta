@@ -152,17 +152,9 @@ export function renderChannelConfigSection(params: { channelId: string; props: C
 }
 
 const CHANNEL_LABELS: Record<string, string> = {
-  whatsapp: "WhatsApp",
-  telegram: "Telegram",
-  discord: "Discord",
-  googlechat: "Google Chat",
-  slack: "Slack",
-  signal: "Signal",
-  imessage: "iMessage",
-  nostr: "Nostr",
-  dingtalk: "DingTalk",
-  feishu: "Feishu",
-  wework: "WeWork",
+  wework: "微信",
+  dingtalk: "钉钉",
+  feishu: "飞书",
   qq: "QQ",
 };
 

@@ -13,13 +13,9 @@ import (
 	"github.com/openocta/openocta/pkg/channels"
 	"github.com/openocta/openocta/pkg/channels/builtin"
 	"github.com/openocta/openocta/pkg/channels/dingtalk"
-	"github.com/openocta/openocta/pkg/channels/discord"
 	"github.com/openocta/openocta/pkg/channels/feishu"
 	"github.com/openocta/openocta/pkg/channels/qq"
-	"github.com/openocta/openocta/pkg/channels/slack"
-	"github.com/openocta/openocta/pkg/channels/telegram"
 	"github.com/openocta/openocta/pkg/channels/wework"
-	"github.com/openocta/openocta/pkg/channels/whatsapp"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/cron"
 	"github.com/openocta/openocta/pkg/gateway/handlers"
@@ -606,14 +602,10 @@ func registerChannelRuntimesFromConfig(
 
 	// 约定：所有通道的 NewRuntimeFromConfig 签名均为 RuntimeFactoryFunc。
 	factories := map[string]channels.RuntimeFactoryFunc{
-		"feishu":   feishu.NewRuntimeFromConfig,
-		"qq":       qq.NewRuntimeFromConfig,
 		"wework":   wework.NewRuntimeFromConfig,
 		"dingtalk": dingtalk.NewRuntimeFromConfig,
-		"telegram": telegram.NewRuntimeFromConfig,
-		"slack":    slack.NewRuntimeFromConfig,
-		"whatsapp": whatsapp.NewRuntimeFromConfig,
-		"discord":  discord.NewRuntimeFromConfig,
+		"feishu":   feishu.NewRuntimeFromConfig,
+		"qq":       qq.NewRuntimeFromConfig,
 	}
 
 	for id, factory := range factories {

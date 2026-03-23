@@ -227,7 +227,7 @@ agentsdk-go 定义了 6 个安全检查点：
 **文件**：
 
 - 视图：`ui/src/ui/views/sandbox.ts`
-- 状态与控制：`ui/src/ui/app-sandbox.ts`、`ui/src/ui/controllers/sandbox.ts`
+- 状态与控制：`ui/src/ui/app-security.ts`、`ui/src/ui/controllers/security.ts`（旧版 `controllers/sandbox.ts` 仍可用于读取沙箱片段）
 
 ### 5.1 页面结构
 

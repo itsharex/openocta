@@ -74,38 +74,6 @@ const CHANNEL_FORM_DEFS: Record<string, ChannelFormDef> = {
       },
     ],
   },
-  telegram: {
-    fields: [
-      { path: ["enabled"], label: "Enabled", required: false, type: "boolean" },
-      { path: ["accountId"], label: "Account ID", required: false, type: "string", placeholder: "default" },
-      { path: ["name"], label: "Name", required: false, type: "string", placeholder: "Telegram" },
-      { path: ["allowedIds"], label: "Allowed IDs", required: false, type: "string[]", placeholder: "user-id-1" },
-    ],
-  },
-  slack: {
-    fields: [
-      { path: ["enabled"], label: "Enabled", required: false, type: "boolean" },
-      { path: ["accountId"], label: "Account ID", required: false, type: "string", placeholder: "default" },
-      { path: ["name"], label: "Name", required: false, type: "string", placeholder: "Slack" },
-      { path: ["allowedIds"], label: "Allowed IDs", required: false, type: "string[]", placeholder: "user-id-1" },
-    ],
-  },
-  discord: {
-    fields: [
-      { path: ["enabled"], label: "Enabled", required: false, type: "boolean" },
-      { path: ["accountId"], label: "Account ID", required: false, type: "string", placeholder: "default" },
-      { path: ["name"], label: "Name", required: false, type: "string", placeholder: "Discord" },
-      { path: ["allowedIds"], label: "Allowed IDs", required: false, type: "string[]", placeholder: "user-id-1" },
-    ],
-  },
-  whatsapp: {
-    fields: [
-      { path: ["enabled"], label: "Enabled", required: false, type: "boolean" },
-      { path: ["accountId"], label: "Account ID", required: false, type: "string", placeholder: "default" },
-      { path: ["name"], label: "Name", required: false, type: "string", placeholder: "WhatsApp" },
-      { path: ["allowedIds"], label: "Allowed IDs", required: false, type: "string[]", placeholder: "user-id-1" },
-    ],
-  },
   qq: {
     fields: [
       { path: ["credentials", "appId"], label: "App ID", required: true, type: "string", placeholder: "your-app-id" },

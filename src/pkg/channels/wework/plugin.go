@@ -9,12 +9,12 @@ var Plugin = &channels.BasePlugin{
 	Id: channelID,
 	MetaData: channels.ChannelMeta{
 		ID:             channelID,
-		Label:          "WeWork",
-		SelectionLabel: "WeWork 企业微信",
+		Label:          "微信",
+		SelectionLabel: "微信（企业智能机器人）",
 		DocsPath:       "/channels/wework",
 		DocsLabel:      "wework",
 		Blurb:          "企业微信智能机器人：WebSocket 长连接（aibot），支持扫码创建与凭据配置。",
 		SystemImage:    "message-square",
-		Order:          85,
+		Order:          50,
 	},
 }

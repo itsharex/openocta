@@ -1320,9 +1320,9 @@ const EN: Strings = {
   channelRelink: "Relink",
   channelWaitForScan: "Wait for scan",
   channelLogout: "Logout",
-  channelWeWork: "WeCom Bot",
+  channelWeWork: "Weixin Work Bot",
   channelWeWorkSub:
-    "Enterprise WeChat intelligent bot via WebSocket (aibot). Scan to create a bot or paste Bot ID and Secret.",
+    "Enterprise WeChat intelligent bot via WebSocket (aibot). Scan to create or paste Bot ID and Secret.",
   channelWeWorkTransport: "Transport",
   channelWeWorkBotId: "Bot ID (masked)",
   channelWeWorkQrStart: "Scan to create bot",
@@ -2275,9 +2275,9 @@ const ZH: Strings = {
   channelRelink: "重新链接",
   channelWaitForScan: "等待扫码",
   channelLogout: "登出",
-  channelWeWork: "企业微信智能机器人",
+  channelWeWork: "微信（企业智能机器人）",
   channelWeWorkSub:
-    "通过官方智能机器人 WebSocket 长连接（aibot）收发消息。支持扫码创建或手动填写 Bot ID / Secret。",
+    "通过企业微信智能机器人 WebSocket 长连接（aibot）收发消息。支持扫码创建或手动填写 Bot ID / Secret。",
   channelWeWorkTransport: "链路",
   channelWeWorkBotId: "Bot ID（脱敏）",
   channelWeWorkQrStart: "扫码快速创建",

@@ -16,8 +16,8 @@ ManifestDPIAware true
 
 !include "MUI.nsh"
 
-!define MUI_ICON "..\icon.svg"
-!define MUI_UNICON "..\icon.svg"
+!define MUI_ICON "..\icon.ico"
+!define MUI_UNICON "..\icon.ico"
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 !define MUI_ABORTWARNING
 

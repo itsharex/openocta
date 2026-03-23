@@ -157,9 +157,12 @@ function buildCommandPolicyPatch(cp: SecurityConfigForm["commandPolicy"]): Recor
   };
 }
 
+type ApprovalQueueWithLegacyLists = SecurityConfigForm["approvalQueue"] &
+  Partial<Record<"allow" | "ask" | "deny", string[]>>;
+
 function mergeLegacyToCommandPolicy(
   validator?: SecurityConfigForm["validator"],
-  approvalQueue?: { allow?: string[]; ask?: string[]; deny?: string[] },
+  approvalQueue?: ApprovalQueueWithLegacyLists,
 ): SecurityConfigForm["commandPolicy"] {
   const deny: string[] = [];
   const ask: string[] = [];

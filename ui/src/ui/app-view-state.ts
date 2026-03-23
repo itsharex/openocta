@@ -117,6 +117,14 @@ export type AppViewState = {
   whatsappLoginQrDataUrl: string | null;
   whatsappLoginConnected: boolean | null;
   whatsappBusy: boolean;
+  weworkQrModalOpen: boolean;
+  weworkQrModalLoading: boolean;
+  weworkQrModalPolling: boolean;
+  weworkQrModalSuccess: boolean;
+  weworkQrModalError: string | null;
+  weworkQrModalReplaceWarn: boolean;
+  weworkQrModalAuthUrl: string | null;
+  weworkQrModalGenPageUrl: string | null;
   nostrProfileFormState: NostrProfileFormState | null;
   nostrProfileAccountId: string | null;
   configFormDirty: boolean;
@@ -391,6 +399,8 @@ export type AppViewState = {
   handleWhatsAppStart: (force: boolean) => Promise<void>;
   handleWhatsAppWait: () => Promise<void>;
   handleWhatsAppLogout: () => Promise<void>;
+  handleWeWorkQrStart: () => Promise<void>;
+  handleWeWorkQrModalClose: () => void;
   handleChannelConfigSave: () => Promise<void>;
   handleChannelConfigReload: () => Promise<void>;
   handleNostrProfileEdit: (accountId: string, profile: NostrProfile | null) => void;
