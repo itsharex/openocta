@@ -64,6 +64,20 @@ type LoadOptions struct {
 	BundledSkillsDir string
 }
 
+// skillMergeKey is the deduplication key in LoadWorkspaceEntries. It follows the on-disk layout
+// (<folder>/SKILL.md → folder basename; flat <stem>.md → stem) so sibling directories are not
+// collapsed when frontmatter "name" duplicates across folders.
+func skillMergeKey(e Entry) string {
+	fn := filepath.Base(e.FilePath)
+	if strings.EqualFold(fn, "SKILL.md") {
+		k := filepath.Base(e.BaseDir)
+		if k != "" && k != "." {
+			return k
+		}
+	}
+	return strings.TrimSuffix(fn, filepath.Ext(fn))
+}
+
 // LoadWorkspaceEntries loads skill entries from a workspace directory.
 // Skills are loaded from multiple locations with the following precedence (lowest to highest):
 // 1. Extra directories (from config.skills.load.extraDirs)
@@ -71,7 +85,7 @@ type LoadOptions struct {
 // 3. Managed skills (~/.openclaw/skills)
 // 4. Workspace skills (<workspace>/skills) - highest priority
 //
-// Name conflict resolution: workspace (highest) > managed > bundled > extra (lowest).
+// Merge key is skillMergeKey (on-disk identity). Higher-precedence sources overwrite the same key.
 func LoadWorkspaceEntries(workspaceDir string, opts *LoadOptions) ([]Entry, error) {
 	env := func(k string) string { return os.Getenv(k) }
 
@@ -112,41 +126,35 @@ func LoadWorkspaceEntries(workspaceDir string, opts *LoadOptions) ([]Entry, erro
 	// 4. Workspace skills (<workspace>/skills) - highest
 	merged := make(map[string]Entry)
 
+	merge := func(skills []Entry) {
+		for _, skill := range skills {
+			k := skillMergeKey(skill)
+			if k == "" {
+				continue
+			}
+			merged[k] = skill
+		}
+	}
+
 	// 1. Extra directories
 	for _, dir := range extraDirs {
 		skills, _ := loadSkillsFromDir(dir, "openclaw-extra")
-		for _, skill := range skills {
-			if skill.Name != "" {
-				merged[skill.Name] = skill
-			}
-		}
+		merge(skills)
 	}
 
 	// 2. Bundled skills (built-in, shipped with install)
 	if bundledSkillsDir != "" {
 		skills, _ := loadSkillsFromDir(bundledSkillsDir, "openclaw-bundled")
-		for _, skill := range skills {
-			if skill.Name != "" {
-				merged[skill.Name] = skill
-			}
-		}
+		merge(skills)
 	}
 
 	// 3. Managed skills (~/.openclaw/skills)
 	skills, _ := loadSkillsFromDir(managedSkillsDir, "openclaw-managed")
-	for _, skill := range skills {
-		if skill.Name != "" {
-			merged[skill.Name] = skill
-		}
-	}
+	merge(skills)
 
 	// 4. Workspace skills (<workspace>/skills) - highest precedence
 	skills, _ = loadSkillsFromDir(workspaceSkillsDir, "openclaw-workspace")
-	for _, skill := range skills {
-		if skill.Name != "" {
-			merged[skill.Name] = skill
-		}
-	}
+	merge(skills)
 
 	// Convert map to slice
 	var result []Entry
@@ -195,7 +203,7 @@ func loadSkillsFromDir(dir string, source string) ([]Entry, error) {
 			skillFile := filepath.Join(skillDir, "SKILL.md")
 			if _, err := os.Stat(skillFile); err == nil {
 				skill, err := loadSkillFromDir(skillDir, source)
-				if err == nil && skill.Name != "" {
+				if err == nil && skillMergeKey(skill) != "" {
 					skills = append(skills, skill)
 				}
 			}
@@ -203,7 +211,7 @@ func loadSkillsFromDir(dir string, source string) ([]Entry, error) {
 			// Single file skill
 			skillFile := filepath.Join(dir, entry.Name())
 			skill, err := loadSkillFromFile(skillFile, source)
-			if err == nil && skill.Name != "" {
+			if err == nil && skillMergeKey(skill) != "" {
 				skills = append(skills, skill)
 			}
 		}
@@ -230,7 +238,7 @@ func loadSkillsFromFS(fsys fs.FS, basePath string, source string) ([]Entry, erro
 			skillFile := path.Join(skillDir, "SKILL.md")
 			if _, err := fs.Stat(fsys, skillFile); err == nil {
 				skill, err := loadSkillFromFSFile(fsys, skillFile, source)
-				if err == nil && skill.Name != "" {
+				if err == nil && skillMergeKey(skill) != "" {
 					skills = append(skills, skill)
 				}
 			}
@@ -240,7 +248,7 @@ func loadSkillsFromFS(fsys fs.FS, basePath string, source string) ([]Entry, erro
 				skillFile = path.Join(basePath, skillFile)
 			}
 			skill, err := loadSkillFromFSFile(fsys, skillFile, source)
-			if err == nil && skill.Name != "" {
+			if err == nil && skillMergeKey(skill) != "" {
 				skills = append(skills, skill)
 			}
 		}

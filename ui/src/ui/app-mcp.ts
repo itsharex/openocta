@@ -203,23 +203,42 @@ export function handleMcpCancel(host: AppViewState) {
   }
 }
 
-export function handleMcpDelete(host: AppViewState, key: string) {
-  const base = host.configForm ?? host.configSnapshot?.config;
-  const mcp = base?.mcp as { servers?: Record<string, McpServerEntry> } | undefined;
-  if (mcp?.servers && key in mcp.servers) {
-    // Backend mergePatch deletes keys when patch value is null
-    saveConfigPatch(host, { mcp: { servers: { [key]: null } } });
-    // Update local form immediately so UI reflects deletion
-    if (host.configForm && host.configForm.mcp && typeof host.configForm.mcp === "object") {
-      const s = (host.configForm.mcp as { servers?: Record<string, McpServerEntry> }).servers;
-      if (s && key in s) {
-        const next = { ...s };
-        delete next[key];
-        (host.configForm.mcp as { servers: Record<string, McpServerEntry> }).servers = next;
-      }
+export async function handleMcpDelete(host: AppViewState, key: string) {
+  const trimmed = (key ?? "").trim();
+  if (!trimmed) {
+    return;
+  }
+
+  if (host.client && host.connected) {
+    let baseHash = host.configSnapshot?.hash;
+    if (!baseHash) {
+      await loadConfig(host);
+      baseHash = host.configSnapshot?.hash;
+    }
+    if (!baseHash) {
+      host.lastError = "Config hash missing; reload and retry.";
+      return;
+    }
+    host.configSaving = true;
+    host.lastError = null;
+    try {
+      await host.client.request("mcp.servers.delete", { serverKey: trimmed, baseHash });
+      host.configFormDirty = false;
+      await loadConfig(host);
+    } catch (err) {
+      host.lastError = String(err);
+    } finally {
+      host.configSaving = false;
+    }
+  } else {
+    const base = host.configForm ?? host.configSnapshot?.config;
+    const mcp = base?.mcp as { servers?: Record<string, McpServerEntry> } | undefined;
+    if (mcp?.servers && trimmed in mcp.servers) {
+      await saveConfigPatch(host, { mcp: { servers: { [trimmed]: null } } });
     }
   }
-  if (host.mcpSelectedKey === key) {
+
+  if (host.mcpSelectedKey === trimmed || host.mcpSelectedKey === key) {
     host.mcpSelectedKey = null;
   }
 }

@@ -61,6 +61,54 @@ function extractEmployeeIdFromSessionKey(key: string): string | null {
   return null;
 }
 
+/** 侧栏搜索：汇总 key、展示名、副标题及网关返回的标签类字段（label、channel、origin 等） */
+function buildSessionSidebarSearchHaystack(
+  s: Record<string, unknown>,
+  key: string,
+  displayName: string,
+  subtitle: string,
+): string {
+  const parts = [key, displayName, subtitle];
+  const pushStr = (v: unknown) => {
+    if (v == null) return;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t) parts.push(t);
+      return;
+    }
+    if (typeof v === "number" || typeof v === "boolean") {
+      parts.push(String(v));
+    }
+  };
+  pushStr(s.label);
+  pushStr(s.displayName);
+  pushStr(s.sessionId);
+  pushStr(s.derivedTitle);
+  pushStr(s.kind);
+  pushStr(s.channel);
+  pushStr(s.subject);
+  pushStr(s.groupChannel);
+  pushStr(s.space);
+  pushStr(s.chatType);
+  pushStr(s.lastChannel);
+  pushStr(s.lastTo);
+  pushStr(s.lastMessagePreview);
+  const origin = s.origin;
+  if (origin && typeof origin === "object" && !Array.isArray(origin)) {
+    for (const v of Object.values(origin as Record<string, unknown>)) {
+      pushStr(v);
+    }
+  }
+  return parts.join("\u0001").toLowerCase();
+}
+
+function sessionSidebarHaystackMatches(haystack: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return tokens.every((t) => haystack.includes(t));
+}
+
 // Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
 let usageDateDebounceTimeout: number | null = null;
 const debouncedLoadUsage = (state: UsageState) => {
@@ -367,6 +415,21 @@ export function renderApp(state: AppViewState) {
           state.tab === "message"
             ? html`
                 <div class="session-sidebar">
+                  <div class="session-search">
+                    <input
+                      class="session-search__input"
+                      type="search"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="搜索名称、标签或预览…"
+                      aria-label="搜索会话"
+                      .value=${state.sessionSidebarQuery}
+                      @input=${(e: Event) => {
+                        state.sessionSidebarQuery = (e.target as HTMLInputElement).value;
+                      }}
+                    />
+                    <span class="session-search__icon" aria-hidden="true">${icons.search}</span>
+                  </div>
                   <button
                     class="session-new"
                     type="button"
@@ -394,22 +457,40 @@ export function renderApp(state: AppViewState) {
 
                   <div class="session-list">
                     ${
-                      (state.sessionsResult?.sessions ?? []).map((s) => {
-                        const key = (s as any).key ?? (s as any).sessionId ?? "";
-                        const isCustom = key.toLowerCase().startsWith("custom:");
-                        const employeeId = isCustom ? null : extractEmployeeIdFromSessionKey(key);
-                        const emp = employeeId
-                          ? state.digitalEmployees?.find((e) => e.id === employeeId)
-                          : null;
-                        const displayName =
-                          emp?.name ||
-                          ((s as any).origin && (((s as any).origin.label || (s as any).origin.from || (s as any).origin.to) as string)) ||
-                          (s as any).label ||
-                          (s as any).displayName ||
-                          (s as any).sessionId ||
-                          key ||
-                          "会话";
-                        const subtitle = (s as any).lastMessagePreview?.trim() || "";
+                      (() => {
+                        const q = state.sessionSidebarQuery;
+                        const rows = (state.sessionsResult?.sessions ?? []).map((s) => {
+                          const row = s as Record<string, unknown>;
+                          const key = (row.key ?? row.sessionId ?? "") as string;
+                          const isCustom = key.toLowerCase().startsWith("custom:");
+                          const employeeId = isCustom ? null : extractEmployeeIdFromSessionKey(key);
+                          const emp = employeeId
+                            ? state.digitalEmployees?.find((e) => e.id === employeeId)
+                            : null;
+                          const origin = row.origin as Record<string, string> | undefined;
+                          const displayName =
+                            emp?.name ||
+                            (origin &&
+                              ((origin.label || origin.from || origin.to) as string)) ||
+                            (row.label as string | undefined) ||
+                            (row.displayName as string | undefined) ||
+                            (row.sessionId as string | undefined) ||
+                            key ||
+                            "会话";
+                          const subtitle =
+                            (row.lastMessagePreview as string | undefined)?.trim() || "";
+                          const haystack = buildSessionSidebarSearchHaystack(
+                            row,
+                            key,
+                            displayName,
+                            subtitle,
+                          );
+                          return { key, isCustom, emp, displayName, subtitle, haystack };
+                        });
+                        const filtered = q.trim()
+                          ? rows.filter((r) => sessionSidebarHaystackMatches(r.haystack, q))
+                          : rows;
+                        return filtered.map(({ key, isCustom, emp, displayName, subtitle }) => {
                         const active = key && state.sessionKey === key;
                         const canEdit = isCustom;
                         const isEditing = canEdit && state.sessionEditingKey === key;
@@ -482,7 +563,8 @@ export function renderApp(state: AppViewState) {
                             </div>
                           </div>
                         `;
-                      })
+                      });
+                      })()
                     }
                   </div>
                 </div>
@@ -1839,6 +1921,7 @@ export function renderApp(state: AppViewState) {
                       if (it.installed && it.serverKey) {
                         mcpInstalled.add(String(it.id));
                         mcpMap.set(it.id, it.serverKey);
+                        mcpMap.set(String(it.id), it.serverKey);
                       }
                     }
                     state.toolLibraryInstalledRemoteIds = mcpInstalled;
@@ -1903,7 +1986,10 @@ export function renderApp(state: AppViewState) {
                     );
                     if (res?.id) {
                       state.toolLibraryInstalledRemoteIds = new Set([...state.toolLibraryInstalledRemoteIds, String(id)]);
-                      state.toolLibraryInstalledMcpMap = new Map(state.toolLibraryInstalledMcpMap).set(id, res.id);
+                      const nextMap = new Map(state.toolLibraryInstalledMcpMap);
+                      nextMap.set(id, res.id);
+                      nextMap.set(String(id), res.id);
+                      state.toolLibraryInstalledMcpMap = nextMap;
                     }
                     await loadConfig(state);
                     await onRefresh();
@@ -1915,7 +2001,10 @@ export function renderApp(state: AppViewState) {
                 },
                 onDelete: async (serverKey) => {
                   state.toolLibraryError = null;
-                  handleMcpDelete(state, serverKey);
+                  await handleMcpDelete(state, serverKey);
+                  if (state.lastError) {
+                    state.toolLibraryError = state.lastError;
+                  }
                   let ridToRemove: number | string | null = null;
                   for (const [rid, sk] of state.toolLibraryInstalledMcpMap) {
                     if (sk === serverKey) {

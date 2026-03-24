@@ -76,7 +76,7 @@ func NewHub(version string, h *handlers.Registry, ctx *handlers.Context) *Hub {
 		"status",
 		"usage.status", "usage.cost",
 		"tts.status", "tts.providers", "tts.enable", "tts.disable", "tts.convert", "tts.setProvider",
-		"config.get", "config.env", "config.set", "config.apply", "config.patch", "config.schema",
+		"config.get", "config.env", "config.set", "config.apply", "config.patch", "mcp.servers.delete", "config.schema",
 		"exec.approvals.get", "exec.approvals.set", "exec.approvals.node.get", "exec.approvals.node.set",
 		"exec.approval.request", "exec.approval.resolve",
 		"wizard.start", "wizard.next", "wizard.cancel", "wizard.status",

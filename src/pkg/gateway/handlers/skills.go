@@ -110,6 +110,57 @@ type SkillEntry struct {
 	Metadata    *SkillMetadata
 }
 
+// skillEntryMatchesClientKey is true when id equals logical name, metadata skillKey, or the on-disk folder under skills/.
+func skillEntryMatchesClientKey(e SkillEntry, id string) bool {
+	if strings.TrimSpace(id) == "" {
+		return false
+	}
+	if e.Name == id {
+		return true
+	}
+	if e.Metadata != nil && e.Metadata.SkillKey != "" && e.Metadata.SkillKey == id {
+		return true
+	}
+	return filepath.Base(e.BaseDir) == id
+}
+
+// canonicalSkillEntryConfigKey returns the key used in config skills.entries (same rule as skills.status skillKey).
+func canonicalSkillEntryConfigKey(e SkillEntry) string {
+	if e.Metadata != nil && e.Metadata.SkillKey != "" {
+		return e.Metadata.SkillKey
+	}
+	return e.Name
+}
+
+// resolveWorkspaceSkillConfigKey maps a client id (e.g. market folder) to the config entry key, or returns id if unknown.
+func resolveWorkspaceSkillConfigKey(cfg *config.OpenOctaConfig, env func(string) string, clientKey string) string {
+	clientKey = strings.TrimSpace(clientKey)
+	if cfg == nil || clientKey == "" {
+		return clientKey
+	}
+	for _, wsDir := range listWorkspaceDirs(cfg, env) {
+		for _, e := range loadWorkspaceSkillEntries(wsDir, cfg) {
+			if skillEntryMatchesClientKey(e, clientKey) {
+				return canonicalSkillEntryConfigKey(e)
+			}
+		}
+	}
+	return clientKey
+}
+
+func skillAgentEntryMatchesClientKey(e agentSkills.Entry, id string) bool {
+	if strings.TrimSpace(id) == "" {
+		return false
+	}
+	if e.Name == id {
+		return true
+	}
+	if e.Metadata != nil && e.Metadata.SkillKey != "" && e.Metadata.SkillKey == id {
+		return true
+	}
+	return filepath.Base(e.BaseDir) == id
+}
+
 // SkillMetadata holds skill metadata.
 type SkillMetadata struct {
 	SkillKey   string
@@ -1064,11 +1115,7 @@ func SkillsGetDocHandler(opts HandlerOpts) error {
 	skillKey := params.SkillKey
 	var content []byte
 	for _, e := range entries {
-		match := e.Name == skillKey
-		if !match && e.Metadata != nil && e.Metadata.SkillKey != "" {
-			match = e.Metadata.SkillKey == skillKey
-		}
-		if !match {
+		if !skillAgentEntryMatchesClientKey(e, skillKey) {
 			continue
 		}
 		if len(e.EmbeddedContent) > 0 {
@@ -1191,6 +1238,8 @@ func SkillsUpdateHandler(opts HandlerOpts) error {
 		return nil
 	}
 
+	resolvedSkillKey := resolveWorkspaceSkillConfigKey(snap.Config, env, params.SkillKey)
+
 	// Use raw file map to preserve all keys; patch only skills.entries[skillKey]
 	cfgMap := ConfigSnapshotToMap(snap)
 	if cfgMap == nil {
@@ -1206,7 +1255,7 @@ func SkillsUpdateHandler(opts HandlerOpts) error {
 		entriesMap = map[string]interface{}{}
 		skillsMap["entries"] = entriesMap
 	}
-	current, _ := entriesMap[params.SkillKey].(map[string]interface{})
+	current, _ := entriesMap[resolvedSkillKey].(map[string]interface{})
 	if current == nil {
 		current = map[string]interface{}{}
 	}
@@ -1232,7 +1281,7 @@ func SkillsUpdateHandler(opts HandlerOpts) error {
 		}
 		current["env"] = envMap
 	}
-	entriesMap[params.SkillKey] = current
+	entriesMap[resolvedSkillKey] = current
 
 	if err := WriteConfigMap(snap.Path, cfgMap); err != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{
@@ -1245,7 +1294,7 @@ func SkillsUpdateHandler(opts HandlerOpts) error {
 	// Build response
 	result := map[string]interface{}{
 		"ok":       true,
-		"skillKey": params.SkillKey,
+		"skillKey": resolvedSkillKey,
 		"config": map[string]interface{}{
 			"enabled": current["enabled"],
 			"apiKey":  current["apiKey"],
@@ -1308,11 +1357,7 @@ func SkillsDeleteHandler(opts HandlerOpts) error {
 	var targetEntry *SkillEntry
 	for i := range entries {
 		e := &entries[i]
-		skillKey := e.Name
-		if e.Metadata != nil && e.Metadata.SkillKey != "" {
-			skillKey = e.Metadata.SkillKey
-		}
-		if skillKey == params.SkillKey {
+		if skillEntryMatchesClientKey(*e, params.SkillKey) {
 			targetEntry = e
 			break
 		}

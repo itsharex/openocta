@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/openocta/openocta/embed"
@@ -357,6 +358,97 @@ func ConfigPatchHandler(opts HandlerOpts) error {
 		"ok":     true,
 		"path":   snap.Path,
 		"config": cfg,
+	}, nil, nil)
+	return nil
+}
+
+// McpServersDeleteHandler handles "mcp.servers.delete": removes one key from config.mcp.servers (same semantics as config.patch with null).
+func McpServersDeleteHandler(opts HandlerOpts) error {
+	ctx := opts.Context
+	if ctx == nil || ctx.LoadConfigSnapshot == nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: "config context not configured",
+		}, nil)
+		return nil
+	}
+	snap, err := ctx.LoadConfigSnapshot()
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: err.Error(),
+		}, nil)
+		return nil
+	}
+	serverKey, _ := opts.Params["serverKey"].(string)
+	serverKey = strings.TrimSpace(serverKey)
+	if serverKey == "" {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "mcp.servers.delete: serverKey required",
+		}, nil)
+		return nil
+	}
+	baseHash, _ := opts.Params["baseHash"].(string)
+	if baseHash == "" {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "config base hash required; re-run config.get and retry",
+		}, nil)
+		return nil
+	}
+	if snap.Hash != "" && snap.Hash != baseHash {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "config changed since last load; re-run config.get and retry",
+		}, nil)
+		return nil
+	}
+	if !snap.Valid {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "invalid config; fix before patching",
+		}, nil)
+		return nil
+	}
+
+	env := func(k string) string { return os.Getenv(k) }
+	_ = installmetadata.RemoveByLocalID(env, "mcp", serverKey)
+
+	patch := map[string]interface{}{
+		"mcp": map[string]interface{}{
+			"servers": map[string]interface{}{
+				serverKey: nil,
+			},
+		},
+	}
+	baseMap := ConfigSnapshotToMap(snap)
+	merged := mergePatch(baseMap, patch)
+	data, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: err.Error(),
+		}, nil)
+		return nil
+	}
+	if err := os.WriteFile(snap.Path, data, 0600); err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: "failed to write config: " + err.Error(),
+		}, nil)
+		return nil
+	}
+	var cfg config.OpenOctaConfig
+	_ = json.Unmarshal(data, &cfg)
+	if opts.Context != nil {
+		opts.Context.Config = &cfg
+	}
+	opts.Respond(true, map[string]interface{}{
+		"ok":        true,
+		"path":      snap.Path,
+		"serverKey": serverKey,
+		"config":    cfg,
 	}, nil, nil)
 	return nil
 }

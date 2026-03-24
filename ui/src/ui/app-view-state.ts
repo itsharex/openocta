@@ -154,6 +154,8 @@ export type AppViewState = {
   sessionsLoading: boolean;
   sessionsResult: SessionsListResult | null;
   sessionEditingKey: string | null;
+  /** 消息页侧栏：按名称 / 标签字段 / 副标题等模糊过滤会话 */
+  sessionSidebarQuery: string;
   sessionsError: string | null;
   sessionsFilterActive: string;
   sessionsFilterLimit: string;

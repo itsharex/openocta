@@ -74,7 +74,7 @@ func DefaultTools() []tool.Tool {
 	return []tool.Tool{
 		EchoTool{},
 		OsInfoTool{},
-		WindowsCmdTool{},
+		//WindowsCmdTool{},
 	}
 }
 
@@ -84,7 +84,7 @@ func DefaultToolsWithInvoker(invoker GatewayInvoker) []tool.Tool {
 	list := []tool.Tool{
 		EchoTool{},
 		OsInfoTool{},
-		WindowsCmdTool{},
+		//WindowsCmdTool{},
 	}
 	if invoker != nil {
 		list = append(list,

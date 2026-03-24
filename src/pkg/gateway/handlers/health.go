@@ -109,6 +109,7 @@ func NewRegistry(ctx *Context) Registry {
 		"config.set":                 ConfigSetHandler,
 		"config.apply":               ConfigApplyHandler,
 		"config.patch":               ConfigPatchHandler,
+		"mcp.servers.delete":         McpServersDeleteHandler,
 		"config.schema":              ConfigSchemaHandler,
 		"exec.approvals.get":         ExecApprovalsGetHandler,
 		"exec.approvals.set":         ExecApprovalsSetHandler,
