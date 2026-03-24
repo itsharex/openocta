@@ -174,7 +174,7 @@ describe("catalog pages", () => {
     const container = document.createElement("div");
     renderIntoContainer(renderEmployeeMarket(employeeProps({ query: "zabbix" })), container);
 
-    expect(container.textContent).toContain("推荐员工");
+    expect(container.textContent).toContain("运维自动化");
     expect(container.textContent).toContain("Zabbix专家");
     expect(container.textContent).not.toContain("Prometheus专家");
   });
@@ -284,7 +284,8 @@ describe("catalog pages", () => {
       ),
       container,
     );
+    expect(container.querySelector(".emp-detail-modal")).not.toBeNull();
     expect(container.querySelector("iframe")).not.toBeNull();
-    expect(container.textContent).toContain("返回教程");
+    expect(container.textContent).toContain("打开原链接");
   });
 });

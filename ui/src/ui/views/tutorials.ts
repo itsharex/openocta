@@ -1,5 +1,5 @@
 import { html, nothing } from "lit";
-import type { EduCategory } from "../controllers/remote-market.ts";
+import type { EduCategory, EduCourse, EduLesson } from "../controllers/remote-market.ts";
 import { getTutorialIcon } from "../tutorial-icons.ts";
 
 export type TutorialsProps = {
@@ -14,6 +14,12 @@ export type TutorialsProps = {
   onLessonClick: (link: string) => void;
   onPlayingClose: () => void;
   onRefresh: () => void;
+};
+
+type SelectedTutorialLesson = {
+  category: EduCategory;
+  course: EduCourse;
+  lesson: EduLesson;
 };
 
 function normalizeQuery(raw: string) {
@@ -56,6 +62,43 @@ export function toBilibiliEmbedUrl(link: string): string | null {
   }
 }
 
+function findSelectedTutorialLesson(
+  categories: EduCategory[],
+  playingLink: string | null,
+): SelectedTutorialLesson | null {
+  const target = (playingLink ?? "").trim();
+  if (!target) return null;
+
+  for (const category of categories ?? []) {
+    for (const course of category.courses ?? []) {
+      const courseLink = (course.link ?? "").trim();
+      const courseType = (course.course_type ?? "").trim().toLowerCase();
+      if (courseType === "standalone" && courseLink === target) {
+        return {
+          category,
+          course,
+          lesson: {
+            id: course.id,
+            title: course.title,
+            duration: course.duration,
+            link: course.link,
+            sort_order: course.sort_order,
+            created_at: course.created_at,
+            updated_at: course.updated_at,
+          },
+        };
+      }
+      for (const lesson of course.lessons ?? []) {
+        if ((lesson.link ?? "").trim() === target) {
+          return { category, course, lesson };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 export function renderTutorials(props: TutorialsProps) {
   const orderedCategories = [...(props.categories ?? [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, "zh-Hans-CN"),
@@ -77,6 +120,7 @@ export function renderTutorials(props: TutorialsProps) {
     });
 
   const embedUrl = props.playingLink ? toBilibiliEmbedUrl(props.playingLink) : null;
+  const selectedLesson = findSelectedTutorialLesson(orderedCategories, props.playingLink);
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
       <div class="emp-search">
@@ -93,40 +137,6 @@ export function renderTutorials(props: TutorialsProps) {
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
     </div>
   `;
-
-  if (embedUrl) {
-    return html`
-    <main class="tutorials-page">
-      <div class="tutorials-board__header">
-        <div class="tutorials-board__title-wrap">
-          <h2 class="tutorials-board__title">OpenOcta 教程</h2>
-        </div>
-        <button class="btn btn--sm" type="button" @click=${props.onPlayingClose}>返回教程</button>
-      </div>
-      <div class="tutorials-board__body">
-        <div class="tutorials-video-context">
-          <div class="tutorials-video-wrap">
-            <iframe
-              src=${embedUrl}
-              scrolling="no"
-              border="0"
-              frameborder="no"
-              framespacing="0"
-              allowfullscreen="true"
-              title="B站视频播放"
-            ></iframe>
-            <a
-              class="tutorials-bilibili-link"
-              href=${props.playingLink!}
-              target="_blank"
-              rel="noopener noreferrer"
-            >在哔哩哔哩打开</a>
-          </div>
-        </div>
-      </div>
-    </main>
-  `;
-  }
 
   return html`
     <main class="tutorials-page">
@@ -254,6 +264,55 @@ export function renderTutorials(props: TutorialsProps) {
           }
         </div>
       </div>
+
+      ${props.playingLink
+        ? html`
+            <div class="modal-overlay" @click=${props.onPlayingClose} role="dialog" aria-modal="true" aria-labelledby="tutorial-detail-title">
+              <div class="modal card emp-detail-modal emp-detail-modal--large tutorials-detail-modal" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="emp-detail-modal__header tutorials-detail-modal__header">
+                  <div class="emp-detail-header tutorials-detail-modal__header-main">
+                    <h1 id="tutorial-detail-title" class="emp-detail-title tutorials-detail-modal__title">
+                      ${selectedLesson?.lesson.title ?? "教程详情"}
+                    </h1>
+                  </div>
+                  <div class="tutorials-detail-modal__actions">
+                    <a
+                      class="btn"
+                      href=${props.playingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      @click=${(e: Event) => e.stopPropagation()}
+                    >
+                      打开原链接
+                    </a>
+                    <button class="btn emp-detail-modal__close" aria-label="关闭" @click=${props.onPlayingClose}>×</button>
+                  </div>
+                </div>
+                <div class="emp-detail-modal__body tutorials-detail-modal__body">
+                  ${embedUrl
+                    ? html`
+                        <div class="tutorials-video-context tutorials-detail-video-context">
+                          <div class="tutorials-video-wrap tutorials-detail-video-wrap">
+                            <iframe
+                              src=${embedUrl}
+                              scrolling="no"
+                              border="0"
+                              frameborder="no"
+                              framespacing="0"
+                              allowfullscreen="true"
+                              title=${selectedLesson?.lesson.title ?? "B站视频播放"}
+                            ></iframe>
+                          </div>
+                        </div>
+                      `
+                    : html`
+                        <div class="callout info">该教程暂不支持内嵌播放，请点击“打开原链接”查看详情。</div>
+                      `}
+                </div>
+              </div>
+            </div>
+          `
+        : nothing}
     </main>
   `;
 }

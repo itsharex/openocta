@@ -4,6 +4,7 @@
 **/.claude-trace/
 ./dist
 ./src/embed/frontend/
+/src/embed/frontend/
 !./src/embed/frontend/.gitkeep
 ./src/embed/config-schema.json
 ./src/embed/openocta.json.example

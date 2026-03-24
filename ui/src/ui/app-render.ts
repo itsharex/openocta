@@ -95,7 +95,7 @@ import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { computeSkillLibraryCategories, renderSkillLibrary } from "./views/skill-library.ts";
 import { computeToolLibraryCategories, renderToolLibrary } from "./views/tool-library.ts";
-import { renderTutorials, toBilibiliEmbedUrl } from "./views/tutorials.ts";
+import { renderTutorials } from "./views/tutorials.ts";
 import { requestDesktopUninstall } from "./controllers/desktop-uninstall.ts";
 import { openExternalUrl } from "./open-external-url.ts";
 import { renderAbout } from "./views/about.ts";
@@ -1953,11 +1953,7 @@ export function renderApp(state: AppViewState) {
                 onQueryChange: (next) => (state.tutorialsQuery = next),
                 onSelectCategory: (id) => (state.tutorialsSelectedCategoryId = id),
                 onLessonClick: (link) => {
-                  if (toBilibiliEmbedUrl(link)) {
-                    state.tutorialsPlayingLink = link;
-                  } else {
-                    window.open(link, "_blank", "noopener,noreferrer");
-                  }
+                  state.tutorialsPlayingLink = link;
                 },
                 onPlayingClose: () => (state.tutorialsPlayingLink = null),
                 onRefresh: async () => {

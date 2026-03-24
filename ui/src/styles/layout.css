@@ -1871,11 +1871,6 @@ button.nav-item {
   color: var(--accent);
 }
 
-
-.emp-detail-header {
-  margin-bottom: 16px;
-}
-
 .emp-detail-title-wrap {
   display: flex;
   align-items: center;
@@ -1932,12 +1927,6 @@ button.nav-item {
   font-size: 13px;
   color: var(--muted);
   margin-right: 20px;
-}
-
-.emp-detail-readme {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
 }
 
 .emp-detail-readme-title {
@@ -2451,8 +2440,7 @@ button.nav-item {
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  border: 1px solid #eceff2;
-  border-radius: 12px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -2653,14 +2641,60 @@ button.nav-item {
 }
 
 .tutorials-video-wrap {
-  border-radius: 16px;
-  border: 1px solid #e8ecf0;
+  border-radius: 6px;
   background: #ffffff;
 }
 
 .tutorials-bilibili-link {
   background: rgba(18, 21, 26, 0.74);
   color: #ffffff;
+}
+
+.tutorials-detail-modal {
+  width: min(1120px, 94vw);
+}
+
+.tutorials-detail-modal__header {
+  align-items: flex-start;
+}
+
+.tutorials-detail-modal__header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tutorials-detail-modal__title {
+  margin: 0;
+}
+
+.tutorials-detail-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tutorials-detail-modal__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tutorials-detail-modal__actions a.btn {
+  color: #45474A;
+}
+
+.tutorials-detail-modal__body {
+  padding-top: 8px;
+}
+
+.tutorials-detail-video-context {
+  min-height: 0;
+}
+
+.tutorials-detail-video-wrap {
+  min-height: min(70vh, 472px);
 }
 
 .emp-detail-modal {
@@ -2686,6 +2720,9 @@ button.nav-item {
   font-size: 26px;
   font-weight: 800;
   color: #1f2329;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .emp-detail-summary {
