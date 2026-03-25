@@ -18,9 +18,6 @@
   --accent-glow: rgba(36, 186, 81, 0.15);
   --accent-foreground: #ffffff;
 
-  --ok: #24ba51;
-  --ok-muted: rgba(36, 186, 81, 0.75);
-  --ok-subtle: rgba(36, 186, 81, 0.1);
   --warn: #f79532;
   --warn-muted: rgba(247, 149, 50, 0.75);
   --warn-subtle: rgba(247, 149, 50, 0.1);
@@ -75,9 +72,6 @@
   --accent-glow: rgba(36, 186, 81, 0.15);
   --accent-foreground: #ffffff;
 
-  --ok: #24ba51;
-  --ok-muted: rgba(36, 186, 81, 0.75);
-  --ok-subtle: rgba(36, 186, 81, 0.1);
   --warn: #f79532;
   --warn-muted: rgba(247, 149, 50, 0.75);
   --warn-subtle: rgba(247, 149, 50, 0.1);

@@ -109,7 +109,7 @@
 }
 
 .agent-swarm__tree-node__status--idle {
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .agent-swarm__tree-node__status--busy {
@@ -178,7 +178,7 @@
 }
 
 .agent-swarm__doc--done {
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .agent-swarm__action-list {
@@ -198,9 +198,9 @@
   border-radius: var(--radius-md);
 }
 
-.agent-swarm__status--ok {
-  background: var(--ok-subtle);
-  color: var(--ok);
+.agent-swarm__status--accent {
+  background: var(--accent-subtle);
+  color: var(--accent);
 }
 
 .agent-swarm__viz {
@@ -296,8 +296,8 @@
 }
 
 .agent-swarm__graph-node__circle--human {
-  border-color: var(--ok);
-  background: var(--ok-subtle);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .agent-swarm__graph-node__circle--assistant {
@@ -308,7 +308,7 @@
 }
 
 .agent-swarm__graph-node--child.agent-swarm__graph-node--idle .agent-swarm__graph-node__circle {
-  border-color: var(--ok);
+  border-color: var(--accent);
 }
 
 .agent-swarm__graph-node--child.agent-swarm__graph-node--busy .agent-swarm__graph-node__circle {
@@ -327,7 +327,7 @@
 }
 
 .agent-swarm__graph-node__status--idle {
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .agent-swarm__graph-node__status--busy {
@@ -346,8 +346,8 @@
   padding: 4px 0;
 }
 
-.agent-swarm__event--ok {
-  color: var(--ok);
+.agent-swarm__event--accent {
+  color: var(--accent);
 }
 
 .agent-swarm__detail {
@@ -406,8 +406,8 @@
   padding: 4px 0;
 }
 
-.agent-swarm__realtime-item--ok {
-  color: var(--ok);
+.agent-swarm__realtime-item--accent {
+  color: var(--accent);
 }
 
 .agent-swarm__realtime-item--mono {

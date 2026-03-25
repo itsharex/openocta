@@ -85,7 +85,7 @@ export function renderAgentSwarm() {
               <li>SRE: 更新 runbook 与告警规则</li>
               <li>安全/网络: 待命，如有异常立即介入</li>
             </ol>
-            <div class="agent-swarm__status agent-swarm__status--ok">
+            <div class="agent-swarm__status agent-swarm__status--accent">
               根因已定位，回滚方案已确认，执行中 🚀
             </div>
           </div>
@@ -150,8 +150,8 @@ export function renderAgentSwarm() {
             </div>
             <div class="agent-swarm__events">
               <div class="agent-swarm__section-title">事件流</div>
-              <div class="agent-swarm__event agent-swarm__event--ok">16:05:22 故障已解决，服务恢复</div>
-              <div class="agent-swarm__event agent-swarm__event--ok">16:04:58 回滚验证通过，健康检查 OK</div>
+              <div class="agent-swarm__event agent-swarm__event--accent">16:05:22 故障已解决，服务恢复</div>
+              <div class="agent-swarm__event agent-swarm__event--accent">16:04:58 回滚验证通过，健康检查 OK</div>
               <div class="agent-swarm__event">16:04:15 云原生运维: 执行 kubectl rollout undo</div>
               <div class="agent-swarm__event">16:03:40 故障分析: 根因报告已输出</div>
               <div class="agent-swarm__event">16:02:18 SRE: 定位到 api-gateway OOM，建议回滚</div>
@@ -176,10 +176,10 @@ export function renderAgentSwarm() {
               收到 SRE 采集的 api-gateway 日志，开始解析 OOM 相关堆栈与内存指标...
             </div>
             <div class="agent-swarm__realtime-title">Realtime content</div>
-            <div class="agent-swarm__realtime-item agent-swarm__realtime-item--ok">
+            <div class="agent-swarm__realtime-item agent-swarm__realtime-item--accent">
               root_cause_analysis.md 已生成 ✓
             </div>
-            <div class="agent-swarm__realtime-item agent-swarm__realtime-item--ok">
+            <div class="agent-swarm__realtime-item agent-swarm__realtime-item--accent">
               根因: 内存泄漏，建议回滚至 v1.2.3 ✓
             </div>
             <div class="agent-swarm__realtime-title">Realtime tools</div>

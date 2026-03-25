@@ -234,9 +234,9 @@ img.chat-avatar {
 .chat-copy-btn[data-copied="1"] {
   opacity: 1;
   pointer-events: auto;
-  border-color: var(--ok-subtle);
-  background: var(--ok-subtle);
-  color: var(--ok);
+  border-color: var(--accent-subtle);
+  background: var(--accent-subtle);
+  color: var(--accent);
 }
 
 .chat-copy-btn:focus-visible {

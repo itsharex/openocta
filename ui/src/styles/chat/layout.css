@@ -629,7 +629,7 @@
   padding: 0 !important;
   border-radius: 50% !important;
   border: none !important;
-  background: var(--ok) !important;
+  background: var(--accent) !important;
   color: #fff !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -639,7 +639,7 @@
 }
 
 .chat-compose__send:hover:not(:disabled) {
-  background: var(--ok-muted) !important;
+  background: var(--accent-muted) !important;
   transform: scale(1.05);
 }
 

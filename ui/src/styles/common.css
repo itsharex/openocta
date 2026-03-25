@@ -65,9 +65,9 @@
   font-size: 11px;
 }
 
-.pill--ok {
+.pill--accent {
   border-color: rgba(34, 197, 94, 0.35);
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .pill--danger {
@@ -267,7 +267,7 @@
 .callout.success {
   border-color: rgba(34, 197, 94, 0.25);
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.04) 100%);
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .chip-row {
@@ -300,9 +300,9 @@
 }
 
 .chip-ok {
-  color: var(--ok);
+  color: var(--accent);
   border-color: rgba(34, 197, 94, 0.3);
-  background: var(--ok-subtle);
+  background: var(--accent-subtle);
 }
 
 .chip-warn {

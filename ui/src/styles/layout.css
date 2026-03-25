@@ -601,7 +601,7 @@ button.nav-item {
 }
 
 .top-tab--active .nav-item__icon svg {
-  stroke: var(--ok);
+  stroke: var(--accent);
 }
 
 /* ===========================================

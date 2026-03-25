@@ -34,7 +34,7 @@
 }
 
 .stat-value.ok {
-  color: var(--ok);
+  color: var(--accent);
 }
 
 .stat-value.warn {
@@ -143,7 +143,7 @@
 }
 
 .statusDot.ok {
-  background: var(--ok);
+  background: var(--accent);
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
   animation: none;
 }
@@ -331,9 +331,9 @@
 }
 
 .cron-job-status-ok {
-  color: var(--ok);
+  color: var(--accent);
   border-color: rgba(34, 197, 94, 0.35);
-  background: var(--ok-subtle);
+  background: var(--accent-subtle);
 }
 
 .cron-job-status-error {

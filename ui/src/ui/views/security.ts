@@ -120,11 +120,11 @@ export function renderSecurity(props: SecurityProps) {
           </div>
           <div>
             <div class="muted" style="font-size: 12px;">${t("securityOverviewSandbox")}</div>
-            <div style="font-size: 16px; font-weight: 600; color: ${sandboxEnabled ? "var(--ok, #16a34a)" : "var(--text-secondary)"};">${sandboxEnabled ? t("sandboxEnabled") : t("sandboxDisabled")}</div>
+            <div style="font-size: 16px; font-weight: 600; color: ${sandboxEnabled ? "var(--accent, #16a34a)" : "var(--text-secondary)"};">${sandboxEnabled ? t("sandboxEnabled") : t("sandboxDisabled")}</div>
           </div>
           <div>
             <div class="muted" style="font-size: 12px;">${t("securityOverviewCommandPolicy")}</div>
-            <div style="font-size: 16px; font-weight: 600; color: ${commandPolicyEnabled ? "var(--ok, #16a34a)" : "var(--text-secondary)"};">${commandPolicyEnabled ? t("sandboxEnabled") : t("sandboxDisabled")}</div>
+            <div style="font-size: 16px; font-weight: 600; color: ${commandPolicyEnabled ? "var(--accent, #16a34a)" : "var(--text-secondary)"};">${commandPolicyEnabled ? t("sandboxEnabled") : t("sandboxDisabled")}</div>
           </div>
           <div>
             <div class="muted" style="font-size: 12px;">${t("securityOverviewPendingApprovals")}</div>

@@ -472,7 +472,7 @@ export function renderConfig(props: ConfigProps) {
           <div class="config-sidebar__title">${t("configSettingsTitle")}</div>
           <span
             class="pill pill--sm ${
-              validity === "valid" ? "pill--ok" : validity === "invalid" ? "pill--danger" : ""
+              validity === "valid" ? "pill--accent" : validity === "invalid" ? "pill--danger" : ""
             }"
             >${
               validity === "valid"
