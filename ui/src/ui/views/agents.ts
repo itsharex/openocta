@@ -1223,7 +1223,7 @@ function renderAgentCron(params: {
                         ${params.loading ? t("commonRefreshing") : t("commonRefresh")}
                     </button>
                 </div>
-                <div class="stat-grid" style="margin-top: 16px;">
+                <div class="stat-grid">
                     <div class="stat">
                         <div class="stat-label">${t("agentsEnabled")}</div>
                         <div class="stat-value">

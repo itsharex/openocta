@@ -44,6 +44,7 @@ import {
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, getTabGroups, iconForTab, pathForTab, subtitleForTab, titleForTab } from "./navigation.ts";
+import { t } from "./strings.js";
 
 /** 从 session key 提取数字员工 ID，如 agent:main:employee:xxx:run:uuid -> xxx */
 function extractEmployeeIdFromSessionKey(key: string): string | null {
@@ -508,7 +509,7 @@ export function renderApp(state: AppViewState) {
             : isScheduledTasks
               ? html`
                   <div class="nav-group">
-                    <button class="nav-label nav-label--static" type="button">
+                    <button class="nav-label" type="button">
                       <span class="nav-label__text">定时任务</span>
                     </button>
                     <div class="nav-group__items">
@@ -520,7 +521,7 @@ export function renderApp(state: AppViewState) {
               : isConfigArea
                 ? html`
                     <div class="nav-group">
-                      <button class="nav-label nav-label--static" type="button">
+                      <button class="nav-label" type="button">
                         <span class="nav-label__text">控制</span>
                       </button>
                       <div class="nav-group__items">
@@ -531,7 +532,7 @@ export function renderApp(state: AppViewState) {
                       </div>
                     </div>
                     <div class="nav-group">
-                      <button class="nav-label nav-label--static" type="button">
+                      <button class="nav-label" type="button">
                         <span class="nav-label__text">Agent</span>
                       </button>
                       <div class="nav-group__items">
@@ -541,7 +542,7 @@ export function renderApp(state: AppViewState) {
                       </div>
                     </div>
                     <div class="nav-group">
-                      <button class="nav-label nav-label--static" type="button">
+                      <button class="nav-label" type="button">
                         <span class="nav-label__text">配置</span>
                       </button>
                       <div class="nav-group__items">
@@ -551,7 +552,7 @@ export function renderApp(state: AppViewState) {
                       </div>
                     </div>
                     <div class="nav-group">
-                      <button class="nav-label nav-label--static" type="button">
+                      <button class="nav-label" type="button">
                         <span class="nav-label__text">资源</span>
                       </button>
                       <div class="nav-group__items">
@@ -681,8 +682,27 @@ export function renderApp(state: AppViewState) {
               <section class="content-header">
                 <div>
                   ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
+                  ${
+                    state.tab === "cron" || state.tab === "scheduledTasks"
+                      ? html`<div class="page-summary">网关中所有已调度任务</div>`
+                      : state.tab === "cronHistory"
+                        ? html`<div class="page-summary">选择任务以查看运行历史</div>`
+                      : nothing
+                  }
                 </div>
                 <div class="page-meta">
+                  ${
+                    state.tab === "cron" || state.tab === "scheduledTasks"
+                      ? html`
+                          <button class="btn" ?disabled=${state.cronLoading} @click=${() => state.loadCron()}>
+                            ${state.cronLoading ? t("commonRefreshing") : t("commonRefresh")}
+                          </button>
+                          <button class="btn primary" @click=${() => (state.cronAddModalOpen = true)}>
+                            新建任务
+                          </button>
+                        `
+                      : nothing
+                  }
                   ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
                   ${isChat ? renderChatControls(state) : nothing}
                 </div>
@@ -1110,6 +1130,7 @@ export function renderApp(state: AppViewState) {
                 error: state.cronError,
                 busy: state.cronBusy,
                 form: state.cronForm,
+                addModalOpen: state.cronAddModalOpen,
                 channels: state.channelsSnapshot?.channelMeta?.length
                   ? state.channelsSnapshot.channelMeta.map((entry) => entry.id)
                   : (state.channelsSnapshot?.channelOrder ?? []),
@@ -1119,7 +1140,14 @@ export function renderApp(state: AppViewState) {
                 runs: state.cronRuns,
                 onFormChange: (patch) => (state.cronForm = { ...state.cronForm, ...patch }),
                 onRefresh: () => state.loadCron(),
-                onAdd: () => addCronJob(state),
+                onOpenAddModal: () => (state.cronAddModalOpen = true),
+                onCloseAddModal: () => (state.cronAddModalOpen = false),
+                onAdd: async () => {
+                  await addCronJob(state);
+                  if (!state.cronError) {
+                    state.cronAddModalOpen = false;
+                  }
+                },
                 onToggle: (job, enabled) => toggleCronJob(state, job, enabled),
                 onRun: (job) => runCronJob(state, job),
                 onRemove: (job) => removeCronJob(state, job),

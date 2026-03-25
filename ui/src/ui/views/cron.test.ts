@@ -2,7 +2,7 @@ import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import type { CronJob } from "../types.ts";
 import { DEFAULT_CRON_FORM } from "../app-defaults.ts";
-import { renderCronHistory, type CronProps } from "./cron.ts";
+import { renderCronConfig, renderCronHistory, type CronProps } from "./cron.ts";
 
 function createJob(id: string): CronJob {
   return {
@@ -27,12 +27,15 @@ function createProps(overrides: Partial<CronProps> = {}): CronProps {
     error: null,
     busy: false,
     form: { ...DEFAULT_CRON_FORM },
+    addModalOpen: false,
     channels: [],
     channelLabels: {},
     runsJobId: null,
     runs: [],
     onFormChange: () => undefined,
     onRefresh: () => undefined,
+    onOpenAddModal: () => undefined,
+    onCloseAddModal: () => undefined,
     onAdd: () => undefined,
     onToggle: () => undefined,
     onRun: () => undefined,
@@ -43,14 +46,23 @@ function createProps(overrides: Partial<CronProps> = {}): CronProps {
 }
 
 describe("cron view", () => {
-  it("prompts to select a job before showing run history", () => {
+  it("renders add-job form inside a modal when opened", () => {
+    const container = document.createElement("div");
+    render(renderCronConfig(createProps({ addModalOpen: true })), container);
+
+    expect(container.querySelector(".cron-config-modal")).not.toBeNull();
+    expect(container.textContent).toContain("New Job");
+    expect(container.textContent).toContain("Add job");
+  });
+
+  it("shows an empty state when there are no jobs to inspect", () => {
     const container = document.createElement("div");
     render(renderCronHistory(createProps()), container);
 
-    expect(container.textContent).toContain("Select a job to inspect run history.");
+    expect(container.textContent).toContain("No jobs yet.");
   });
 
-  it("loads run history when clicking a job row", () => {
+  it("loads run history when selecting a job", () => {
     const container = document.createElement("div");
     const onLoadRuns = vi.fn();
     const job = createJob("job-1");
@@ -64,39 +76,30 @@ describe("cron view", () => {
       container,
     );
 
-    const row = container.querySelector(".list-item-clickable");
-    expect(row).not.toBeNull();
-    row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const select = container.querySelector("select");
+    expect(select).not.toBeNull();
+    select!.value = "job-1";
+    select?.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(onLoadRuns).toHaveBeenCalledWith("job-1");
   });
 
-  it("marks the selected job and keeps History button to a single call", () => {
+  it("reflects the selected job in the task selector", () => {
     const container = document.createElement("div");
-    const onLoadRuns = vi.fn();
     const job = createJob("job-1");
     render(
       renderCronHistory(
         createProps({
           jobs: [job],
           runsJobId: "job-1",
-          onLoadRuns,
         }),
       ),
       container,
     );
 
-    const selected = container.querySelector(".list-item-selected");
-    expect(selected).not.toBeNull();
-
-    const historyButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "History",
-    );
-    expect(historyButton).not.toBeUndefined();
-    historyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-    expect(onLoadRuns).toHaveBeenCalledTimes(1);
-    expect(onLoadRuns).toHaveBeenCalledWith("job-1");
+    const select = container.querySelector("select") as HTMLSelectElement | null;
+    expect(select).not.toBeNull();
+    expect(select?.value).toBe("job-1");
   });
 
   it("renders run chat links when session keys are present", () => {
@@ -144,13 +147,12 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Latest runs for Daily ping.");
-
     const cards = Array.from(container.querySelectorAll(".card"));
-    const runHistoryCard = cards.find(
-      (card) => card.querySelector(".card-title")?.textContent?.trim() === "Run history",
-    );
-    expect(runHistoryCard).not.toBeUndefined();
+    expect(cards).toHaveLength(1);
+    const runHistoryCard = cards[0];
+
+    const select = runHistoryCard.querySelector("select") as HTMLSelectElement | null;
+    expect(select?.value).toBe("job-1");
 
     const summaries = Array.from(
       runHistoryCard?.querySelectorAll(".list-item .list-sub") ?? [],

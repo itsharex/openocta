@@ -17,4 +17,4 @@
 ./openocta
 .DS_Store
 ./docs/
-/ui/src/ui/__screenshots__
+__screenshots__

@@ -4,33 +4,30 @@
    Stats - Bold values, subtle labels
    =========================================== */
 
-.stat {
-  background: var(--bg);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  transition:
-    border-color var(--duration-normal) var(--ease-out);
+.stat-grid {
+  margin-top: 20px;
+  display: flex;
+  gap: 20px 72px;
+  flex-wrap: wrap;
 }
 
-.stat:hover {
-  border-color: var(--border-primary);
+.stat {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
 }
 
 .stat-label {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 26px;
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  margin-top: 6px;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 36px;
 }
 
 .stat-value.ok {
@@ -360,6 +357,47 @@
 
 .cron-job-actions .btn {
   flex: 0 0 auto;
+}
+
+.cron-config-stack {
+  gap: 18px;
+}
+
+.cron-config-stack-history,
+.cron-jobs-card {
+  flex: 1;
+}
+
+.cron-config-stack-history .field {
+  width: 320px;
+}
+
+.cron-config-modal {
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cron-config-modal__sub {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.cron-config-modal__body {
+  display: grid;
+  gap: 14px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 18px 4px 0 0;
+}
+
+.cron-config-modal__actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 @container (max-width: 560px) {

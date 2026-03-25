@@ -181,7 +181,7 @@ export function renderOverview(props: OverviewProps) {
       <div class="card">
         <div class="card-title">${t("overviewSnapshot")}</div>
         <div class="card-sub">${t("overviewSnapshotSub")}</div>
-        <div class="stat-grid" style="margin-top: 16px;">
+        <div class="stat-grid">
           <div class="stat">
             <div class="stat-label">${t("overviewStatus")}</div>
             <div class="stat-value ${props.connected ? "ok" : "warn"}">

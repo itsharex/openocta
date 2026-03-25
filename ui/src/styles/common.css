@@ -3,32 +3,28 @@
    =========================================== */
 
 .card {
-  border: 1px solid var(--border);
   background: var(--bg);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   padding: 20px;
-  animation: rise 0.35s var(--ease-out) backwards;
-  transition:
-    border-color var(--duration-normal) var(--ease-out),
-    transform var(--duration-normal) var(--ease-out);
-}
-
-.card:hover {
-  border-color: var(--border-primary);
+  transition: transform var(--duration-normal) var(--ease-out);
 }
 
 .card-title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
   color: var(--text-primary);
 }
 
 .card-sub {
   color: var(--text-secondary);
   font-size: 13px;
-  margin-top: 6px;
-  line-height: 1.5;
+  font-weight: normal;
+  line-height: 14px;
+}
+
+.card-title + .card-sub {
+  margin-top: 12px;
 }
 
 .label {
@@ -318,6 +314,7 @@
 }
 
 .modal-overlay {
+  margin: 0 !important;
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -373,19 +370,6 @@
 
 .list-item-clickable {
   cursor: pointer;
-}
-
-.list-item-clickable:hover {
-  border-color: var(--border-primary);
-}
-
-.list-item-selected {
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.list-item.active {
-  background: var(--bg2);
 }
 
 .list-main {
