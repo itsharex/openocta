@@ -1,39 +1,6 @@
 @import "./chat.css";
 
 /* ===========================================
-   Cards - Refined with depth
-   =========================================== */
-
-.card {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  animation: rise 0.35s var(--ease-out) backwards;
-  transition:
-    border-color var(--duration-normal) var(--ease-out),
-    transform var(--duration-normal) var(--ease-out);
-}
-
-.card:hover {
-  border-color: var(--border-primary);
-}
-
-.card-title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-.card-sub {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 6px;
-  line-height: 1.5;
-}
-
-/* ===========================================
    Stats - Bold values, subtle labels
    =========================================== */
 
@@ -163,39 +130,6 @@
 }
 
 /* ===========================================
-   Labels & Pills
-   =========================================== */
-
-.label {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  background: var(--bg-content);
-  font-size: 13px;
-  font-weight: 500;
-  transition: border-color var(--duration-fast) ease;
-}
-
-.pill:hover {
-  border-color: var(--border-primary);
-}
-
-.pill.danger {
-  border-color: var(--danger-subtle);
-  background: var(--danger-subtle);
-  color: var(--danger);
-}
-
-/* ===========================================
    Status Dot - With glow for emphasis
    =========================================== */
 
@@ -214,164 +148,6 @@
   animation: none;
 }
 
-/* ===========================================
-   Buttons - Tactile with personality
-   =========================================== */
-
-.btn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  gap: 4px;
-  border: none;
-  background: #fff;
-  padding: 2px 16px;
-  border-radius: 4px;
-  font-size: 13px;
-  line-height: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.btn svg {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.5px;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  flex-shrink: 0;
-}
-
-.btn.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-/* Keyboard shortcut badge (shadcn style) */
-.btn-kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 6px;
-  padding: 2px 5px;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  color: inherit;
-  opacity: 0.8;
-}
-
-.btn.primary .btn-kbd {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-:root[data-theme="light"] .btn-kbd {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-:root[data-theme="light"] .btn.primary .btn-kbd {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.btn.active {
-  border-color: var(--accent);
-  background: var(--accent-subtle);
-  color: var(--accent);
-}
-
-.btn.danger {
-  border-color: transparent;
-  background: var(--danger-subtle);
-  color: var(--danger);
-}
-
-.btn.danger:hover {
-  background: rgba(239, 68, 68, 0.15);
-}
-
-.btn--sm {
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ===========================================
-   Form Fields
-   =========================================== */
-
-.field {
-  display: grid;
-  gap: 6px;
-}
-
-.field.full {
-  grid-column: 1 / -1;
-}
-
-.field span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.field input,
-.field textarea,
-.field select {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  outline: none;
-  transition:
-    border-color var(--duration-fast) ease,
-    box-shadow var(--duration-fast) ease;
-}
-
-.field input:focus,
-.field textarea:focus,
-.field select:focus {
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field select {
-  appearance: none;
-  padding-right: 36px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  cursor: pointer;
-}
-
-.field textarea {
-  font-family: var(--mono);
-  min-height: 160px;
-  resize: vertical;
-  white-space: pre;
-  line-height: 1.5;
-}
-
-.field.checkbox {
-  grid-template-columns: auto 1fr;
-  align-items: center;
-}
-
 .config-form .field.checkbox {
   grid-template-columns: 18px minmax(0, 1fr);
   column-gap: 10px;
@@ -382,67 +158,6 @@
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
-}
-
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
-:root[data-theme="light"] .field input,
-:root[data-theme="light"] .field textarea,
-:root[data-theme="light"] .field select {
-  background: var(--bg);
-  border-color: var(--border);
-}
-
-:root[data-theme="light"] .btn.primary {
-  background: #24BA51;
-}
-
-/* ===========================================
-   Utilities
-   =========================================== */
-
-.muted {
-  color: var(--text-secondary);
-}
-
-.mono {
-  font-family: var(--mono);
-}
-
-/* ===========================================
-   Callouts - Informative with subtle depth
-   =========================================== */
-
-.callout {
-  padding: 14px 16px;
-  border-radius: var(--radius-md);
-  background: var(--bg-content);
-  border: 1px solid var(--border);
-  font-size: 13px;
-  line-height: 1.5;
-  position: relative;
-}
-
-.callout.danger {
-  border-color: rgba(239, 68, 68, 0.25);
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%);
-  color: var(--danger);
-}
-
-.callout.info {
-  border-color: rgba(59, 130, 246, 0.25);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%);
-  color: var(--info);
-}
-
-.callout.success {
-  border-color: rgba(34, 197, 94, 0.25);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.04) 100%);
-  color: var(--ok);
 }
 
 /* Compaction indicator */
@@ -488,41 +203,6 @@
   max-width: 100%;
 }
 
-:root[data-theme="light"] .code-block,
-:root[data-theme="light"] .list-item,
-:root[data-theme="light"] .table-row,
-:root[data-theme="light"] .chip {
-  background: var(--bg);
-}
-
-/* ===========================================
-   Lists
-   =========================================== */
-
-.list {
-  display: grid;
-  gap: 8px;
-  container-type: inline-size;
-}
-
-.list-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
-  gap: 16px;
-  align-items: start;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: var(--bg);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) ease;
-}
-
-.list-item:hover {
-  border-color: var(--border-primary);
-}
-
 /* 数字员工等：按钮始终在右侧，不随响应式堆叠到下方 */
 .list-item--row {
   display: flex !important;
@@ -538,47 +218,6 @@
 }
 .list-item--row .row {
   flex-shrink: 0;
-}
-
-.list-item-clickable {
-  cursor: pointer;
-}
-
-.list-item-clickable:hover {
-  border-color: var(--border-primary);
-}
-
-.list-item-selected {
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.list-item.active {
-  background: var(--bg2);
-}
-
-.list-main {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.list-title {
-  font-weight: 500;
-}
-
-.list-sub {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.list-meta {
-  text-align: right;
-  color: var(--text-secondary);
-  font-size: 12px;
-  display: grid;
-  gap: 4px;
-  min-width: 200px;
 }
 
 .list-meta .btn {
@@ -749,93 +388,6 @@
     flex-direction: column;
     align-items: stretch;
   }
-}
-
-/* ===========================================
-   Chips - Compact and punchy
-   =========================================== */
-
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  padding: 5px 12px;
-  color: var(--text-secondary);
-  background: var(--bg-content);
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.chip:hover {
-  border-color: var(--border-primary);
-  transform: translateY(-1px);
-}
-
-.chip input {
-  margin-right: 6px;
-}
-
-.chip-ok {
-  color: var(--ok);
-  border-color: rgba(34, 197, 94, 0.3);
-  background: var(--ok-subtle);
-}
-
-.chip-warn {
-  color: var(--warn);
-  border-color: rgba(245, 158, 11, 0.3);
-  background: var(--warn-subtle);
-}
-
-.chip-danger {
-  color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.3);
-  background: var(--danger-subtle);
-}
-
-/* ===========================================
-   Tables
-   =========================================== */
-
-.table {
-  display: grid;
-  gap: 6px;
-}
-
-.table-head,
-.table-row {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 0.8fr 0.7fr 0.8fr 0.8fr 0.8fr 0.8fr 0.6fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.table-head {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  padding: 0 12px;
-}
-
-.table-row {
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  transition: border-color var(--duration-fast) ease;
-}
-
-.table-row:hover {
-  border-color: var(--border-primary);
 }
 
 .session-link {
@@ -1600,28 +1152,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-}
-
-/* ===========================================
-   Modal Overlay (skills upload, etc.)
-   =========================================== */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 150;
-}
-
-.modal-overlay .modal {
-  width: min(880px, 100%);
-  max-height: 90vh;
-  overflow-y: auto;
 }
 
 /* ===========================================
@@ -2394,15 +1924,6 @@
   border-left: 3px solid var(--danger, #c62828);
 }
 
-.btn--danger-outline {
-  border-color: color-mix(in srgb, var(--danger, #c62828) 45%, var(--border));
-  color: var(--danger, #c62828);
-}
-
-.btn--danger-outline:hover {
-  background: color-mix(in srgb, var(--danger, #c62828) 8%, transparent);
-}
-
 .about-uninstall-modal {
   max-width: 560px;
   width: min(560px, calc(100vw - 32px));
@@ -2490,39 +2011,4 @@
   line-height: 1.5;
   color: var(--danger, #c62828);
   background: color-mix(in srgb, var(--danger, #c62828) 10%, transparent);
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.modal__title {
-  margin: 0 0 8px;
-  font-size: 17px;
-}
-
-.modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.btn__icon {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-right: 6px;
-}
-
-.btn__icon svg {
-  width: 16px;
-  height: 16px;
 }
