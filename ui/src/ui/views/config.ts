@@ -496,13 +496,13 @@ export function renderConfig(props: ConfigProps) {
             <circle cx="11" cy="11" r="8"></circle>
             <path d="M21 21l-4.35-4.35"></path>
           </svg>
-          <input
+          <span class="input"><input
             type="text"
             class="config-search__input"
             placeholder=${t("configSearchPlaceholder")}
             .value=${props.searchQuery}
             @input=${(e: Event) => props.onSearchChange((e.target as HTMLInputElement).value)}
-          />
+          /></span>
           ${
             props.searchQuery
               ? html`
@@ -728,11 +728,11 @@ export function renderConfig(props: ConfigProps) {
               : html`
                 <label class="field config-raw-field">
                   <span>${t("configRawJson5")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     .value=${props.raw}
                     @input=${(e: Event) =>
                       props.onRawChange((e.target as HTMLTextAreaElement).value)}
-                  ></textarea>
+                  ></textarea></span>
                 </label>
               `
           }

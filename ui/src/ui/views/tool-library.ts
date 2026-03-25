@@ -237,14 +237,14 @@ export function renderToolLibrary(props: ToolLibraryProps) {
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
       <div class="emp-search">
-        <input
+        <span class="input"><input
           class="emp-search__input"
           type="text"
           placeholder="搜索 MCP 名称或描述..."
           .value=${props.query}
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
-        />
+        /></span>
         <span class="emp-search__icon" aria-hidden="true">🔍</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
@@ -280,12 +280,12 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                         <div class="card-title">${t("mcpAddServer")}</div>
                         <div class="field" style="margin-top: 12px;">
                           <span>${t("mcpServerName")} *</span>
-                          <input
+                          <span class="input"><input
                             type="text"
                             .value=${props.addName ?? ""}
                             @input=${(e: Event) => props.onAddNameChange?.((e.target as HTMLInputElement).value)}
                             placeholder="prometheus, my-mcp"
-                          />
+                          /></span>
                         </div>
                         <div class="row" style="margin: 12px 0; gap: 8px;">
                           <button
@@ -342,25 +342,25 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                                   </div>
                                   <div class="field">
                                     <span>${t("mcpToolPrefix")}</span>
-                                    <input
+                                    <span class="input"><input
                                       type="text"
                                       .value=${props.addDraft?.toolPrefix ?? ""}
                                       placeholder="Optional"
                                       @input=${(e: Event) =>
                                         props.onAddFormPatch?.({ toolPrefix: (e.target as HTMLInputElement).value })}
-                                    />
+                                    /></span>
                                   </div>
                                 </div>
                               `
                             : html`
                                 <div class="field">
                                   <span>${t("mcpRawJson")}</span>
-                                  <textarea
+                                  <span class="textarea"><textarea
                                     style="min-height: 180px; font-family: var(--mono);"
                                     .value=${props.addRawJson ?? "{}"}
                                     @input=${(e: Event) =>
                                       props.onAddRawChange?.((e.target as HTMLTextAreaElement).value)}
-                                  ></textarea>
+                                  ></textarea></span>
                                   ${
                                     props.addRawError
                                       ? html`<div class="callout danger" style="margin-top: 8px;">${props.addRawError}</div>`

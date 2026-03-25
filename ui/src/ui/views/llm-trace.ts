@@ -140,12 +140,12 @@ export function renderLlmTrace(props: LlmTraceProps) {
       <div class="row" style="margin-top: 16px; gap: 12px; align-items: center;">
         <div class="field" style="flex: 1; min-width: 200px;">
           <span>${t("llmTraceSearch")}</span>
-          <input
+          <span class="input"><input
             type="text"
             .value=${props.search}
             placeholder=${t("llmTraceSearchPlaceholder")}
             @input=${(e: Event) => props.onSearchChange((e.target as HTMLInputElement).value)}
-          />
+          /></span>
         </div>
       </div>
 

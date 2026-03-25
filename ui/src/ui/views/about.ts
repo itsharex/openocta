@@ -91,14 +91,14 @@ export function renderAbout(props: AboutViewProps) {
                       class="about-uninstall-card ${props.uninstallMode === "program" ? "about-uninstall-card--selected" : ""}"
                     >
                       <label class="about-uninstall-mode-label">
-                        <input
+                        <span class="radio"><input
                           type="radio"
                           name="oo-uninstall-mode"
                           value="program"
                           ?checked=${props.uninstallMode === "program"}
                           ?disabled=${props.uninstallLoading}
                           @change=${() => props.onUninstallModeChange("program")}
-                        />
+                        /></span>
                         <span class="about-uninstall-mode-title">仅卸载程序</span>
                       </label>
                       <p>
@@ -116,14 +116,14 @@ export function renderAbout(props: AboutViewProps) {
                         : ""}"
                     >
                       <label class="about-uninstall-mode-label">
-                        <input
+                        <span class="radio"><input
                           type="radio"
                           name="oo-uninstall-mode"
                           value="full"
                           ?checked=${props.uninstallMode === "full"}
                           ?disabled=${props.uninstallLoading}
                           @change=${() => props.onUninstallModeChange("full")}
-                        />
+                        /></span>
                         <span class="about-uninstall-mode-title">全部卸载</span>
                       </label>
                       <p>删除应用程序<strong>以及</strong>本地状态目录（配置、会话、日志、缓存等）。</p>

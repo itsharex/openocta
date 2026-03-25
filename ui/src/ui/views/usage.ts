@@ -3823,7 +3823,7 @@ function renderSessionsCard(
         </div>
         <label class="sessions-sort">
           <span>${t("usageSort")}</span>
-          <select
+          <span class="select"><select
             @change=${(e: Event) => onSessionSortChange((e.target as HTMLSelectElement).value as typeof sessionSort)}
           >
             <option value="cost" ?selected=${sessionSort === "cost"}>${t("usageCost")}</option>
@@ -3831,7 +3831,7 @@ function renderSessionsCard(
             <option value="messages" ?selected=${sessionSort === "messages"}>${t("usageMessagesCol")}</option>
             <option value="recent" ?selected=${sessionSort === "recent"}>${t("usageRecent")}</option>
             <option value="tokens" ?selected=${sessionSort === "tokens"}>${t("usageTokensCol")}</option>
-          </select>
+          </select></span>
         </label>
         <button
           class="btn btn-sm sessions-action-btn icon"
@@ -4605,7 +4605,7 @@ function renderSessionLogsCompact(
         </button>
       </div>
       <div class="usage-filters-inline" style="margin: 10px 12px;">
-        <select
+        <span class="select"><select
           multiple
           size="4"
           @change=${(event: Event) =>
@@ -4619,8 +4619,8 @@ function renderSessionLogsCompact(
           <option value="assistant" ?selected=${roleSelected.has("assistant")}>${t("usageAssistant")}</option>
           <option value="tool" ?selected=${roleSelected.has("tool")}>${t("usageTool")}</option>
           <option value="toolResult" ?selected=${roleSelected.has("toolResult")}>${t("usageToolResult")}</option>
-        </select>
-        <select
+        </select></span>
+        <span class="select"><select
           multiple
           size="4"
           @change=${(event: Event) =>
@@ -4634,22 +4634,22 @@ function renderSessionLogsCompact(
             (tool) =>
               html`<option value=${tool} ?selected=${toolSelected.has(tool)}>${tool}</option>`,
           )}
-        </select>
+        </select></span>
         <label class="usage-filters-inline" style="gap: 6px;">
-          <input
+          <span class="checkbox"><input
             type="checkbox"
             .checked=${filters.hasTools}
             @change=${(event: Event) =>
               onFilterHasToolsChange((event.target as HTMLInputElement).checked)}
-          />
+          /></span>
           ${t("usageHasTools")}
         </label>
-        <input
+        <span class="input"><input
           type="text"
           placeholder=${t("usageSearchConversation")}
           .value=${filters.query}
           @input=${(event: Event) => onFilterQueryChange((event.target as HTMLInputElement).value)}
-        />
+        /></span>
         <button class="btn btn-sm usage-action-btn usage-secondary-btn" @click=${onFilterClear}>
           ${t("usageClear")}
         </button>
@@ -5081,7 +5081,7 @@ export function renderUsage(props: UsageProps) {
               const checked = selectedSet.has(normalizeQueryText(value));
               return html`
                 <label class="usage-filter-option">
-                  <input
+                  <span class="checkbox"><input
                     type="checkbox"
                     .checked=${checked}
                     @change=${(e: Event) => {
@@ -5093,7 +5093,7 @@ export function renderUsage(props: UsageProps) {
                           : removeQueryToken(props.queryDraft, token),
                       );
                     }}
-                  />
+                  /></span>
                   <span>${value}</span>
                 </label>
               `;
@@ -5260,7 +5260,7 @@ export function renderUsage(props: UsageProps) {
             title="End Date"
             @change=${(e: Event) => props.onEndDateChange((e.target as HTMLInputElement).value)}
           />
-          <select
+          <span class="select"><select
             title="Time zone"
             .value=${props.timeZone}
             @change=${(e: Event) =>
@@ -5268,7 +5268,7 @@ export function renderUsage(props: UsageProps) {
           >
             <option value="local">Local</option>
             <option value="utc">UTC</option>
-          </select>
+          </select></span>
           <div class="chart-toggle">
             <button
               class="toggle-btn ${isTokenMode ? "active" : ""}"
@@ -5296,7 +5296,7 @@ export function renderUsage(props: UsageProps) {
 
       <div style="margin-top: 12px;">
           <div class="usage-query-bar">
-          <input
+          <span class="input"><input
             class="usage-query-input"
             type="text"
             .value=${props.queryDraft}
@@ -5308,7 +5308,7 @@ export function renderUsage(props: UsageProps) {
                 props.onApplyQuery();
               }
             }}
-          />
+          /></span>
           <div class="usage-query-actions">
             <button
               class="btn btn-sm usage-action-btn usage-secondary-btn"

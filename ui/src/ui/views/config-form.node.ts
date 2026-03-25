@@ -267,13 +267,12 @@ export function renderNode(params: {
           ${help ? html`<span class="cfg-toggle-row__help">${help}</span>` : nothing}
         </div>
         <div class="cfg-toggle">
-          <input
+          <span class="checkbox"><input
             type="checkbox"
             .checked=${displayValue}
             ?disabled=${disabled}
             @change=${(e: Event) => onPatch(path, (e.target as HTMLInputElement).checked)}
-          />
-          <span class="cfg-toggle__track"></span>
+          /><span class="cfg-toggle__track"></span></span>
         </div>
       </label>
     `;
@@ -332,7 +331,7 @@ function renderTextInput(params: {
       ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
       ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
       <div class="cfg-input-wrap">
-        <input
+        <span class="input"><input
           type=${isSensitive ? "password" : inputType}
           class="cfg-input"
           placeholder=${placeholder}
@@ -358,7 +357,7 @@ function renderTextInput(params: {
             const raw = (e.target as HTMLInputElement).value;
             onPatch(path, raw.trim());
           }}
-        />
+        /></span>
         ${
           schema.default !== undefined
             ? html`
@@ -411,7 +410,7 @@ function renderJsonInput(params: {
       ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
       ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
       <div class="cfg-input-wrap cfg-input-wrap--textarea">
-        <textarea
+        <span class="textarea"><textarea
           class="cfg-textarea cfg-textarea--json"
           rows="6"
           placeholder="{}"
@@ -442,7 +441,7 @@ function renderJsonInput(params: {
               target.value = jsonValue(value ?? schema.default);
             }
           }}
-        ></textarea>
+        ></textarea></span>
         ${
           schema.default !== undefined
             ? html`
@@ -492,7 +491,7 @@ function renderNumberInput(params: {
           ?disabled=${disabled}
           @click=${() => onPatch(path, numValue - 1)}
         >−</button>
-        <input
+        <span class="input"><input
           type="number"
           class="cfg-number__input"
           .value=${displayValue == null ? "" : String(displayValue)}
@@ -502,7 +501,7 @@ function renderNumberInput(params: {
             const parsed = raw === "" ? undefined : Number(raw);
             onPatch(path, parsed);
           }}
-        />
+        /></span>
         <button
           type="button"
           class="cfg-number__btn"
@@ -542,7 +541,7 @@ function renderSelect(params: {
     <div class="cfg-field">
       ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
       ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
-      <select
+      <span class="select"><select
         class="cfg-select"
         ?disabled=${disabled}
         .value=${currentIndex >= 0 ? String(currentIndex) : unset}
@@ -557,7 +556,7 @@ function renderSelect(params: {
           <option value=${String(idx)}>${String(opt)}</option>
         `,
         )}
-      </select>
+      </select></span>
     </div>
   `;
 }
@@ -840,7 +839,7 @@ function renderMapField(params: {
             return html`
               <div class="cfg-map__item">
                 <div class="cfg-map__item-key">
-                  <input
+                  <span class="input"><input
                     type="text"
                     class="cfg-input cfg-input--sm"
                     placeholder="Key"
@@ -859,13 +858,13 @@ function renderMapField(params: {
                       delete next[key];
                       onPatch(path, next);
                     }}
-                  />
+                  /></span>
                 </div>
                 <div class="cfg-map__item-value">
                   ${
                     anySchema
                       ? html`
-                        <textarea
+                        <span class="textarea"><textarea
                           class="cfg-textarea cfg-textarea--sm"
                           placeholder="JSON value"
                           rows="2"
@@ -884,7 +883,7 @@ function renderMapField(params: {
                               target.value = fallback;
                             }
                           }}
-                        ></textarea>
+                        ></textarea></span>
                       `
                       : renderNode({
                           schema,

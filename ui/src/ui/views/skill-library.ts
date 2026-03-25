@@ -228,14 +228,14 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
       <div class="emp-search">
-        <input
+        <span class="input"><input
           class="emp-search__input"
           type="text"
           placeholder="搜索技能"
           .value=${props.query}
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
-        />
+        /></span>
         <span class="emp-search__icon" aria-hidden="true">🔍</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
@@ -305,7 +305,7 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
                       <div class="card-title">${t("skillsAddSkill")}</div>
                       <div class="field" style="margin-top: 12px;">
                         <span>${t("skillsUploadName")}</span>
-                        <input
+                        <span class="input"><input
                           type="text"
                           .value=${props.uploadName}
                           @input=${(e: Event) =>
@@ -313,7 +313,7 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
                           placeholder=${t("skillsUploadNamePlaceholder")}
                           pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}"
                           ?disabled=${props.uploadFiles.length > 1}
-                        />
+                        /></span>
                         ${props.uploadFiles.length > 1
                           ? html`
                               <div class="muted" style="margin-top: 4px; font-size: 0.9em;">

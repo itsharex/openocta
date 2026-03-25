@@ -96,7 +96,7 @@ export function renderNostrProfileForm(params: {
           <label for="${inputId}" style="display: block; margin-bottom: 4px; font-weight: 500;">
             ${label}
           </label>
-          <textarea
+          <span class="textarea"><textarea
             id="${inputId}"
             .value=${value}
             placeholder=${placeholder ?? ""}
@@ -108,7 +108,7 @@ export function renderNostrProfileForm(params: {
               callbacks.onFieldChange(field, target.value);
             }}
             ?disabled=${state.saving}
-          ></textarea>
+          ></textarea></span>
           ${help ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${help}</div>` : nothing}
           ${error ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">${error}</div>` : nothing}
         </div>
@@ -120,19 +120,33 @@ export function renderNostrProfileForm(params: {
         <label for="${inputId}" style="display: block; margin-bottom: 4px; font-weight: 500;">
           ${label}
         </label>
-        <input
-          id="${inputId}"
-          type=${type}
-          .value=${value}
-          placeholder=${placeholder ?? ""}
-          maxlength=${maxLength ?? 256}
-          style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;"
-          @input=${(e: InputEvent) => {
-            const target = e.target as HTMLInputElement;
-            callbacks.onFieldChange(field, target.value);
-          }}
-          ?disabled=${state.saving}
-        />
+        ${type === "text"
+          ? html`<span class="input"><input
+              id="${inputId}"
+              type=${type}
+              .value=${value}
+              placeholder=${placeholder ?? ""}
+              maxlength=${maxLength ?? 256}
+              style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;"
+              @input=${(e: InputEvent) => {
+                const target = e.target as HTMLInputElement;
+                callbacks.onFieldChange(field, target.value);
+              }}
+              ?disabled=${state.saving}
+            /></span>`
+          : html`<input
+              id="${inputId}"
+              type=${type}
+              .value=${value}
+              placeholder=${placeholder ?? ""}
+              maxlength=${maxLength ?? 256}
+              style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;"
+              @input=${(e: InputEvent) => {
+                const target = e.target as HTMLInputElement;
+                callbacks.onFieldChange(field, target.value);
+              }}
+              ?disabled=${state.saving}
+            />`}
         ${help ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${help}</div>` : nothing}
         ${error ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">${error}</div>` : nothing}
       </div>

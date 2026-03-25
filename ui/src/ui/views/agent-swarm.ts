@@ -194,12 +194,12 @@ export function renderAgentSwarm() {
       </div>
 
       <div class="agent-swarm__input-bar">
-        <input
+        <span class="input"><input
           class="agent-swarm__input"
           type="text"
           placeholder="Type a message... (Ctrl/Cmd+Enter to send)"
           disabled
-        />
+        /></span>
         <button class="agent-swarm__send-btn" disabled>Send</button>
       </div>
 

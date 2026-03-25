@@ -518,7 +518,7 @@ function renderBindings(state: BindingState) {
                 <div class="list-meta">
                   <label class="field">
                     <span>${t("nodesNodeLabel")}</span>
-                    <select
+                    <span class="select"><select
                       ?disabled=${state.disabled || !supportsBinding}
                       @change=${(event: Event) => {
                         const target = event.target as HTMLSelectElement;
@@ -536,7 +536,7 @@ function renderBindings(state: BindingState) {
                             ${node.label}
                           </option>`,
                       )}
-                    </select>
+                    </select></span>
                   </label>
                   ${
                     !supportsBinding
@@ -622,7 +622,7 @@ function renderExecApprovalsTarget(state: ExecApprovalsState) {
         <div class="list-meta">
           <label class="field">
             <span>${t("nodesHost")}</span>
-            <select
+            <span class="select"><select
               ?disabled=${state.disabled}
               @change=${(event: Event) => {
                 const target = event.target as HTMLSelectElement;
@@ -637,14 +637,14 @@ function renderExecApprovalsTarget(state: ExecApprovalsState) {
             >
               <option value="gateway" ?selected=${state.target === "gateway"}>${t("nodesHostGateway")}</option>
               <option value="node" ?selected=${state.target === "node"}>${t("nodesHostNode")}</option>
-            </select>
+            </select></span>
           </label>
           ${
             state.target === "node"
               ? html`
                 <label class="field">
                   <span>${t("nodesNodeLabel")}</span>
-                  <select
+                  <span class="select"><select
                     ?disabled=${state.disabled || !hasNodes}
                     @change=${(event: Event) => {
                       const target = event.target as HTMLSelectElement;
@@ -662,7 +662,7 @@ function renderExecApprovalsTarget(state: ExecApprovalsState) {
                           ${node.label}
                         </option>`,
                     )}
-                  </select>
+                  </select></span>
                 </label>
               `
               : nothing
@@ -735,7 +735,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
         <div class="list-meta">
           <label class="field">
             <span>${t("nodesMode")}</span>
-            <select
+            <span class="select"><select
               ?disabled=${state.disabled}
               @change=${(event: Event) => {
                 const target = event.target as HTMLSelectElement;
@@ -763,7 +763,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
                     ${t(option.labelKey)}
                   </option>`,
               )}
-            </select>
+            </select></span>
           </label>
         </div>
       </div>
@@ -778,7 +778,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
         <div class="list-meta">
           <label class="field">
             <span>${t("nodesMode")}</span>
-            <select
+            <span class="select"><select
               ?disabled=${state.disabled}
               @change=${(event: Event) => {
                 const target = event.target as HTMLSelectElement;
@@ -806,7 +806,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
                     ${t(option.labelKey)}
                   </option>`,
               )}
-            </select>
+            </select></span>
           </label>
         </div>
       </div>
@@ -825,7 +825,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
         <div class="list-meta">
           <label class="field">
             <span>${t("nodesFallback")}</span>
-            <select
+            <span class="select"><select
               ?disabled=${state.disabled}
               @change=${(event: Event) => {
                 const target = event.target as HTMLSelectElement;
@@ -853,7 +853,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
                     ${t(option.labelKey)}
                   </option>`,
               )}
-            </select>
+            </select></span>
           </label>
         </div>
       </div>
@@ -874,7 +874,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
         <div class="list-meta">
           <label class="field">
             <span>${t("nodesEnabled")}</span>
-            <input
+            <span class="checkbox"><input
               type="checkbox"
               ?disabled=${state.disabled}
               .checked=${autoEffective}
@@ -882,7 +882,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
                 const target = event.target as HTMLInputElement;
                 state.onPatch([...basePath, "autoAllowSkills"], target.checked);
               }}
-            />
+            /></span>
           </label>
           ${
             !isDefaults && !autoIsDefault
@@ -952,7 +952,7 @@ function renderAllowlistEntry(
       <div class="list-meta">
         <label class="field">
           <span>${t("nodesPattern")}</span>
-          <input
+          <span class="input"><input
             type="text"
             .value=${entry.pattern ?? ""}
             ?disabled=${state.disabled}
@@ -963,7 +963,7 @@ function renderAllowlistEntry(
                 target.value,
               );
             }}
-          />
+          /></span>
         </label>
         <button
           class="btn btn--sm danger"
@@ -1003,7 +1003,7 @@ function renderAgentBinding(agent: BindingAgent, state: BindingState) {
       <div class="list-meta">
         <label class="field">
           <span>${t("nodesBinding")}</span>
-          <select
+          <span class="select"><select
             ?disabled=${state.disabled || !supportsBinding}
             @change=${(event: Event) => {
               const target = event.target as HTMLSelectElement;
@@ -1023,7 +1023,7 @@ function renderAgentBinding(agent: BindingAgent, state: BindingState) {
                   ${node.label}
                 </option>`,
             )}
-          </select>
+          </select></span>
         </label>
       </div>
     </div>

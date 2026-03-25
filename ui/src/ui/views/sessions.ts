@@ -142,7 +142,7 @@ export function renderSessions(props: SessionsProps) {
       <div class="filters" style="margin-top: 14px;">
         <label class="field">
           <span>${t("sessionsActiveWithin")}</span>
-          <input
+          <span class="input"><input
             .value=${props.activeMinutes}
             @input=${(e: Event) =>
               props.onFiltersChange({
@@ -151,11 +151,11 @@ export function renderSessions(props: SessionsProps) {
                 includeGlobal: props.includeGlobal,
                 includeUnknown: props.includeUnknown,
               })}
-          />
+          /></span>
         </label>
         <label class="field">
           <span>${t("sessionsLimit")}</span>
-          <input
+          <span class="input"><input
             .value=${props.limit}
             @input=${(e: Event) =>
               props.onFiltersChange({
@@ -164,11 +164,11 @@ export function renderSessions(props: SessionsProps) {
                 includeGlobal: props.includeGlobal,
                 includeUnknown: props.includeUnknown,
               })}
-          />
+          /></span>
         </label>
         <label class="field checkbox">
           <span>${t("sessionsIncludeGlobal")}</span>
-          <input
+          <span class="checkbox"><input
             type="checkbox"
             .checked=${props.includeGlobal}
             @change=${(e: Event) =>
@@ -178,11 +178,11 @@ export function renderSessions(props: SessionsProps) {
                 includeGlobal: (e.target as HTMLInputElement).checked,
                 includeUnknown: props.includeUnknown,
               })}
-          />
+          /></span>
         </label>
         <label class="field checkbox">
           <span>${t("sessionsIncludeUnknown")}</span>
-          <input
+          <span class="checkbox"><input
             type="checkbox"
             .checked=${props.includeUnknown}
             @change=${(e: Event) =>
@@ -192,7 +192,7 @@ export function renderSessions(props: SessionsProps) {
                 includeGlobal: props.includeGlobal,
                 includeUnknown: (e.target as HTMLInputElement).checked,
               })}
-          />
+          /></span>
         </label>
       </div>
 
@@ -318,13 +318,13 @@ function renderRow(
         bulkMode
           ? html`
               <div>
-                <input
+                <span class="checkbox"><input
                   type="checkbox"
                   .checked=${selected}
                   ?disabled=${disabled || isMainSession}
                   @change=${(e: Event) =>
                     onSelectionChange(row.key, (e.target as HTMLInputElement).checked)}
-                />
+                /></span>
               </div>
             `
           : nothing
@@ -334,7 +334,7 @@ function renderRow(
         ${showDisplayName ? html`<span class="muted session-key-display-name">${displayName}</span>` : nothing}
       </div>
       <div>
-        <input
+        <span class="input"><input
           .value=${row.label ?? ""}
           ?disabled=${disabled}
           placeholder=${t("commonOptional")}
@@ -342,13 +342,13 @@ function renderRow(
             const value = (e.target as HTMLInputElement).value.trim();
             onPatch(row.key, { label: value || null });
           }}
-        />
+        /></span>
       </div>
       <div>${row.kind}</div>
       <div>${updated}</div>
       <div>${formatSessionTokens(row)}</div>
       <div>
-        <select
+        <span class="select"><select
           .value=${thinking}
           ?disabled=${disabled}
           @change=${(e: Event) => {
@@ -362,10 +362,10 @@ function renderRow(
             (level) =>
               html`<option value=${level} ?selected=${level === thinking}>${level || t("commonInherit")}</option>`,
           )}
-        </select>
+        </select></span>
       </div>
       <div>
-        <select
+        <span class="select"><select
           .value=${verbose}
           ?disabled=${disabled}
           @change=${(e: Event) => {
@@ -377,10 +377,10 @@ function renderRow(
             (level) =>
               html`<option value=${level.value} ?selected=${level.value === verbose}>${level.label}</option>`,
           )}
-        </select>
+        </select></span>
       </div>
       <div>
-        <select
+        <span class="select"><select
           .value=${reasoning}
           ?disabled=${disabled}
           @change=${(e: Event) => {
@@ -392,7 +392,7 @@ function renderRow(
             (level) =>
               html`<option value=${level} ?selected=${level === reasoning}>${level || t("commonInherit")}</option>`,
           )}
-        </select>
+        </select></span>
       </div>
       <div>
         <button class="btn danger" ?disabled=${disabled} @click=${() => onDelete(row.key)}>

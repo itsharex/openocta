@@ -105,7 +105,7 @@ export function renderSandbox(props: SandboxProps) {
             <div class="sandbox-form-center">
               <div class="field" style="width: 100%; margin-bottom: 16px;">
                 <span>${t("sandboxAllowedPaths")}</span>
-                <textarea
+                <span class="textarea"><textarea
                   rows="3"
                   .value=${allowedPaths}
                   placeholder="/tmp&#10;./workspace"
@@ -113,11 +113,11 @@ export function renderSandbox(props: SandboxProps) {
                     const v = (e.target as HTMLTextAreaElement).value;
                     props.onPatch(["allowedPaths"], splitLines(v));
                   }}
-                ></textarea>
+                ></textarea></span>
               </div>
               <div class="field" style="width: 100%; margin-bottom: 16px;">
                 <span>${t("sandboxNetworkAllow")}</span>
-                <textarea
+                <span class="textarea"><textarea
                   rows="2"
                   .value=${networkAllow}
                   placeholder="localhost&#10;127.0.0.1&#10;*.anthropic.com"
@@ -125,7 +125,7 @@ export function renderSandbox(props: SandboxProps) {
                     const v = (e.target as HTMLTextAreaElement).value;
                     props.onPatch(["networkAllow"], splitLines(v));
                   }}
-                ></textarea>
+                ></textarea></span>
               </div>
 
               <div style="margin: 24px 0;">
@@ -133,7 +133,7 @@ export function renderSandbox(props: SandboxProps) {
                 <div class="row" style="flex-wrap: wrap; gap: 12px;">
                   <div class="field" style="flex: 1 1 160px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxCPUPercent")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       min="0"
                       max="100"
@@ -145,11 +145,11 @@ export function renderSandbox(props: SandboxProps) {
                         const v = raw === "" ? undefined : Number(raw);
                         props.onPatch(["resourceLimit", "maxCpuPercent"], Number.isNaN(v as number) ? undefined : v);
                       }}
-                    />
+                    /></span>
                   </div>
                   <div class="field" style="flex: 1 1 220px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxMemoryBytes")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${String(maxMemoryBytes)}
                       placeholder="1G, 512M, 1024"
@@ -157,11 +157,11 @@ export function renderSandbox(props: SandboxProps) {
                         const raw = (e.target as HTMLInputElement).value.trim();
                         props.onPatch(["resourceLimit", "maxMemoryBytes"], raw === "" ? undefined : raw);
                       }}
-                    />
+                    /></span>
                   </div>
                   <div class="field" style="flex: 1 1 220px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxDiskBytes")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${String(maxDiskBytes)}
                       placeholder="10G, 100G, 10240"
@@ -169,7 +169,7 @@ export function renderSandbox(props: SandboxProps) {
                         const raw = (e.target as HTMLInputElement).value.trim();
                         props.onPatch(["resourceLimit", "maxDiskBytes"], raw === "" ? undefined : raw);
                       }}
-                    />
+                    /></span>
                   </div>
                 </div>
               </div>
@@ -213,7 +213,7 @@ export function renderSandbox(props: SandboxProps) {
               <div class="row" style="flex-direction: column; gap: 12px;">
                 <div class="field" style="width: 100%;">
                   <span style="font-size: 14px;">${t("sandboxBanCommands")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="2"
                     style="font-size: 14px;"
                     .value=${banCommands}
@@ -222,11 +222,11 @@ export function renderSandbox(props: SandboxProps) {
                       const v = (e.target as HTMLTextAreaElement).value;
                       props.onPatch(["validator", "banCommands"], splitLines(v));
                     }}
-                  ></textarea>
+                  ></textarea></span>
                 </div>
                 <div class="field" style="width: 100%;">
                   <span style="font-size: 14px;">${t("sandboxBanArguments")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="2"
                     style="font-size: 14px;"
                     .value=${banArguments}
@@ -235,11 +235,11 @@ export function renderSandbox(props: SandboxProps) {
                       const v = (e.target as HTMLTextAreaElement).value;
                       props.onPatch(["validator", "banArguments"], splitLines(v));
                     }}
-                  ></textarea>
+                  ></textarea></span>
                 </div>
                 <div class="field" style="width: 100%;">
                   <span style="font-size: 14px;">${t("sandboxBanFragments")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="2"
                     style="font-size: 14px;"
                     .value=${banFragments}
@@ -248,11 +248,11 @@ export function renderSandbox(props: SandboxProps) {
                       const v = (e.target as HTMLTextAreaElement).value;
                       props.onPatch(["validator", "banFragments"], splitLines(v));
                     }}
-                  ></textarea>
+                  ></textarea></span>
                 </div>
                 <div class="field" style="width: 100%;">
                   <span style="font-size: 14px;">${t("sandboxSecretPatterns")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="3"
                     style="font-size: 14px; font-family: var(--mono);"
                     .value=${secretPatterns}
@@ -261,7 +261,7 @@ export function renderSandbox(props: SandboxProps) {
                       const v = (e.target as HTMLTextAreaElement).value;
                       props.onPatch(["validator", "secretPatterns"], splitLines(v));
                     }}
-                  ></textarea>
+                  ></textarea></span>
                   <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("sandboxSecretPatternsHint")}</div>
                 </div>
               </div>
@@ -304,7 +304,7 @@ export function renderSandbox(props: SandboxProps) {
                 ${approvalEnabled
                   ? html`
                       <div class="row" style="align-items: flex-start; gap: 8px; margin-left: 4px;">
-                        <input
+                        <span class="checkbox"><input
                           type="checkbox"
                           id="blockOnApproval"
                           .checked=${approvalBlockOnApproval}
@@ -313,7 +313,7 @@ export function renderSandbox(props: SandboxProps) {
                             const checked = (e.target as HTMLInputElement).checked;
                             props.onPatch(["approvalQueue", "blockOnApproval"], checked);
                           }}
-                        />
+                        /></span>
                         <div style="flex: 1; min-width: 220px;">
                           <label for="blockOnApproval" style="font-size: 14px; cursor: pointer;">
                             ${t("securityApprovalBlockOnApproval")}
@@ -329,7 +329,7 @@ export function renderSandbox(props: SandboxProps) {
 
               <div class="field" style="width: 100%; margin-top: 10px;">
                 <span style="font-size: 14px;">${t("securityApprovalTimeoutSeconds")}</span>
-                <input
+                <span class="input"><input
                   type="text"
                   .value=${String(approvalTimeoutSeconds)}
                   placeholder="300"
@@ -338,13 +338,13 @@ export function renderSandbox(props: SandboxProps) {
                     const v = raw === "" ? undefined : Number(raw);
                     props.onPatch(["approvalQueue", "timeoutSeconds"], Number.isNaN(v as number) ? undefined : v);
                   }}
-                />
+                /></span>
                 <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityApprovalTimeoutSecondsHint")}</div>
               </div>
 
               <div class="field" style="width: 100%; margin-top: 16px;">
                 <span style="font-size: 14px;">${t("securityApprovalAllow")}</span>
-                <textarea
+                <span class="textarea"><textarea
                   rows="2"
                   style="font-size: 14px;"
                   .value=${approvalAllow}
@@ -353,13 +353,13 @@ export function renderSandbox(props: SandboxProps) {
                     const v = (e.target as HTMLTextAreaElement).value;
                     props.onPatch(["approvalQueue", "allow"], splitLines(v));
                   }}
-                ></textarea>
+                ></textarea></span>
                 <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityApprovalAllowHint")}</div>
               </div>
 
               <div class="field" style="width: 100%; margin-top: 16px;">
                 <span style="font-size: 14px;">${t("securityApprovalAsk")}</span>
-                <textarea
+                <span class="textarea"><textarea
                   rows="2"
                   style="font-size: 14px;"
                   .value=${approvalAsk}
@@ -368,13 +368,13 @@ export function renderSandbox(props: SandboxProps) {
                     const v = (e.target as HTMLTextAreaElement).value;
                     props.onPatch(["approvalQueue", "ask"], splitLines(v));
                   }}
-                ></textarea>
+                ></textarea></span>
                 <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityApprovalAskHint")}</div>
               </div>
 
               <div class="field" style="width: 100%; margin-top: 16px;">
                 <span style="font-size: 14px;">${t("securityApprovalDeny")}</span>
-                <textarea
+                <span class="textarea"><textarea
                   rows="2"
                   style="font-size: 14px;"
                   .value=${approvalDeny}
@@ -383,7 +383,7 @@ export function renderSandbox(props: SandboxProps) {
                     const v = (e.target as HTMLTextAreaElement).value;
                     props.onPatch(["approvalQueue", "deny"], splitLines(v));
                   }}
-                ></textarea>
+                ></textarea></span>
                 <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityApprovalDenyHint")}</div>
               </div>
 

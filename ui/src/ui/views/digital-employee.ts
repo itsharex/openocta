@@ -151,23 +151,23 @@ export function renderDigitalEmployeeEditModal(props: DigitalEmployeeEditModalPr
         <div class="card-title">修改数字员工</div>
         <div class="field" style="margin-top: 12px;">
           <span>名称</span>
-          <input type="text" .value=${props.editName} disabled />
+          <span class="input"><input type="text" .value=${props.editName} disabled /></span>
           <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">名称不可修改</div>
         </div>
         <div class="field" style="margin-top: 12px;">
           <span>描述</span>
-          <textarea
+          <span class="textarea"><textarea
             rows="2"
             .value=${props.editDescription}
             @input=${(e: Event) =>
               props.onEditDescriptionChange(
                 (e.target as HTMLTextAreaElement).value,
               )}
-          ></textarea>
+          ></textarea></span>
         </div>
         <div class="field" style="margin-top: 12px;">
           <span>Prompt（可选）</span>
-          <textarea
+          <span class="textarea"><textarea
             rows="4"
             .value=${props.editPrompt}
             @input=${(e: Event) =>
@@ -175,7 +175,7 @@ export function renderDigitalEmployeeEditModal(props: DigitalEmployeeEditModalPr
                 (e.target as HTMLTextAreaElement).value,
               )}
             placeholder="为该数字员工编写系统提示/人设说明。"
-          ></textarea>
+          ></textarea></span>
         </div>
         <div class="field" style="margin-top: 12px;">
           <span>MCP 配置（可选）</span>
@@ -198,7 +198,7 @@ export function renderDigitalEmployeeEditModal(props: DigitalEmployeeEditModalPr
           ${
             props.editMcpMode === "raw"
               ? html`
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="4"
                     style="margin-top: 8px;"
                     .value=${props.editMcpJson}
@@ -207,7 +207,7 @@ export function renderDigitalEmployeeEditModal(props: DigitalEmployeeEditModalPr
                         (e.target as HTMLTextAreaElement).value,
                       )}
                     placeholder='{"prometheus":{"service":"prometheus","serviceUrl":"http://localhost:9090"}}'
-                  ></textarea>
+                  ></textarea></span>
                   <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">
                     与主配置 mcp.servers 结构一致，会话时合并（同 key 时员工覆盖）
                   </div>
@@ -389,32 +389,32 @@ export function renderDigitalEmployeeCreateModal(props: DigitalEmployeeCreateMod
         <div class="card-title">新增数字员工</div>
         <div class="field" style="margin-top: 12px;">
           <span>名称</span>
-          <input
+          <span class="input"><input
             type="text"
             .value=${props.createName}
             @input=${(e: Event) => props.onCreateNameChange((e.target as HTMLInputElement).value)}
             placeholder="如 SRE 运维专家"
-          />
+          /></span>
           <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">名称唯一</div>
         </div>
         <div class="field" style="margin-top: 12px;">
           <span>描述</span>
-          <textarea
+          <span class="textarea"><textarea
             rows="2"
             .value=${props.createDescription}
             @input=${(e: Event) =>
               props.onCreateDescriptionChange((e.target as HTMLTextAreaElement).value)}
-          ></textarea>
+          ></textarea></span>
         </div>
         <div class="field" style="margin-top: 12px;">
           <span>Prompt（可选）</span>
-          <textarea
+          <span class="textarea"><textarea
             rows="4"
             .value=${props.createPrompt}
             @input=${(e: Event) =>
               props.onCreatePromptChange((e.target as HTMLTextAreaElement).value)}
             placeholder="为该数字员工编写系统提示/人设说明。"
-          ></textarea>
+          ></textarea></span>
         </div>
         <div class="field" style="margin-top: 12px;">
           <button class="btn secondary" type="button" @click=${props.onToggleAdvanced}>
@@ -449,14 +449,14 @@ export function renderDigitalEmployeeCreateModal(props: DigitalEmployeeCreateMod
                   </div>
                   ${props.createMcpMode === "raw"
                     ? html`
-                        <textarea
+                        <span class="textarea"><textarea
                           rows="4"
                           style="margin-top: 8px;"
                           .value=${props.mcpJson}
                           @input=${(e: Event) =>
                             props.onMcpJsonChange((e.target as HTMLTextAreaElement).value)}
                           placeholder='{"prometheus":{"service":"prometheus","serviceUrl":"http://localhost:9090"}}'
-                        ></textarea>
+                        ></textarea></span>
                         <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">
                           与主配置 mcp.servers 结构一致，会话时合并（同 key 时员工覆盖）
                         </div>
@@ -487,13 +487,13 @@ export function renderDigitalEmployeeCreateModal(props: DigitalEmployeeCreateMod
                 </div>
                 <div class="field" style="margin-top: 8px;">
                   <span>技能名称（可选）</span>
-                  <input
+                  <span class="input"><input
                     type="text"
                     .value=${props.skillUploadName}
                     @input=${(e: Event) =>
                       props.onSkillUploadNameChange((e.target as HTMLInputElement).value)}
                     placeholder="不填则从文件名推导，如 prometheus-1.0.0.zip → prometheus-1.0.0"
-                  />
+                  /></span>
                 </div>
                 <div class="field" style="margin-top: 8px;">
                   <span>技能文件（SKILL.md 或 zip，可多选，提交时一并上传）</span>
@@ -610,11 +610,11 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
       <div class="filters" style="margin-top: 14px;">
         <label class="field" style="flex: 1;">
           <span>${t("commonFilter")}</span>
-          <input
+          <span class="input"><input
             .value=${props.filter}
             @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
             placeholder="搜索名称/ID/描述"
-          />
+          /></span>
         </label>
         <div class="muted">${filtered.length} 个</div>
       </div>
@@ -655,35 +655,35 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
                   <div class="card-title">新增数字员工</div>
                   <div class="field" style="margin-top: 12px;">
                     <span>名称</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.createName}
                       @input=${(e: Event) =>
                         props.onCreateNameChange((e.target as HTMLInputElement).value)}
                       placeholder="如 SRE 运维专家"
-                    />
+                    /></span>
                     <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">名称唯一</div>
                   </div>
                   <div class="field" style="margin-top: 12px;">
                     <span>描述</span>
-                    <textarea
+                    <span class="textarea"><textarea
                       rows="2"
                       .value=${props.createDescription}
                       @input=${(e: Event) =>
                         props.onCreateDescriptionChange(
                           (e.target as HTMLTextAreaElement).value,
                         )}
-                    ></textarea>
+                    ></textarea></span>
                   </div>
                   <div class="field" style="margin-top: 12px;">
                     <span>Prompt（可选）</span>
-                    <textarea
+                    <span class="textarea"><textarea
                       rows="4"
                       .value=${props.createPrompt}
                       @input=${(e: Event) =>
                         props.onCreatePromptChange((e.target as HTMLTextAreaElement).value)}
                       placeholder="为该数字员工编写系统提示/人设说明。"
-                    ></textarea>
+                    ></textarea></span>
                   </div>
                   <div class="field" style="margin-top: 12px;">
                     <button class="btn secondary" type="button" @click=${props.onToggleAdvanced}>
@@ -722,7 +722,7 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
                               ${
                                 props.createMcpMode === "raw"
                                   ? html`
-                                      <textarea
+                                      <span class="textarea"><textarea
                                         rows="4"
                                         style="margin-top: 8px;"
                                         .value=${props.mcpJson}
@@ -731,7 +731,7 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
                                             (e.target as HTMLTextAreaElement).value,
                                           )}
                                         placeholder='{"prometheus":{"service":"prometheus","serviceUrl":"http://localhost:9090"}}'
-                                      ></textarea>
+                                      ></textarea></span>
                                       <div class="list-sub muted" style="font-size: 11px; margin-top: 4px;">
                                         与主配置 mcp.servers 结构一致，会话时合并（同 key 时员工覆盖）
                                       </div>
@@ -763,7 +763,7 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
                             </div>
                             <div class="field" style="margin-top: 8px;">
                               <span>技能名称（可选）</span>
-                              <input
+                              <span class="input"><input
                                 type="text"
                                 .value=${props.skillUploadName}
                                 @input=${(e: Event) =>
@@ -771,7 +771,7 @@ export function renderDigitalEmployee(props: DigitalEmployeeProps) {
                                     (e.target as HTMLInputElement).value,
                                   )}
                                 placeholder="不填则从文件名推导，如 prometheus-1.0.0.zip → prometheus-1.0.0"
-                              />
+                              /></span>
                             </div>
                             <div class="field" style="margin-top: 8px;">
                               <span>技能文件（SKILL.md 或 zip，可多选，提交时一并上传）</span>
@@ -1021,12 +1021,12 @@ function renderEmployeeMcpItem(item: EmployeeMcpItem, cb: EmployeeMcpCallbacks):
       <div style="margin-top: 10px;">
         <div class="field">
           <span>Key（唯一）*</span>
-          <input
+          <span class="input"><input
             type="text"
             .value=${item.key}
             placeholder="如 prometheus, filesystem"
             @input=${(e: Event) => cb.onKeyChange(item.id, (e.target as HTMLInputElement).value)}
-          />
+          /></span>
         </div>
 
         <div class="row" style="margin-top: 10px; gap: 8px;">
@@ -1051,13 +1051,13 @@ function renderEmployeeMcpItem(item: EmployeeMcpItem, cb: EmployeeMcpCallbacks):
             ? html`
                 <div class="field" style="margin-top: 10px;">
                   <span>JSON</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     rows="6"
                     style="font-family: var(--mono); font-size: 12px;"
                     .value=${item.rawJson}
                     @input=${(e: Event) =>
                       cb.onRawChange(item.id, (e.target as HTMLTextAreaElement).value)}
-                  ></textarea>
+                  ></textarea></span>
                   ${
                     item.rawError
                       ? html`<div class="callout danger" style="margin-top: 8px;">${item.rawError}</div>`
@@ -1157,7 +1157,7 @@ function renderEmployeeMcpFormFields(
     return html`
       <div class="field">
         <span>command *</span>
-        <select
+        <span class="select"><select
           @change=${(e: Event) => onPatch({ command: (e.target as HTMLSelectElement).value })}
         >
           ${options.map((c) => html`
@@ -1168,11 +1168,11 @@ function renderEmployeeMcpFormFields(
               ${c}
             </option>
           `)}
-        </select>
+        </select></span>
       </div>
       <div class="field" style="margin-top: 8px;">
         <span>args</span>
-        <input
+        <span class="input"><input
           type="text"
           .value=${(item.draft?.args ?? []).join(" ")}
           placeholder="-y prometheus-mcp-server"
@@ -1180,11 +1180,11 @@ function renderEmployeeMcpFormFields(
             const val = (e.target as HTMLInputElement).value;
             onPatch({ args: val.trim() ? val.trim().split(/\s+/) : [] });
           }}
-        />
+        /></span>
       </div>
       <div class="field" style="margin-top: 8px;">
         <span>env</span>
-        <textarea
+        <span class="textarea"><textarea
           style="min-height: 80px; font-family: var(--mono); font-size: 12px;"
           placeholder="KEY=value"
           .value=${formatEnvForEdit(item.draft?.env)}
@@ -1192,7 +1192,7 @@ function renderEmployeeMcpFormFields(
             const val = (e.target as HTMLTextAreaElement).value;
             onPatch({ env: parseEnvFromEdit(val) });
           }}
-        ></textarea>
+        ></textarea></span>
       </div>
     `;
   }
@@ -1200,33 +1200,33 @@ function renderEmployeeMcpFormFields(
     return html`
       <div class="field">
         <span>url *</span>
-        <input
+        <span class="input"><input
           type="text"
           .value=${item.draft?.url ?? ""}
           placeholder="https://mcp.example.com/sse"
           @input=${(e: Event) => onPatch({ url: (e.target as HTMLInputElement).value })}
-        />
+        /></span>
       </div>
     `;
   }
   return html`
     <div class="field">
       <span>service *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${item.draft?.service ?? ""}
         placeholder="prometheus"
         @input=${(e: Event) => onPatch({ service: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
     <div class="field" style="margin-top: 8px;">
       <span>serviceUrl *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${item.draft?.serviceUrl ?? ""}
         placeholder="http://localhost:9090"
         @input=${(e: Event) => onPatch({ serviceUrl: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
   `;
 }

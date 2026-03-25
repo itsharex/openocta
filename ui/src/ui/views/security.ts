@@ -177,11 +177,11 @@ export function renderSecurity(props: SecurityProps) {
             <div class="sandbox-form-center">
               <div class="field" style="width: 100%; margin-bottom: 16px;">
                 <span>${t("sandboxAllowedPaths")}</span>
-                <textarea rows="3" .value=${allowedPaths} placeholder="/tmp&#10;./workspace" @input=${(e: Event) => props.onPatch(["sandbox", "allowedPaths"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea>
+                <span class="textarea"><textarea rows="3" .value=${allowedPaths} placeholder="/tmp&#10;./workspace" @input=${(e: Event) => props.onPatch(["sandbox", "allowedPaths"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea></span>
               </div>
               <div class="field" style="width: 100%; margin-bottom: 16px;">
                 <span>${t("sandboxNetworkAllow")}</span>
-                <textarea rows="2" .value=${networkAllow} placeholder="localhost&#10;127.0.0.1" @input=${(e: Event) => props.onPatch(["sandbox", "networkAllow"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea>
+                <span class="textarea"><textarea rows="2" .value=${networkAllow} placeholder="localhost&#10;127.0.0.1" @input=${(e: Event) => props.onPatch(["sandbox", "networkAllow"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea></span>
               </div>
               <div style="margin: 24px 0;">
                 <div class="card-sub" style="margin-bottom: 12px; font-size: 14px;">${t("sandboxResourceLimit")}</div>
@@ -205,15 +205,15 @@ export function renderSecurity(props: SecurityProps) {
                 <div class="row" style="flex-wrap: wrap; gap: 12px;">
                   <div class="field" style="flex: 1 1 120px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxCPUPercent")}</span>
-                    <input type="text" .value=${String(maxCpuPercent)} placeholder="60" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxCpuPercent"], parseNum((e.target as HTMLInputElement).value))} />
+                    <span class="input"><input type="text" .value=${String(maxCpuPercent)} placeholder="60" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxCpuPercent"], parseNum((e.target as HTMLInputElement).value))} /></span>
                   </div>
                   <div class="field" style="flex: 1 1 160px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxMemoryBytes")}</span>
-                    <input type="text" .value=${String(maxMemoryBytes)} placeholder="1G" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxMemoryBytes"], (e.target as HTMLInputElement).value.trim() || undefined)} />
+                    <span class="input"><input type="text" .value=${String(maxMemoryBytes)} placeholder="1G" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxMemoryBytes"], (e.target as HTMLInputElement).value.trim() || undefined)} /></span>
                   </div>
                   <div class="field" style="flex: 1 1 160px; min-width: 0;">
                     <span style="font-size: 14px;">${t("sandboxMaxDiskBytes")}</span>
-                    <input type="text" .value=${String(maxDiskBytes)} placeholder="1G" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxDiskBytes"], (e.target as HTMLInputElement).value.trim() || undefined)} />
+                    <span class="input"><input type="text" .value=${String(maxDiskBytes)} placeholder="1G" @input=${(e: Event) => props.onPatch(["sandbox", "resourceLimit", "maxDiskBytes"], (e.target as HTMLInputElement).value.trim() || undefined)} /></span>
                   </div>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export function renderSecurity(props: SecurityProps) {
                 ${(["deny", "ask", "allow"] as const).map(
                   (p) => html`
                     <label class="row" style="align-items: center; gap: 6px; cursor: pointer;">
-                      <input type="radio" name="defaultPolicy" .checked=${defaultPolicy === p} @change=${() => props.onPatch(["commandPolicy", "defaultPolicy"], p)} />
+                      <span class="radio"><input type="radio" name="defaultPolicy" .checked=${defaultPolicy === p} @change=${() => props.onPatch(["commandPolicy", "defaultPolicy"], p)} /></span>
                       <span>${p === "deny" ? t("securityDefaultDeny") : p === "ask" ? t("securityDefaultAsk") : t("securityDefaultAllow")}</span>
                     </label>
                   `,
@@ -255,17 +255,17 @@ export function renderSecurity(props: SecurityProps) {
             <div class="muted" style="font-size: 12px; margin-bottom: 12px;">${t("securityRulesHint")}</div>
             <div class="field" style="margin-bottom: 16px;">
               <span style="font-size: 14px;">${t("securityActionDeny")}</span>
-              <textarea rows="3" .value=${denyRulesText} placeholder="sudo&#10;dd&#10;mkfs&#10;rm -rf" @input=${(e: Event) => patchRulesFromTextareas((e.target as HTMLTextAreaElement).value, askRulesText, allowRulesText)}></textarea>
+              <span class="textarea"><textarea rows="3" .value=${denyRulesText} placeholder="sudo&#10;dd&#10;mkfs&#10;rm -rf" @input=${(e: Event) => patchRulesFromTextareas((e.target as HTMLTextAreaElement).value, askRulesText, allowRulesText)}></textarea></span>
               <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityRulesDenyHint")}</div>
             </div>
             <div class="field" style="margin-bottom: 16px;">
               <span style="font-size: 14px;">${t("securityActionAsk")}</span>
-              <textarea rows="3" .value=${askRulesText} placeholder="rm&#10;mv&#10;cp" @input=${(e: Event) => patchRulesFromTextareas(denyRulesText, (e.target as HTMLTextAreaElement).value, allowRulesText)}></textarea>
+              <span class="textarea"><textarea rows="3" .value=${askRulesText} placeholder="rm&#10;mv&#10;cp" @input=${(e: Event) => patchRulesFromTextareas(denyRulesText, (e.target as HTMLTextAreaElement).value, allowRulesText)}></textarea></span>
               <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityRulesAskHint")}</div>
             </div>
             <div class="field" style="margin-bottom: 16px;">
               <span style="font-size: 14px;">${t("securityActionAllow")}</span>
-              <textarea rows="3" .value=${allowRulesText} placeholder="ls&#10;pwd&#10;echo" @input=${(e: Event) => patchRulesFromTextareas(denyRulesText, askRulesText, (e.target as HTMLTextAreaElement).value)}></textarea>
+              <span class="textarea"><textarea rows="3" .value=${allowRulesText} placeholder="ls&#10;pwd&#10;echo" @input=${(e: Event) => patchRulesFromTextareas(denyRulesText, askRulesText, (e.target as HTMLTextAreaElement).value)}></textarea></span>
               <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityRulesAllowHint")}</div>
             </div>
             <details style="margin-top: 16px;">
@@ -273,15 +273,15 @@ export function renderSecurity(props: SecurityProps) {
               <div style="margin-top: 12px;">
                 <div class="field" style="margin-bottom: 12px;">
                   <span style="font-size: 14px;">${t("sandboxBanArguments")}</span>
-                  <textarea rows="2" .value=${banArguments} placeholder="--no-preserve-root&#10;/dev/" @input=${(e: Event) => props.onPatch(["commandPolicy", "banArguments"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea>
+                  <span class="textarea"><textarea rows="2" .value=${banArguments} placeholder="--no-preserve-root&#10;/dev/" @input=${(e: Event) => props.onPatch(["commandPolicy", "banArguments"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea></span>
                 </div>
                 <div class="field" style="margin-bottom: 12px;">
                   <span style="font-size: 14px;">${t("securityMaxLength")}</span>
-                  <input type="text" .value=${String(maxLength)} placeholder="4096" @input=${(e: Event) => props.onPatch(["commandPolicy", "maxLength"], parseNum((e.target as HTMLInputElement).value))} />
+                  <span class="input"><input type="text" .value=${String(maxLength)} placeholder="4096" @input=${(e: Event) => props.onPatch(["commandPolicy", "maxLength"], parseNum((e.target as HTMLInputElement).value))} /></span>
                 </div>
                 <div class="field">
                   <span style="font-size: 14px;">${t("sandboxSecretPatterns")}</span>
-                  <textarea rows="2" style="font-family: var(--mono);" .value=${secretPatterns} placeholder="sk-[a-zA-Z0-9]{48}" @input=${(e: Event) => props.onPatch(["commandPolicy", "secretPatterns"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea>
+                  <span class="textarea"><textarea rows="2" style="font-family: var(--mono);" .value=${secretPatterns} placeholder="sk-[a-zA-Z0-9]{48}" @input=${(e: Event) => props.onPatch(["commandPolicy", "secretPatterns"], splitLines((e.target as HTMLTextAreaElement).value))}></textarea></span>
                 </div>
               </div>
             </details>
@@ -308,12 +308,12 @@ export function renderSecurity(props: SecurityProps) {
             ${approvalEnabled
               ? html`
                   <div class="row" style="align-items: flex-start; gap: 8px; margin-bottom: 16px;">
-                    <input type="checkbox" id="blockOnApproval" .checked=${approvalBlockOnApproval} ?disabled=${props.saving} @input=${(e: Event) => props.onPatch(["approvalQueue", "blockOnApproval"], (e.target as HTMLInputElement).checked)} />
+                    <span class="checkbox"><input type="checkbox" id="blockOnApproval" .checked=${approvalBlockOnApproval} ?disabled=${props.saving} @input=${(e: Event) => props.onPatch(["approvalQueue", "blockOnApproval"], (e.target as HTMLInputElement).checked)} /></span>
                     <label for="blockOnApproval" style="font-size: 14px; cursor: pointer;">${t("securityApprovalBlockOnApproval")} <span class="muted" style="font-size: 12px;">${t("securityApprovalBlockOnApprovalHint")}</span></label>
                   </div>
                   <div class="field" style="margin-bottom: 16px;">
                     <span style="font-size: 14px;">${t("securityApprovalTimeoutSeconds")}</span>
-                    <input type="text" .value=${String(approvalTimeoutSeconds)} placeholder="300" @input=${(e: Event) => props.onPatch(["approvalQueue", "timeoutSeconds"], parseNum((e.target as HTMLInputElement).value))} />
+                    <span class="input"><input type="text" .value=${String(approvalTimeoutSeconds)} placeholder="300" @input=${(e: Event) => props.onPatch(["approvalQueue", "timeoutSeconds"], parseNum((e.target as HTMLInputElement).value))} /></span>
                     <div class="muted" style="font-size: 12px; margin-top: 4px;">${t("securityApprovalTimeoutSecondsHint")}</div>
                   </div>
                 `

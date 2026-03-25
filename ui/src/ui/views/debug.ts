@@ -78,20 +78,20 @@ export function renderDebug(props: DebugProps) {
         <div class="form-grid" style="margin-top: 16px;">
           <label class="field">
             <span>${t("debugMethod")}</span>
-            <input
+            <span class="input"><input
               .value=${props.callMethod}
               @input=${(e: Event) => props.onCallMethodChange((e.target as HTMLInputElement).value)}
               placeholder="system-presence"
-            />
+            /></span>
           </label>
           <label class="field">
             <span>${t("debugParams")} (JSON)</span>
-            <textarea
+            <span class="textarea"><textarea
               .value=${props.callParams}
               @input=${(e: Event) =>
                 props.onCallParamsChange((e.target as HTMLTextAreaElement).value)}
               rows="6"
-            ></textarea>
+            ></textarea></span>
           </label>
         </div>
         <div class="row" style="margin-top: 12px;">

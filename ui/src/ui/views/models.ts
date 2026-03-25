@@ -421,7 +421,7 @@ export function renderModels(props: ModelsProps) {
                 <div class="config-form">
                   <div class="field">
                     <span>${t("modelsProviderId")} *</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addProviderForm.providerId}
                       placeholder=${t("modelsProviderIdPlaceholder")}
@@ -432,48 +432,48 @@ export function renderModels(props: ModelsProps) {
                             .replace(/\s+/g, "-")
                             .replace(/[^a-z0-9_-]/g, ""),
                         })}
-                    />
+                    /></span>
                     <small class="muted" style="font-size: 11px;">${t("modelsProviderIdHint")}</small>
                   </div>
                   <div class="field">
                     <span>${t("modelsDisplayName")} *</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addProviderForm.displayName}
                       placeholder=${t("modelsDisplayNamePlaceholder")}
                       @input=${(e: Event) =>
                         props.onAddProviderFormChange({ displayName: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                   <div class="field">
                     <span>${t("modelsDefaultBaseUrl")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addProviderForm.baseUrl}
                       placeholder=${t("modelsDefaultBaseUrlPlaceholder")}
                       @input=${(e: Event) =>
                         props.onAddProviderFormChange({ baseUrl: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                   <div class="field">
                     <span>${t("modelsApiKey")}</span>
-                    <input
+                    <span class="input"><input
                       type="password"
                       .value=${props.addProviderForm.apiKey}
                       placeholder="sk-... or $ENV_VAR"
                       @input=${(e: Event) =>
                         props.onAddProviderFormChange({ apiKey: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                   <div class="field">
                     <span>${t("modelsApiKeyPrefix")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addProviderForm.apiKeyPrefix}
                       placeholder=${t("modelsApiKeyPrefixPlaceholder")}
                       @input=${(e: Event) =>
                         props.onAddProviderFormChange({ apiKeyPrefix: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                 </div>
                 <div class="row" style="margin-top: 16px; gap: 8px;">
@@ -538,23 +538,23 @@ export function renderModels(props: ModelsProps) {
                 <div class="config-form">
                   <div class="field">
                     <span>${t("modelsModelId")} *</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addModelForm.modelId}
                       placeholder="e.g. qwen3-max"
                       @input=${(e: Event) =>
                         props.onAddModelFormChange({ modelId: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                   <div class="field">
                     <span>${t("modelsModelName")} *</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addModelForm.modelName}
                       placeholder="e.g. Qwen3 Max"
                       @input=${(e: Event) =>
                         props.onAddModelFormChange({ modelName: (e.target as HTMLInputElement).value })}
-                    />
+                    /></span>
                   </div>
                 </div>
                 <div class="row" style="margin-top: 16px; gap: 8px;">
@@ -595,7 +595,7 @@ export function renderModels(props: ModelsProps) {
                   <div class="config-form">
                     <div class="field">
                       <span>${t("modelsBaseUrl")}</span>
-                      <input
+                      <span class="input"><input
                         type="text"
                         .value=${props.providers?.[props.selectedProvider!]?.baseUrl ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.baseUrl ?? ""}
                         placeholder=${BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.baseUrl ?? ""}
@@ -603,11 +603,11 @@ export function renderModels(props: ModelsProps) {
                           props.onPatch(props.selectedProvider!, {
                             baseUrl: (e.target as HTMLInputElement).value,
                           })}
-                      />
+                      /></span>
                     </div>
                     <div class="field">
                       <span>${t("modelsApiKey")}</span>
-                      <input
+                      <span class="input"><input
                         type="password"
                         .value=${props.providers?.[props.selectedProvider!]?.apiKey ?? ""}
                         placeholder="sk-... or $ENV_VAR"
@@ -615,13 +615,13 @@ export function renderModels(props: ModelsProps) {
                           props.onPatch(props.selectedProvider!, {
                             apiKey: (e.target as HTMLInputElement).value,
                           })}
-                      />
+                      /></span>
                     </div>
                     ${!BUILTIN_PROVIDERS.some((p) => p.id === props.selectedProvider)
                       ? html`
                           <div class="field">
                             <span>${t("modelsDisplayName")}</span>
-                            <input
+                            <span class="input"><input
                               type="text"
                               .value=${props.providers?.[props.selectedProvider!]?.displayName ?? ""}
                               placeholder=${props.selectedProvider}
@@ -629,7 +629,7 @@ export function renderModels(props: ModelsProps) {
                                 props.onPatch(props.selectedProvider!, {
                                   displayName: (e.target as HTMLInputElement).value,
                                 })}
-                            />
+                            /></span>
                           </div>
                         `
                       : nothing}
@@ -642,7 +642,7 @@ export function renderModels(props: ModelsProps) {
                           title=${t("modelsApiTypeTooltip")}
                         >?</span>
                       </div>
-                      <select
+                      <span class="select"><select
                         .value=${props.providers?.[props.selectedProvider!]?.api ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.defaultApi ?? "openai-completions"}
                         @change=${(e: Event) =>
                           props.onPatch(props.selectedProvider!, {
@@ -651,7 +651,7 @@ export function renderModels(props: ModelsProps) {
                       >
                         <option value="openai-completions">${t("modelsApiTypeOpenAI")}</option>
                         <option value="anthropic-messages">${t("modelsApiTypeAnthropic")}</option>
-                      </select>
+                      </select></span>
                       <p class="muted" style="font-size: 12px; margin-bottom: 0; margin-top: 6px; line-height: 1.5;">
                         ${t("modelsApiTypeTooltip")}
                       </p>
@@ -706,7 +706,7 @@ export function renderModels(props: ModelsProps) {
                                           <div style="margin-top: 4px;">
                                             ${mEnvEntries.map(([k, v]) => html`
                                               <div class="row" style="gap: 6px; align-items: center; margin-top: 4px;">
-                                                <input
+                                                <span class="input"><input
                                                   type="text"
                                                   style="flex: 1; font-size: 11px; padding: 4px;"
                                                   placeholder=${t("envVarsKeyPlaceholder")}
@@ -718,8 +718,8 @@ export function renderModels(props: ModelsProps) {
                                                     if (nk) next[nk] = v;
                                                     props.onPatchModelEnv(props.selectedProvider!, m.id, next);
                                                   }}
-                                                />
-                                                <input
+                                                /></span>
+                                                <span class="input"><input
                                                   type="text"
                                                   style="flex: 1; font-size: 11px; padding: 4px;"
                                                   placeholder=${t("envVarsValuePlaceholder")}
@@ -729,7 +729,7 @@ export function renderModels(props: ModelsProps) {
                                                     next[k] = (e.target as HTMLInputElement).value;
                                                     props.onPatchModelEnv(props.selectedProvider!, m.id, next);
                                                   }}
-                                                />
+                                                /></span>
                                                 <button class="btn btn--sm" style="font-size: 11px;" @click=${() => {
                                                   const next = { ...mEnv };
                                                   delete next[k];

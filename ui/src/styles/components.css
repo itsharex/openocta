@@ -150,13 +150,6 @@
   column-gap: 10px;
 }
 
-.config-form .field.checkbox input[type="checkbox"] {
-  margin: 0;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-}
-
 /* Compaction indicator */
 .compaction-indicator {
   font-size: 13px;
@@ -1840,13 +1833,6 @@
   white-space: normal;
   word-break: break-word;
   line-height: 1.4;
-}
-
-.sandbox-hook-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .sandbox-hook-label span {

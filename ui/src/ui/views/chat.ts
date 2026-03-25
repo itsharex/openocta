@@ -488,7 +488,7 @@ export function renderChat(props: ChatProps) {
         <div class="chat-compose__inner">
           <label class="field chat-compose__field">
             <span>Message</span>
-            <textarea
+            <span class="textarea"><textarea
             ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
             .value=${props.draft}
             ?disabled=${!props.connected}
@@ -517,7 +517,7 @@ export function renderChat(props: ChatProps) {
             }}
             @paste=${(e: ClipboardEvent) => handlePaste(e, props)}
             placeholder=${composePlaceholder}
-          ></textarea>
+          ></textarea></span>
         </label>
           <div class="chat-compose__row">
           <div class="chat-compose__meta">
@@ -546,7 +546,7 @@ export function renderChat(props: ChatProps) {
               props.onModelRefChange
                 ? html`
                     <label class="field chat-compose__model-select">
-                      <select
+                      <span class="select"><select
                         aria-label="大模型"
                         .value=${props.modelRef ?? props.defaultModelRef ?? ""}
                         ?disabled=${!props.connected}
@@ -561,7 +561,7 @@ export function renderChat(props: ChatProps) {
                         ${(props.modelOptions ?? [{ value: "", label: "默认" }]).map(
                           (opt) => html`<option value=${opt.value}>${opt.label}</option>`,
                         )}
-                      </select>
+                      </select></span>
                     </label>
                   `
                 : nothing

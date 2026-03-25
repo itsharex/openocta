@@ -85,17 +85,17 @@ export function renderChannelConfigForm(props: ChannelConfigFormProps) {
             ${field.type === "boolean"
               ? html`
                   <div class="row" style="align-items: center; gap: 8px;">
-                    <input
+                    <span class="checkbox"><input
                       type="checkbox"
                       ?checked=${raw === true}
                       ?disabled=${props.disabled}
                       @change=${(e: Event) =>
                         props.onPatch(basePath, (e.target as HTMLInputElement).checked)}
-                    />
+                    /></span>
                   </div>
                 `
               : html`
-                  <input
+                  <span class="input"><input
                     type="${field.type === "number" ? "number" : "text"}"
                     .value=${displayValue}
                     placeholder=${field.placeholder ?? ""}
@@ -104,7 +104,7 @@ export function renderChannelConfigForm(props: ChannelConfigFormProps) {
                       const v = (e.target as HTMLInputElement).value;
                       props.onPatch(basePath, parseFieldValue(v, field));
                     }}
-                  />
+                  /></span>
                 `}
             ${field.help
               ? html`<div class="muted" style="font-size: 12px; margin-top: 4px; line-height: 1.35;">

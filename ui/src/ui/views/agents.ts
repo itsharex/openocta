@@ -879,7 +879,7 @@ function renderAgentOverview(params: {
                 <div class="row" style="gap: 12px; flex-wrap: wrap;">
                     <label class="field" style="min-width: 260px; flex: 1;">
                         <span>${t("agentsPrimaryModelLabel")}${isDefault ? ` ${t("agentsPrimaryModelDefault")}` : ""}</span>
-                        <select
+                        <span class="select"><select
                                 .value=${effectivePrimary ?? ""}
                                 ?disabled=${!configForm || configLoading || configSaving}
                                 @change=${(e: Event) =>
@@ -895,11 +895,11 @@ function renderAgentOverview(params: {
                                             `
                             }
                             ${buildModelOptions(configForm, effectivePrimary ?? undefined)}
-                        </select>
+                        </select></span>
                     </label>
                     <label class="field" style="min-width: 260px; flex: 1;">
                         <span>${t("agentsFallbacksLabel")}</span>
-                        <input
+                        <span class="input"><input
                                 .value=${fallbackText}
                                 ?disabled=${!configForm || configLoading || configSaving}
                                 placeholder="provider/model, provider/model"
@@ -908,7 +908,7 @@ function renderAgentOverview(params: {
                                                 agent.id,
                                                 parseFallbackList((e.target as HTMLInputElement).value),
                                         )}
-                        />
+                        /></span>
                     </label>
                 </div>
                 <div class="row" style="justify-content: flex-end; gap: 8px;">
@@ -1396,14 +1396,14 @@ function renderAgentFiles(params: {
                                                             }
                                                             <label class="field" style="margin-top: 12px;">
                                                                 <span>Content</span>
-                                                                <textarea
+                                                                <span class="textarea"><textarea
                                                                         .value=${draft}
                                                                         @input=${(e: Event) =>
                                                                                 params.onFileDraftChange(
                                                                                         activeEntry.name,
                                                                                         (e.target as HTMLTextAreaElement).value,
                                                                                 )}
-                                                                ></textarea>
+                                                                ></textarea></span>
                                                             </label>
                                                         `
                                         }
@@ -1663,14 +1663,13 @@ function renderAgentTools(params: {
                                                             <div class="agent-tool-sub">${tool.description}</div>
                                                         </div>
                                                         <label class="cfg-toggle">
-                                                            <input
+                                                            <span class="checkbox"><input
                                                                     type="checkbox"
                                                                     .checked=${allowed}
                                                                     ?disabled=${!editable}
                                                                     @change=${(e: Event) =>
                                                                             updateTool(tool.id, (e.target as HTMLInputElement).checked)}
-                                                            />
-                                                            <span class="cfg-toggle__track"></span>
+                                                            /><span class="cfg-toggle__track"></span></span>
                                                         </label>
                                                     </div>
                                                 `;
@@ -1841,11 +1840,11 @@ function renderAgentSkills(params: {
             <div class="filters" style="margin-top: 14px;">
                 <label class="field" style="flex: 1;">
                     <span>${t("agentsFilter")}</span>
-                    <input
+                    <span class="input"><input
                             .value=${params.filter}
                             @input=${(e: Event) => params.onFilterChange((e.target as HTMLInputElement).value)}
                             placeholder=${t("skillsSearchPlaceholder")}
-                    />
+                    /></span>
                 </label>
                 <div class="muted">${filtered.length} ${t("skillsShown")}</div>
             </div>
@@ -1964,14 +1963,13 @@ function renderAgentSkillRow(
             </div>
             <div class="list-meta">
                 <label class="cfg-toggle">
-                    <input
+                    <span class="checkbox"><input
                             type="checkbox"
                             .checked=${enabled}
                             ?disabled=${!params.editable}
                             @change=${(e: Event) =>
                                     params.onToggle(params.agentId, skill.name, (e.target as HTMLInputElement).checked)}
-                    />
-                    <span class="cfg-toggle__track"></span>
+                    /><span class="cfg-toggle__track"></span></span>
                 </label>
             </div>
         </div>

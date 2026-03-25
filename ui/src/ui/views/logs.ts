@@ -82,20 +82,20 @@ export function renderLogs(props: LogsProps) {
       <div class="filters" style="margin-top: 14px;">
         <label class="field" style="min-width: 220px;">
           <span>Filter</span>
-          <input
+          <span class="input"><input
             .value=${props.filterText}
             @input=${(e: Event) => props.onFilterTextChange((e.target as HTMLInputElement).value)}
             placeholder="Search logs"
-          />
+          /></span>
         </label>
         <label class="field checkbox">
           <span>Auto-follow</span>
-          <input
+          <span class="checkbox"><input
             type="checkbox"
             .checked=${props.autoFollow}
             @change=${(e: Event) =>
               props.onToggleAutoFollow((e.target as HTMLInputElement).checked)}
-          />
+          /></span>
         </label>
       </div>
 
@@ -103,12 +103,12 @@ export function renderLogs(props: LogsProps) {
         ${LEVELS.map(
           (level) => html`
             <label class="chip log-chip ${level}">
-              <input
+              <span class="checkbox"><input
                 type="checkbox"
                 .checked=${props.levelFilters[level]}
                 @change=${(e: Event) =>
                   props.onLevelToggle(level, (e.target as HTMLInputElement).checked)}
-              />
+              /></span>
               <span>${level}</span>
             </label>
           `,

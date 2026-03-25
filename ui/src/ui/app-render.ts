@@ -456,7 +456,7 @@ export function renderApp(state: AppViewState) {
                             <div class="session-item__body">
                               ${isEditing
                                 ? html`
-                                    <input
+                                    <span class="input"><input
                                       class="session-item__input"
                                       type="text"
                                       .value=${displayName}
@@ -471,7 +471,7 @@ export function renderApp(state: AppViewState) {
                                         }
                                       }}
                                       @click=${(e: Event) => e.stopPropagation()}
-                                    />
+                                    /></span>
                                   `
                                 : html`<span class="session-item__text">${displayName}</span>`}
                               ${!isEditing && subtitle ? html`<span class="session-item__sub muted">${subtitle}</span>` : nothing}

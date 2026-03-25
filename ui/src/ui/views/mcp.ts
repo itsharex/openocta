@@ -131,15 +131,15 @@ export function renderMcpAddConnectionFields(
     return html`
       <div class="field">
         <span>${t("mcpCommand")} *</span>
-        <select
+        <span class="select"><select
           .value=${sel}
           @change=${(e: Event) => onPatch({ command: (e.target as HTMLSelectElement).value })}
         >
           ${MCP_COMMAND_OPTIONS.map((c) => html`<option value=${c}>${c}</option>`)}
-        </select>
+        </select></span>
       <div class="field">
         <span>${t("mcpArgs")}</span>
-        <input
+        <span class="input"><input
           type="text"
           .value={(draft?.args ?? []).join(" ")}
           placeholder="-y prometheus-mcp-server"
@@ -147,11 +147,11 @@ export function renderMcpAddConnectionFields(
             const val = (e.target as HTMLInputElement).value;
             onPatch({ args: val.trim() ? val.trim().split(/\s+/) : [] });
           }}
-        />
+        /></span>
       </div>
       <div class="field">
         <span>${t("mcpEnv")}</span>
-        <textarea
+        <span class="textarea"><textarea
           style="min-height: 80px; font-family: var(--mono); font-size: 12px;"
           placeholder=${t("mcpEnvPlaceholder")}
           .value=${formatEnvForEdit(draft?.env)}
@@ -159,7 +159,7 @@ export function renderMcpAddConnectionFields(
             const val = (e.target as HTMLTextAreaElement).value;
             onPatch({ env: parseEnvFromEdit(val) });
           }}
-        ></textarea>
+        ></textarea></span>
       </div>
     `;
   }
@@ -167,33 +167,33 @@ export function renderMcpAddConnectionFields(
     return html`
       <div class="field">
         <span>${t("mcpUrl")} *</span>
-        <input
+        <span class="input"><input
           type="text"
           .value=${draft?.url ?? ""}
           placeholder="https://mcp.example.com/sse"
           @input=${(e: Event) => onPatch({ url: (e.target as HTMLInputElement).value })}
-        />
+        /></span>
       </div>
     `;
   }
   return html`
     <div class="field">
       <span>${t("mcpService")} *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${draft?.service ?? ""}
         placeholder="prometheus"
         @input=${(e: Event) => onPatch({ service: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
     <div class="field">
       <span>${t("mcpServiceUrl")} *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${draft?.serviceUrl ?? ""}
         placeholder="http://localhost:9090"
         @input=${(e: Event) => onPatch({ serviceUrl: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
   `;
 }
@@ -211,16 +211,16 @@ function renderEditConnectionTypeFields(
     return html`
       <div class="field">
         <span>${t("mcpCommand")} *</span>
-        <select
+        <span class="select"><select
           .value=${sel}
           @change=${(e: Event) =>
             onFormPatch(selectedKey, { command: (e.target as HTMLSelectElement).value })}
         >
           ${MCP_COMMAND_OPTIONS_EDIT.map((c) => html`<option value=${c}>${c}</option>`)}
-        </select>
+        </select></span>
       <div class="field">
         <span>${t("mcpArgs")}</span>
-        <input
+        <span class="input"><input
           type="text"
           .value=${(selected.args ?? []).join(" ")}
           placeholder="-y prometheus-mcp-server"
@@ -228,11 +228,11 @@ function renderEditConnectionTypeFields(
             const val = (e.target as HTMLInputElement).value;
             onFormPatch(selectedKey, { args: val.trim() ? val.trim().split(/\s+/) : [] });
           }}
-        />
+        /></span>
       </div>
       <div class="field">
         <span>${t("mcpEnv")}</span>
-        <textarea
+        <span class="textarea"><textarea
           style="min-height: 80px; font-family: var(--mono); font-size: 12px;"
           placeholder=${t("mcpEnvPlaceholder")}
           .value=${formatEnvForEdit(selected.env)}
@@ -240,7 +240,7 @@ function renderEditConnectionTypeFields(
             const val = (e.target as HTMLTextAreaElement).value;
             onFormPatch(selectedKey, { env: parseEnvFromEdit(val) });
           }}
-        ></textarea>
+        ></textarea></span>
       </div>
     `;
   }
@@ -248,36 +248,36 @@ function renderEditConnectionTypeFields(
     return html`
       <div class="field">
         <span>${t("mcpUrl")} *</span>
-        <input
+        <span class="input"><input
           type="text"
           .value=${selected.url ?? ""}
           placeholder="https://mcp.example.com/sse"
           @input=${(e: Event) =>
             onFormPatch(selectedKey, { url: (e.target as HTMLInputElement).value })}
-        />
+        /></span>
       </div>
     `;
   }
   return html`
     <div class="field">
       <span>${t("mcpService")} *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${selected.service ?? ""}
         placeholder="prometheus"
         @input=${(e: Event) =>
           onFormPatch(selectedKey, { service: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
     <div class="field">
       <span>${t("mcpServiceUrl")} *</span>
-      <input
+      <span class="input"><input
         type="text"
         .value=${selected.serviceUrl ?? ""}
         placeholder="http://localhost:9090"
         @input=${(e: Event) =>
           onFormPatch(selectedKey, { serviceUrl: (e.target as HTMLInputElement).value })}
-      />
+      /></span>
     </div>
   `;
 }
@@ -336,14 +336,14 @@ export function renderMcpEditModal(props: McpEditModalProps) {
                   <div class="field">
                     <span>${t("mcpEnabled")}</span>
                     <div class="row" style="align-items: center; gap: 8px;">
-                      <input
+                      <span class="checkbox"><input
                         type="checkbox"
                         ?checked=${entry.enabled !== false}
                         @change=${(e: Event) =>
                           props.onFormPatch(serverKey, {
                             enabled: (e.target as HTMLInputElement).checked,
                           })}
-                      />
+                      /></span>
                     </div>
                   </div>
                   <div class="mcp-connection-tabs" style="display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border, #333); padding-bottom: 4px;">
@@ -384,7 +384,7 @@ export function renderMcpEditModal(props: McpEditModalProps) {
                   </div>
                   <div class="field">
                     <span>${t("mcpToolPrefix")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${entry.toolPrefix ?? ""}
                       placeholder="Optional"
@@ -392,19 +392,19 @@ export function renderMcpEditModal(props: McpEditModalProps) {
                         props.onFormPatch(serverKey, {
                           toolPrefix: (e.target as HTMLInputElement).value,
                         })}
-                    />
+                    /></span>
                   </div>
                 </div>
               `
             : html`
                 <div class="field">
                   <span>${t("mcpRawJson")}</span>
-                  <textarea
+                  <span class="textarea"><textarea
                     style="min-height: 200px; font-family: var(--mono);"
                     .value=${props.rawJson}
                     @input=${(e: Event) =>
                       props.onRawChange(serverKey, (e.target as HTMLTextAreaElement).value)}
-                  ></textarea>
+                  ></textarea></span>
                   ${
                     props.rawError
                       ? html`<div class="callout danger" style="margin-top: 8px;">${props.rawError}</div>`
@@ -489,12 +489,12 @@ export function renderMcp(props: McpProps) {
                   <div class="card-title">${t("mcpAddServer")}</div>
                   <div class="field" style="margin-top: 12px;">
                     <span>${t("mcpServerName")} *</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.addName}
                       @input=${(e: Event) => props.onAddNameChange((e.target as HTMLInputElement).value)}
                       placeholder="prometheus, my-mcp"
-                    />
+                    /></span>
                   </div>
                   <div class="row" style="margin: 12px 0; gap: 8px;">
                     <button
@@ -551,25 +551,25 @@ export function renderMcp(props: McpProps) {
                             </div>
                             <div class="field">
                               <span>${t("mcpToolPrefix")}</span>
-                              <input
+                              <span class="input"><input
                                 type="text"
                                 .value=${props.addDraft?.toolPrefix ?? ""}
                                 placeholder="Optional"
                                 @input=${(e: Event) =>
                                   props.onAddFormPatch({ toolPrefix: (e.target as HTMLInputElement).value })}
-                              />
+                              /></span>
                             </div>
                           </div>
                         `
                       : html`
                           <div class="field">
                             <span>${t("mcpRawJson")}</span>
-                            <textarea
+                            <span class="textarea"><textarea
                               style="min-height: 180px; font-family: var(--mono);"
                               .value=${props.addRawJson}
                               @input=${(e: Event) =>
                                 props.onAddRawChange((e.target as HTMLTextAreaElement).value)}
-                            ></textarea>
+                            ></textarea></span>
                             ${
                               props.addRawError
                                 ? html`<div class="callout danger" style="margin-top: 8px;">${props.addRawError}</div>`
@@ -779,14 +779,14 @@ export function renderMcp(props: McpProps) {
                             <div class="field">
                               <span>${t("mcpEnabled")}</span>
                               <div class="row" style="align-items: center; gap: 8px;">
-                                <input
+                                <span class="checkbox"><input
                                   type="checkbox"
                                   ?checked=${selected.enabled !== false}
                                   @change=${(e: Event) =>
                                     props.onFormPatch(props.selectedKey!, {
                                       enabled: (e.target as HTMLInputElement).checked,
                                     })}
-                                />
+                                /></span>
                               </div>
                             </div>
                             <div class="mcp-connection-tabs" style="display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border, #333); padding-bottom: 4px;">
@@ -827,7 +827,7 @@ export function renderMcp(props: McpProps) {
                             </div>
                             <div class="field">
                               <span>${t("mcpToolPrefix")}</span>
-                              <input
+                              <span class="input"><input
                                 type="text"
                                 .value=${selected.toolPrefix ?? ""}
                                 placeholder="Optional"
@@ -835,19 +835,19 @@ export function renderMcp(props: McpProps) {
                                   props.onFormPatch(props.selectedKey!, {
                                     toolPrefix: (e.target as HTMLInputElement).value,
                                   })}
-                              />
+                              /></span>
                             </div>
                           </div>
                         `
                       : html`
                           <div class="field">
                             <span>${t("mcpRawJson")}</span>
-                            <textarea
+                            <span class="textarea"><textarea
                               style="min-height: 200px; font-family: var(--mono);"
                               .value=${props.rawJson}
                               @input=${(e: Event) =>
                                 props.onRawChange(props.selectedKey!, (e.target as HTMLTextAreaElement).value)}
-                            ></textarea>
+                            ></textarea></span>
                             ${
                               props.rawError
                                 ? html`<div class="callout danger" style="margin-top: 8px;">${props.rawError}</div>`

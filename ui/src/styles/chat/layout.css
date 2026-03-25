@@ -280,8 +280,8 @@
 }
 
 .chat-compose__inner:focus-within {
-  border-color: var(--border-primary);
-  box-shadow: 0 0 0 1px var(--border-primary);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-subtle);
 }
 
 /* Image attachments preview */
@@ -407,10 +407,6 @@
   min-width: 0;
 }
 
-.chat-compose__meta .field > span {
-  display: none;
-}
-
 /* + file upload button - circular */
 .chat-compose__meta .chat-compose__add-file {
   width: 28px !important;
@@ -418,16 +414,6 @@
   height: 28px !important;
   border-radius: 50% !important;
   border: 1px solid var(--border);
-}
-
-.chat-compose__meta .chat-compose__model-select select {
-  min-width: 0;
-  flex: 0 1 auto;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 100px;
-  border: none;
-  background: var(--bg-content) !important;
 }
 
 .chat-compose__model-label {
@@ -438,23 +424,7 @@
 }
 
 .chat-compose__model-select select {
-  min-width: 160px;
-  max-width: 240px;
-  padding: 6px 28px 6px 12px;
-  font-size: 13px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  color: var(--text-regular);
-}
-
-.chat-compose__model-select select:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.chat-compose__model-select select:focus {
-  outline: none;
-  border-color: var(--border-primary);
+  border-radius: 30px;
 }
 
 .chat-attachment__file {
@@ -524,16 +494,6 @@
   background: linear-gradient(to bottom, transparent, var(--bg-content) 20%);
 }
 
-:root[data-theme="light"] .chat-compose__inner {
-  background: #fff;
-  border-color: rgba(16, 24, 40, 0.12);
-}
-
-:root[data-theme="light"] .chat-compose__inner:focus-within {
-  border-color: rgba(16, 24, 40, 0.2);
-  box-shadow: 0 0 0 1px rgba(16, 24, 40, 0.08);
-}
-
 :root[data-theme="light"] .chat-compose__secondary {
   background: #fff !important;
   border-color: rgba(16, 24, 40, 0.12) !important;
@@ -554,8 +514,14 @@
 }
 
 /* Hide the "Message" label - keep textarea only */
-.chat-compose__field > span {
+.chat-compose__field > span:not(.textarea) {
   display: none;
+}
+
+.chat-compose__field > .textarea {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* 通义千问风格：无边框 textarea，与容器融为一体 */

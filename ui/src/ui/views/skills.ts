@@ -163,7 +163,7 @@ export function renderSkills(props: SkillsProps) {
                   <div class="card-title">${t("skillsAddSkill")}</div>
                   <div class="field" style="margin-top: 12px;">
                     <span>${t("skillsUploadName")}</span>
-                    <input
+                    <span class="input"><input
                       type="text"
                       .value=${props.uploadName}
                       @input=${(e: Event) =>
@@ -171,7 +171,7 @@ export function renderSkills(props: SkillsProps) {
                       placeholder=${t("skillsUploadNamePlaceholder")}
                       pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}"
                       ?disabled=${props.uploadFiles.length > 1}
-                    />
+                    /></span>
                     ${
                       props.uploadFiles.length > 1
                         ? html`
@@ -260,11 +260,11 @@ export function renderSkills(props: SkillsProps) {
       <div class="filters" style="margin-top: 14px;">
         <label class="field" style="flex: 1;">
           <span>${t("commonFilter")}</span>
-          <input
+          <span class="input"><input
             .value=${props.filter}
             @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
             placeholder=${t("skillsSearchPlaceholder")}
-          />
+          /></span>
         </label>
         <div class="muted">${filtered.length} ${t("skillsShown")}</div>
       </div>
@@ -624,14 +624,14 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
             ? html`
               <div class="field" style="margin-top: 10px;">
                 <span>API key</span>
-                <input
+                <span class="input"><input
                   type="password"
                   .value=${apiKey}
                   @input=${(e: Event) => {
                     e.stopPropagation();
                     props.onEdit(skill.skillKey, (e.target as HTMLInputElement).value);
                   }}
-                />
+                /></span>
               </div>
               <button
                 class="btn primary"

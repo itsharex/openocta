@@ -299,14 +299,14 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
       <div class="emp-search">
-        <input
+        <span class="input"><input
           class="emp-search__input"
           type="text"
           placeholder="搜索"
           .value=${props.query}
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
-        />
+        /></span>
         <span class="emp-search__icon" aria-hidden="true">🔍</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>

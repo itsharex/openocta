@@ -76,7 +76,7 @@ function renderVarsTable(
                 ([key, value], index) => html`
                   <tr>
                     <td>
-                      <input
+                      <span class="input"><input
                         class="env-vars__input"
                         type="text"
                         .value=${key}
@@ -86,10 +86,10 @@ function renderVarsTable(
                           const target = e.target as HTMLInputElement;
                           handleKeyChange(index, target.value);
                         }}
-                      />
+                      /></span>
                     </td>
                     <td>
-                      <input
+                      <span class="input"><input
                         class="env-vars__input"
                         type="text"
                         .value=${value}
@@ -99,7 +99,7 @@ function renderVarsTable(
                           const target = e.target as HTMLInputElement;
                           handleValueChange(index, target.value);
                         }}
-                      />
+                      /></span>
                     </td>
                     <td>
                       <button

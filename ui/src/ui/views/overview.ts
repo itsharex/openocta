@@ -128,29 +128,29 @@ export function renderOverview(props: OverviewProps) {
         <div class="form-grid" style="margin-top: 16px;">
           <label class="field">
             <span>${t("overviewGatewayHost")}</span>
-            <input
+            <span class="input"><input
               .value=${props.settings.gatewayUrl}
               @input=${(e: Event) => {
                 const v = (e.target as HTMLInputElement).value;
                 props.onSettingsChange({ ...props.settings, gatewayUrl: v });
               }}
               placeholder="127.0.0.1:18900"
-            />
+            /></span>
           </label>
           <label class="field">
             <span>${t("overviewGatewayToken")}</span>
-            <input
+            <span class="input"><input
               .value=${props.settings.token}
               @input=${(e: Event) => {
                 const v = (e.target as HTMLInputElement).value;
                 props.onSettingsChange({ ...props.settings, token: v });
               }}
               placeholder="OPENCLAW_GATEWAY_TOKEN"
-            />
+            /></span>
           </label>
           <label class="field">
             <span>${t("overviewPassword")}</span>
-            <input
+            <span class="input"><input
               type="password"
               .value=${props.password}
               @input=${(e: Event) => {
@@ -158,17 +158,17 @@ export function renderOverview(props: OverviewProps) {
                 props.onPasswordChange(v);
               }}
               placeholder="system or shared password"
-            />
+            /></span>
           </label>
           <label class="field">
             <span>${t("overviewDefaultSessionKey")}</span>
-            <input
+            <span class="input"><input
               .value=${props.settings.sessionKey}
               @input=${(e: Event) => {
                 const v = (e.target as HTMLInputElement).value;
                 props.onSessionKeyChange(v);
               }}
-            />
+            /></span>
           </label>
         </div>
         <div class="row" style="margin-top: 14px;">
