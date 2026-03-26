@@ -1076,9 +1076,10 @@ func ChatSendHandler(opts HandlerOpts) error {
 			}
 			if runtimeConfig != nil && runtimeConfig.Mcp != nil && len(runtimeConfig.Mcp.Servers) > 0 {
 				mgr, err := mcpManager.NewManager(context.Background(), runtimeConfig)
-				if err == nil {
-					mcpTools, err := mgr.Tools(ctx)
-					if err == nil {
+				if err == nil && mgr != nil {
+					defer mgr.Close()
+					mcpTools, mcpToolsErr := mgr.Tools(ctx)
+					if mcpToolsErr == nil {
 						for _, t := range mcpTools {
 							agentTools = append(agentTools, t)
 						}

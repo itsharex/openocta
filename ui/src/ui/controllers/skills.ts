@@ -50,6 +50,29 @@ function getErrorMessage(err: unknown) {
   return String(err);
 }
 
+/**
+ * Keys that identify disabled skills in the UI. Uses skillKey plus aliases (name, on-disk folder)
+ * so cards keyed by market `folder` stay in sync when they differ from canonical skillKey.
+ */
+export function disabledSkillKeysFromReport(report: SkillStatusReport | null | undefined): Set<string> {
+  const set = new Set<string>();
+  const add = (s: string | undefined) => {
+    const t = (s ?? "").trim();
+    if (t) set.add(t);
+  };
+  for (const e of report?.skills ?? []) {
+    if (!e.disabled) continue;
+    add(e.skillKey);
+    add(e.name);
+    const base = (e.baseDir ?? "").replace(/[/\\]+$/, "");
+    if (base) {
+      const seg = base.split(/[/\\]/).pop();
+      add(seg);
+    }
+  }
+  return set;
+}
+
 export async function loadSkills(state: SkillsState, options?: LoadSkillsOptions) {
   if (options?.clearMessages && Object.keys(state.skillMessages).length > 0) {
     state.skillMessages = {};

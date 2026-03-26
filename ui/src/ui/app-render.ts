@@ -40,6 +40,7 @@ import {
 } from "./controllers/sessions.ts";
 import {
   deleteSkill,
+  disabledSkillKeysFromReport,
   loadSkillDoc,
   installSkill,
   loadSkills,
@@ -1990,9 +1991,7 @@ export function renderApp(state: AppViewState) {
                   ...(state.skillsReport?.skills ?? []).map((entry) => entry.skillKey),
                   ...(state.skillLibraryItems ?? []).filter((s) => s.installed).map((s) => s.folder),
                 ]),
-                disabledKeys: new Set(
-                  (state.skillsReport?.skills ?? []).filter((e) => e.disabled).map((e) => e.skillKey),
-                ),
+                disabledKeys: disabledSkillKeysFromReport(state.skillsReport),
                 installingFolder: state.skillLibraryInstallingFolder,
                 onInstall: async (folder, category) => {
                   state.skillLibraryInstallingFolder = folder;

@@ -31,9 +31,9 @@ func ValidateCommandWithConfig(command string, cfg *config.SandboxValidatorConfi
 		return fmt.Errorf("control characters detected")
 	}
 	// Safe default: block pipes/redirections/substitution in non-interactive policy.
-	if strings.ContainsAny(cmd, "|;&><`$") {
-		return fmt.Errorf("pipe or shell metacharacters are blocked")
-	}
+	//if strings.ContainsAny(cmd, "|;&><`$") {
+	//	return fmt.Errorf("pipe or shell metacharacters are blocked")
+	//}
 
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {

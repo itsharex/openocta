@@ -115,6 +115,11 @@ func (c *Client) Close() error {
 	}
 	err := c.session.Close()
 	c.session = nil
+	// SDK transport normally waits on the child; if anything left the process unreaped, avoid leaks.
+	if c.cmd != nil && c.cmd.ProcessState == nil && c.cmd.Process != nil {
+		_ = c.cmd.Process.Kill()
+		_ = c.cmd.Wait()
+	}
 	return err
 }
 
