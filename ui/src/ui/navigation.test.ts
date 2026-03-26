@@ -27,16 +27,21 @@ describe("iconForTab", () => {
 
   it("returns stable icons for known tabs", () => {
     expect(iconForTab("chat")).toBe("messageSquare");
-    expect(iconForTab("overview")).toBe("barChart");
+    expect(iconForTab("overview")).toBe("overviewGrid");
     expect(iconForTab("channels")).toBe("link");
     expect(iconForTab("instances")).toBe("radio");
-    expect(iconForTab("sessions")).toBe("fileText");
+    expect(iconForTab("sessions")).toBe("scrollText");
     expect(iconForTab("cron")).toBe("loader");
-    expect(iconForTab("cronHistory")).toBe("scrollText");
+    expect(iconForTab("cronHistory")).toBe("historyClock");
     expect(iconForTab("skills")).toBe("zap");
     expect(iconForTab("nodes")).toBe("monitor");
     expect(iconForTab("config")).toBe("settings");
     expect(iconForTab("debug")).toBe("bug");
+    expect(iconForTab("usage")).toBe("usageBars");
+    expect(iconForTab("models")).toBe("modelCube");
+    expect(iconForTab("sandbox")).toBe("sandbox");
+    expect(iconForTab("envVars")).toBe("envVars");
+    expect(iconForTab("llmTrace")).toBe("traceBars");
     expect(iconForTab("logs")).toBe("scrollText");
   });
 

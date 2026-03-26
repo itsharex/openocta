@@ -46,6 +46,12 @@
   pointer-events: none;
 }
 
+.emp-search__icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
 .emp-content {
   display: flex;
   gap: 20px;

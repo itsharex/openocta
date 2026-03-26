@@ -497,7 +497,7 @@ export function renderApp(state: AppViewState) {
             : "nav__toggle-icon--collapse"}"
           aria-hidden="true"
         >
-          ${icons.arrowDown}
+          ${icons.menu}
         </span>
       </button>
     </div>
@@ -776,7 +776,7 @@ export function renderApp(state: AppViewState) {
                             <span class="session-item__icon" aria-hidden="true">
                               ${emp
                                 ? html`<span class="session-item__icon-emp">${(emp as any).name?.slice(0, 1) || "?"}</span>`
-                                : html`<span class="session-item__icon-default">${icons.messageSquare}</span>`}
+                                : html`<span class="session-item__icon-default">${icons.chatBubble}</span>`}
                             </span>
                             <div class="session-item__body">
                               ${isEditing
@@ -856,7 +856,7 @@ export function renderApp(state: AppViewState) {
                         : "session-sidebar__toggle-icon--collapse"}"
                       aria-hidden="true"
                     >
-                      ${icons.arrowDown}
+                      ${icons.menu}
                     </span>
                   </button>
                 </div>
@@ -925,7 +925,7 @@ export function renderApp(state: AppViewState) {
                                 gatewayToken: state.settings.token,
                               })}
                           >
-                            <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
+                            <span class="nav-item__icon" aria-hidden="true">${icons.documentation}</span>
                             <span class="nav-item__text">在线文档</span>
                           </button>
                           ${renderTab(state, "aboutUs")}

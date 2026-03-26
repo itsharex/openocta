@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { EduCategory, EduCourse, EduLesson } from "../controllers/remote-market.ts";
+import { icons } from "../icons.js";
 import { getTutorialIcon } from "../tutorial-icons.ts";
 
 export type TutorialsProps = {
@@ -132,7 +133,7 @@ export function renderTutorials(props: TutorialsProps) {
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
         /></span>
-        <span class="emp-search__icon" aria-hidden="true">🔍</span>
+        <span class="emp-search__icon" aria-hidden="true">${icons.search}</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
     </div>

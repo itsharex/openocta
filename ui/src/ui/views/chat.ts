@@ -323,7 +323,7 @@ export function renderChat(props: ChatProps) {
                     props.onSend();
                   }}
                 >
-                  ${icons.zap} ${p}
+                  ${icons.chatPrompt} ${p}
                 </button>
               `,
             )}

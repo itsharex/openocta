@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { icons } from "../icons.js";
 import { resolveLogoUrl, type SkillDetail, type SkillListItem } from "../controllers/remote-market.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { t } from "../strings.js";
@@ -257,7 +258,7 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
         /></span>
-        <span class="emp-search__icon" aria-hidden="true">🔍</span>
+        <span class="emp-search__icon" aria-hidden="true">${icons.search}</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
       <button class="btn primary" ?disabled=${props.loading} @click=${props.onAddClick}>${t("skillsAdd")}</button>

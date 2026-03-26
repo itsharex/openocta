@@ -252,12 +252,12 @@
 
 .nav__toggle-icon--collapse,
 .session-sidebar__toggle-icon--collapse {
-  transform: rotate(90deg);
+  transform: rotateY(180deg);
 }
 
 .nav__toggle-icon--expand,
 .session-sidebar__toggle-icon--expand {
-  transform: rotate(-90deg);
+  transform: rotateY(0);
 }
 
 .session-item {
@@ -291,9 +291,14 @@
   color: var(--accent);
 }
 
-.session-item__icon-default svg {
-  width: 16px;
-  height: 16px;
+.session-item__icon-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .session-item__icon-emp {
@@ -729,9 +734,7 @@ button.nav-item {
 .nav-item__icon svg {
   width: 16px;
   height: 16px;
-  stroke: var(--text-placeholder);
-  fill: none;
-  stroke-width: 1.5px;
+  color: var(--text-placeholder);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -769,11 +772,11 @@ button.nav-item {
   color: var(--accent);
 }
 .nav-item.active .nav-item__icon svg {
-  stroke: var(--accent);
+  color: var(--accent);
 }
 
 .top-tab--active .nav-item__icon svg {
-  stroke: var(--accent);
+  color: var(--accent);
 }
 
 /* ===========================================
@@ -1641,7 +1644,7 @@ button.nav-item {
 .top-tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 100%;
   padding: 0 14px;
   border: none;

@@ -484,6 +484,8 @@
   }
 
   svg {
+    width: 16px;
+    height: 16px;
     margin-right: 4px;
     vertical-align: middle;
   }
@@ -593,7 +595,7 @@
   width: 28px !important;
   min-width: 28px !important;
   height: 28px !important;
-  padding: 0 !important;
+  padding: 0 0 0 2px !important;
   border-radius: 50% !important;
   border: none !important;
   background: var(--accent) !important;
@@ -617,8 +619,8 @@
 }
 
 .chat-compose__send svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
   fill: none;
   stroke-width: 2px;

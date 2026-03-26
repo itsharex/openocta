@@ -163,7 +163,7 @@ export function iconForTab(tab: Tab): IconName {
     case "scheduledTasks":
       return "alarmClock";
     case "cronHistory":
-      return "scrollText";
+      return "historyClock";
     case "employeeMarket":
       return "users";
     case "skillLibrary":
@@ -185,15 +185,15 @@ export function iconForTab(tab: Tab): IconName {
     // case "agentSwarm":
     //   return "brain";
     case "overview":
-      return "barChart";
+      return "overviewGrid";
     case "channels":
       return "link";
     case "instances":
       return "radio";
     case "sessions":
-      return "fileText";
+      return "scrollText";
     case "usage":
-      return "barChart";
+      return "usageBars";
     case "cron":
       return "loader";
     case "skills":
@@ -201,7 +201,7 @@ export function iconForTab(tab: Tab): IconName {
     case "mcp":
       return "folder";
     case "llmTrace":
-      return "scrollText";
+      return "traceBars";
     case "sandbox":
       return "sandbox";
     case "nodes":
@@ -209,9 +209,9 @@ export function iconForTab(tab: Tab): IconName {
     case "config":
       return "settings";
     case "envVars":
-      return "settings";
+      return "envVars";
     case "models":
-      return "folder";
+      return "modelCube";
     case "debug":
       return "bug";
     case "logs":

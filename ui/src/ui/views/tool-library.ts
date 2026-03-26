@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { McpDetail, McpListItem } from "../controllers/remote-market.ts";
+import { icons } from "../icons.js";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { t } from "../strings.js";
@@ -257,7 +258,7 @@ export function renderToolLibrary(props: ToolLibraryProps) {
           ?disabled=${props.loading}
           @input=${(e: Event) => props.onQueryChange((e.target as HTMLInputElement).value)}
         /></span>
-        <span class="emp-search__icon" aria-hidden="true">🔍</span>
+        <span class="emp-search__icon" aria-hidden="true">${icons.search}</span>
       </div>
       <button class="btn" @click=${props.onRefresh} ?disabled=${props.loading}>刷新</button>
       ${props.onAddServer
