@@ -259,6 +259,127 @@ func SessionsCreateHandler(opts HandlerOpts) error {
 	return nil
 }
 
+// SessionsEnsureParams requests idempotent creation of a session store row for an explicit chat key.
+type SessionsEnsureParams struct {
+	Key   string  `json:"key"`
+	Label *string `json:"label,omitempty"`
+}
+
+// SessionsEnsureResult is the response for sessions.ensure.
+type SessionsEnsureResult struct {
+	OK        bool                   `json:"ok"`
+	Key       string                 `json:"key"`
+	Created   bool                   `json:"created"`
+	SessionID string                 `json:"sessionId"`
+	Entry     map[string]interface{} `json:"entry"`
+}
+
+// SessionsEnsureHandler ensures sessions.json + empty transcript exist for the given key (e.g. digital-employee webchat).
+func SessionsEnsureHandler(opts HandlerOpts) error {
+	params := parseSessionsEnsureParams(opts.Params)
+	key := strings.TrimSpace(strings.ToLower(params.Key))
+	if key == "" {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "sessions.ensure: key is required",
+		}, nil)
+		return nil
+	}
+
+	cfg := loadConfigFromContext(opts.Context)
+	if cfg == nil {
+		cfg = &config.OpenOctaConfig{}
+	}
+	env := func(k string) string { return os.Getenv(k) }
+	target := resolveGatewaySessionStoreTarget(cfg, key, env)
+	storePath := target.storePath
+
+	sidRaw := tools.SessionIDFromSessionKey(key)
+	validated, err := session.ValidateSessionID(sidRaw)
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: fmt.Sprintf("sessions.ensure: invalid derived session id: %v", err),
+		}, nil)
+		return nil
+	}
+	transcriptPath := session.ResolveSessionFilePath(validated, &session.SessionPathOptions{AgentID: target.agentID}, env)
+	sessionFile := validated + ".jsonl"
+
+	defaultLabel := "Web 会话"
+	if emp := parseEmployeeIDFromSessionKey(key); emp != "" {
+		defaultLabel = "数字员工 · " + emp
+	}
+	label := defaultLabel
+	if params.Label != nil && strings.TrimSpace(*params.Label) != "" {
+		label = strings.TrimSpace(*params.Label)
+	}
+
+	var created bool
+	updated, err := updateSessionStore(storePath, func(store session.SessionStore) (session.SessionEntry, error) {
+		for _, candidate := range target.storeKeys {
+			if e, ok := store[candidate]; ok && strings.TrimSpace(e.SessionID) != "" {
+				created = false
+				return e, nil
+			}
+		}
+		primaryKey := target.storeKeys[0]
+		if primaryKey == "" {
+			primaryKey = target.canonicalKey
+		}
+		entry := store[primaryKey]
+		if strings.TrimSpace(entry.SessionID) != "" {
+			created = false
+			return entry, nil
+		}
+		created = true
+		now := time.Now().UnixMilli()
+		entry = session.SessionEntry{
+			SessionID:   validated,
+			SessionFile: sessionFile,
+			UpdatedAt:   now,
+			Channel:     "webchat",
+			Label:       label,
+		}
+		store[primaryKey] = entry
+		return entry, nil
+	})
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInternal,
+			Message: "sessions.ensure: " + err.Error(),
+		}, nil)
+		return nil
+	}
+
+	if err := session.EnsureTranscriptFile(transcriptPath, validated); err != nil {
+		sessionsLog.Warn("sessions.ensure: ensure transcript failed path=%s sessionID=%s err=%v", transcriptPath, validated, err)
+	}
+
+	opts.Respond(true, &SessionsEnsureResult{
+		OK:        true,
+		Key:       target.canonicalKey,
+		Created:   created,
+		SessionID: updated.SessionID,
+		Entry:     sessionEntryToMap(updated),
+	}, nil, nil)
+	return nil
+}
+
+func parseSessionsEnsureParams(params map[string]interface{}) *SessionsEnsureParams {
+	p := &SessionsEnsureParams{}
+	if params == nil {
+		return p
+	}
+	if k, ok := params["key"].(string); ok {
+		p.Key = k
+	}
+	if lab, ok := params["label"].(string); ok && lab != "" {
+		p.Label = &lab
+	}
+	return p
+}
+
 func parseSessionsCreateParams(params map[string]interface{}) (*SessionsCreateParams, error) {
 	p := &SessionsCreateParams{}
 	if params == nil {

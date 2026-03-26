@@ -1,6 +1,7 @@
 package http
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	agentSkills "github.com/openocta/openocta/pkg/agent/skills"
@@ -20,6 +22,43 @@ import (
 )
 
 const siteAPIEnvKey = "OPENOCTA_SITE_API_BASE_URL"
+
+var (
+	siteAPITransport     http.RoundTripper
+	siteAPITransportOnce sync.Once
+)
+
+// siteAPIRoundTripper returns a shared transport for OPENOCTA_SITE_API_BASE_URL requests.
+// TLS verification is skipped so self-signed or misconfigured HTTPS dev/staging hosts still work.
+func siteAPIRoundTripper() http.RoundTripper {
+	siteAPITransportOnce.Do(func() {
+		base, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			siteAPITransport = &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // intentional for site API compatibility
+			}
+			return
+		}
+		t := base.Clone()
+		if t.TLSClientConfig == nil {
+			t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+		} else {
+			c := t.TLSClientConfig.Clone()
+			c.InsecureSkipVerify = true //nolint:gosec
+			t.TLSClientConfig = c
+		}
+		siteAPITransport = t
+	})
+	return siteAPITransport
+}
+
+// newSiteAPIHTTPClient is used for all outbound requests to OPENOCTA_SITE_API_BASE_URL (proxy, install zip fetch).
+func newSiteAPIHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: siteAPIRoundTripper(),
+	}
+}
 
 // remoteIDFromItem 从员工 item 的 id 提取远程 id（number 转 string）
 func remoteIDFromItem(id interface{}) string {
@@ -262,7 +301,7 @@ func (s *Server) proxySiteGET(w http.ResponseWriter, r *http.Request, upstreamPa
 	}
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		writeSiteProxyFailure(w, http.StatusBadGateway, err.Error(), u.String())
@@ -316,7 +355,7 @@ func (s *Server) handleSiteEmployees(w http.ResponseWriter, r *http.Request) {
 	var remote []employeeMarketItem
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	if res, err := client.Do(req); err == nil {
 		_ = json.NewDecoder(res.Body).Decode(&remote)
 		res.Body.Close()
@@ -406,7 +445,7 @@ func (s *Server) handleSiteEmployeeDetail(w http.ResponseWriter, r *http.Request
 	u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/employees/" + url.PathEscape(id)
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		writeSiteProxyFailure(w, http.StatusBadGateway, err.Error(), u.String())
@@ -465,7 +504,7 @@ func (s *Server) handleSiteMcps(w http.ResponseWriter, r *http.Request) {
 	u.RawQuery = r.URL.RawQuery
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		writeSiteProxyFailure(w, http.StatusBadGateway, err.Error(), u.String())
@@ -525,7 +564,7 @@ func (s *Server) handleSiteMcpDetail(w http.ResponseWriter, r *http.Request) {
 	u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/mcps/" + url.PathEscape(id)
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		writeSiteProxyFailure(w, http.StatusBadGateway, err.Error(), u.String())
@@ -583,7 +622,7 @@ func (s *Server) handleSiteSkills(w http.ResponseWriter, r *http.Request) {
 	u.RawQuery = r.URL.RawQuery
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		writeSiteProxyFailure(w, http.StatusBadGateway, err.Error(), u.String())
@@ -622,7 +661,7 @@ func (s *Server) handleSiteSkillDetail(w http.ResponseWriter, r *http.Request) {
 	u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/skills/" + url.PathEscape(folder)
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newSiteAPIHTTPClient(8 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		if tryWriteLocalSkillDetail(w, managedDir, folder) {

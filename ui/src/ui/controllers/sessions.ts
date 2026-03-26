@@ -22,6 +22,46 @@ export type SessionsCreateResult = {
   entry: Record<string, unknown>;
 };
 
+export type SessionsEnsureResult = {
+  ok: boolean;
+  key: string;
+  created: boolean;
+  sessionId: string;
+  entry: Record<string, unknown>;
+};
+
+/** 幂等：为指定 session key 写入 sessions 存储并保证转录文件存在（如数字员工 Web 会话在开聊前就出现在侧栏）。 */
+export async function ensureSessionForKey(
+  state: SessionsState,
+  opts: { key: string; label?: string },
+): Promise<SessionsEnsureResult | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+  const key = (opts.key ?? "").trim().toLowerCase();
+  if (!key) {
+    return null;
+  }
+  try {
+    const params: Record<string, unknown> = { key };
+    if (opts.label?.trim()) {
+      params.label = opts.label.trim();
+    }
+    const res = await state.client.request<SessionsEnsureResult>("sessions.ensure", params);
+    if (res?.ok && res.key) {
+      await loadSessions(state, {
+        activeMinutes: 10080,
+        limit: 5000,
+        includeLastMessage: true,
+      });
+      return res;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function createSession(
   state: SessionsState,
   opts?: { label?: string },

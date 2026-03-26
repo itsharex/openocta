@@ -95,7 +95,11 @@ export class GatewayBrowserClient {
       return;
     }
     this.ws = new WebSocket(this.opts.url);
-    this.ws.addEventListener("open", () => this.queueConnect());
+    this.ws.addEventListener("open", () => {
+      // Hub seq is global; after reconnect we only receive new frames, not 1..n from last connection.
+      this.lastSeq = null;
+      this.queueConnect();
+    });
     this.ws.addEventListener("message", (ev) => {
       void this.handleWsMessage(ev.data);
     });

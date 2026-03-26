@@ -292,7 +292,7 @@ func fetchZipFromSite(ctx context.Context, baseURL, kind, id string) ([]byte, er
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/zip, application/octet-stream, */*")
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := newSiteAPIHTTPClient(60 * time.Second)
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err

@@ -3,6 +3,18 @@ export type ParsedAgentSessionKey = {
   rest: string;
 };
 
+/** 与网关 chat.send 一致：TrimSpace + ToLower，避免 WebSocket 事件与 UI 会话 key 大小写不一致时丢弃 final。 */
+export function canonicalGatewaySessionKey(sessionKey: string | undefined | null): string {
+  return (sessionKey ?? "").trim().toLowerCase();
+}
+
+export function gatewaySessionKeysEqual(
+  a: string | undefined | null,
+  b: string | undefined | null,
+): boolean {
+  return canonicalGatewaySessionKey(a) === canonicalGatewaySessionKey(b);
+}
+
 export function parseAgentSessionKey(
   sessionKey: string | undefined | null,
 ): ParsedAgentSessionKey | null {
@@ -48,6 +60,24 @@ export function isAcpSessionKey(sessionKey: string | undefined | null): boolean 
   }
   const parsed = parseAgentSessionKey(raw);
   return Boolean((parsed?.rest ?? "").toLowerCase().startsWith("acp:"));
+}
+
+/** UI 为数字员工新开线程时生成的 key：首条消息写入前可能尚不在 sessions.list 中。 */
+export function isEmployeeRunSessionKey(sessionKey: string | undefined | null): boolean {
+  const raw = (sessionKey ?? "").trim();
+  if (!raw) {
+    return false;
+  }
+  return /^agent:[^:]+:employee:[^:]+:run:.+/i.test(raw);
+}
+
+/** 稳定态数字员工 Web 会话 agent:*:employee:*（恰好四段，无 :run:）。sessions.ensure 写入前可能不在 list。 */
+export function isStableEmployeeWebchatSessionKey(sessionKey: string | undefined | null): boolean {
+  const raw = (sessionKey ?? "").trim();
+  if (!raw) {
+    return false;
+  }
+  return /^agent:[^:]+:employee:[^:]+$/i.test(raw);
 }
 
 const THREAD_SESSION_MARKERS = [":thread:", ":topic:"];

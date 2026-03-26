@@ -1,4 +1,5 @@
 import { truncateText } from "./format.ts";
+import { gatewaySessionKeysEqual } from "./sessions/session-key-utils.js";
 
 const TOOL_STREAM_LIMIT = 50;
 const TOOL_STREAM_THROTTLE_MS = 80;
@@ -219,7 +220,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
     return;
   }
   const sessionKey = typeof payload.sessionKey === "string" ? payload.sessionKey : undefined;
-  if (sessionKey && sessionKey !== host.sessionKey) {
+  if (sessionKey && !gatewaySessionKeysEqual(sessionKey, host.sessionKey)) {
     return;
   }
   // Fallback: only accept session-less events for the active run.

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/openocta/openocta/pkg/appinstance"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/daemon"
 	gatewayclient "github.com/openocta/openocta/pkg/gateway/client"
@@ -91,6 +92,8 @@ func runGateway(cmd *cobra.Command, _ []string) error {
 	// Redirect standard library logger (log.Printf, etc.) into the global logger,
 	// so logs from dependencies using the default logger are captured consistently.
 	logging.RedirectStdLog(logging.LevelInfo)
+
+	appinstance.KillOtherOpenOctaProcesses()
 
 	port := paths.ResolveGatewayPort(nil, env)
 	if gatewayPort > 0 {

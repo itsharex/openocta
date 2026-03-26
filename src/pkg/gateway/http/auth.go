@@ -13,6 +13,9 @@ const (
 	envGatewayToken     = "OPENOCTA_GATEWAY_TOKEN"
 )
 
+// gatewayHTTPAuthDisabled 为 true 时不校验 HTTP 网关令牌（全部放行）。需要恢复校验时改为 false。
+const gatewayHTTPAuthDisabled = true
+
 // getExpectedToken returns the gateway token from config or env.
 // Config takes precedence; env OPENOCTA_GATEWAY_TOKEN overrides when set.
 func (s *Server) getExpectedToken() string {
@@ -42,6 +45,9 @@ func extractRequestToken(r *http.Request) string {
 // validateGatewayToken returns true if the request has a valid token.
 // When expectedToken is empty (no auth configured), allows all requests.
 func (s *Server) validateGatewayToken(r *http.Request) bool {
+	if gatewayHTTPAuthDisabled {
+		return true
+	}
 	expected := s.getExpectedToken()
 	if expected == "" {
 		return true

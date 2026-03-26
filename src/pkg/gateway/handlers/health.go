@@ -146,6 +146,7 @@ func NewRegistry(ctx *Context) Registry {
 		"voicewake.set":              VoicewakeSetHandler,
 		"sessions.list":              SessionsListHandler,
 		"sessions.create":            SessionsCreateHandler,
+		"sessions.ensure":            SessionsEnsureHandler,
 		"sessions.preview":           SessionsPreviewHandler,
 		"sessions.patch":             SessionsPatchHandler,
 		"sessions.reset":             SessionsResetHandler,

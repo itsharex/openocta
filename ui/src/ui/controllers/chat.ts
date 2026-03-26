@@ -1,6 +1,7 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { extractText } from "../chat/message-extract.ts";
+import { canonicalGatewaySessionKey, gatewaySessionKeysEqual } from "../sessions/session-key-utils.js";
 import { generateUUID } from "../uuid.ts";
 
 export type ChatState = {
@@ -37,7 +38,7 @@ export async function loadChatHistory(state: ChatState) {
     const res = await state.client.request<{ messages?: Array<unknown>; thinkingLevel?: string }>(
       "chat.history",
       {
-        sessionKey: state.sessionKey,
+        sessionKey: canonicalGatewaySessionKey(state.sessionKey),
         limit: 200,
       },
     );
@@ -136,7 +137,7 @@ export async function sendChatMessage(
 
   try {
     await state.client.request("chat.send", {
-      sessionKey: state.sessionKey,
+      sessionKey: canonicalGatewaySessionKey(state.sessionKey),
       message: msg,
       deliver: false,
       idempotencyKey: runId,
@@ -170,10 +171,8 @@ export async function abortChatRun(state: ChatState): Promise<boolean> {
   }
   const runId = state.chatRunId;
   try {
-    await state.client.request(
-      "chat.abort",
-      runId ? { sessionKey: state.sessionKey, runId } : { sessionKey: state.sessionKey },
-    );
+    const sk = canonicalGatewaySessionKey(state.sessionKey);
+    await state.client.request("chat.abort", runId ? { sessionKey: sk, runId } : { sessionKey: sk });
     return true;
   } catch (err) {
     state.lastError = String(err);
@@ -185,7 +184,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (!payload) {
     return null;
   }
-  if (payload.sessionKey !== state.sessionKey) {
+  if (!gatewaySessionKeysEqual(payload.sessionKey, state.sessionKey)) {
     return null;
   }
 

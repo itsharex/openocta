@@ -14,6 +14,7 @@ func TestSessionIDFromSessionKey(t *testing.T) {
 		{"agent:main:main", "main"},
 		{"agent:main:employee:sre:run:uuid", "employee-sre-run-uuid"},
 		{"agent:main:employee:sre:run:550e8400-e29b-41d4-a716-446655440000", "employee-sre-run-550e8400-e29b-41d4-a716-446655440000"},
+		{"agent:main:employee:clickhouse", "employee-clickhouse"},
 		{"agent:main:dm:alice", "dm-alice"},
 	}
 	for _, tt := range tests {

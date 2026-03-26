@@ -1,7 +1,12 @@
 import type { OpenClawApp } from "./app.ts";
 import type { GatewayHelloOk } from "./gateway.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
-import { parseAgentSessionKey } from "./sessions/session-key-utils.js";
+import {
+  gatewaySessionKeysEqual,
+  isEmployeeRunSessionKey,
+  isStableEmployeeWebchatSessionKey,
+  parseAgentSessionKey,
+} from "./sessions/session-key-utils.js";
 import { scheduleChatScroll } from "./app-scroll.ts";
 import { setLastActiveSessionKey, syncUrlWithSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
@@ -41,8 +46,15 @@ async function reconcileInvalidChatSessionFromList(host: OpenClawApp): Promise<b
     return false;
   }
 
-  const inList = rows.some((row) => row.key === key);
+  const inList = rows.some((row) => gatewaySessionKeysEqual(row.key, key));
   if (rows.length > 0 && inList) {
+    return false;
+  }
+  // 新开员工会话：首条 chat.send 完成前 store 里可能还没有该 key，避免误判并切走 session。
+  if (!inList && isEmployeeRunSessionKey(key)) {
+    return false;
+  }
+  if (!inList && isStableEmployeeWebchatSessionKey(key)) {
     return false;
   }
   if (rows.length === 0 && key === "agent.main.main") {
@@ -67,6 +79,10 @@ async function reconcileInvalidChatSessionFromList(host: OpenClawApp): Promise<b
   });
   host.chatMessage = "";
   host.chatAttachments = [];
+  host.chatRunId = null;
+  host.chatStream = null;
+  host.chatStreamStartedAt = null;
+  host.chatSending = false;
   host.resetToolStream();
   await host.loadAssistantIdentity();
   syncUrlWithSessionKey(
@@ -260,9 +276,11 @@ export async function handleSendChat(
 
 export async function refreshChat(host: ChatHost) {
   const app = host as unknown as OpenClawApp;
+  // 使用较大 limit，避免列表按更新时间截断后把当前会话误判为「已删除」（与员工市场入口的 loadSessions 不一致时尤其明显）。
   await loadSessions(app, {
     activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
     includeLastMessage: true,
+    limit: 5000,
   });
   const switched = await reconcileInvalidChatSessionFromList(app);
   await Promise.all([loadChatHistory(app), refreshChatAvatar(host)]);

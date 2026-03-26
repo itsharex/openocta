@@ -30,7 +30,14 @@ import {
 } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
-import { createSession, deleteSession, deleteSessions, loadSessions, patchSession } from "./controllers/sessions.ts";
+import {
+  createSession,
+  deleteSession,
+  deleteSessions,
+  ensureSessionForKey,
+  loadSessions,
+  patchSession,
+} from "./controllers/sessions.ts";
 import {
   deleteSkill,
   loadSkillDoc,
@@ -60,6 +67,83 @@ function extractEmployeeIdFromSessionKey(key: string): string | null {
     return key.slice(empDash.length).split(/[:/-]/)[0] || null;
   }
   return null;
+}
+
+function normalizeDigitalEmployeeId(raw: string): string {
+  const t = (raw ?? "").trim().toLowerCase();
+  return t || "default";
+}
+
+/** 与网关 chat.send 一致使用小写 id；优先精确 stable key，否则复用该员工任一已有会话（含旧 :run:uuid），保证一人一线程。 */
+function findExistingEmployeeWebchatSessionKey(
+  sessions: Array<{ key: string }>,
+  idNorm: string,
+): string | null {
+  const stable = `agent:main:employee:${idNorm}`;
+  for (const s of sessions) {
+    if ((s.key ?? "").trim().toLowerCase() === stable) {
+      return s.key;
+    }
+  }
+  for (const s of sessions) {
+    const ek = extractEmployeeIdFromSessionKey(s.key);
+    if (ek && ek.toLowerCase() === idNorm) {
+      return s.key;
+    }
+  }
+  return null;
+}
+
+async function openDigitalEmployeeWebchat(state: AppViewState, employeeIdRaw: string) {
+  const idNorm = normalizeDigitalEmployeeId(employeeIdRaw);
+  await loadSessions(state, {
+    activeMinutes: 10080,
+    limit: 5000,
+    includeLastMessage: true,
+  });
+  const sessions = state.sessionsResult?.sessions ?? [];
+  const existingKey = findExistingEmployeeWebchatSessionKey(sessions, idNorm);
+  const sessionKey = existingKey ?? `agent:main:employee:${idNorm}`;
+  const isNewSlot = !existingKey;
+
+  if (isNewSlot) {
+    const emp = state.digitalEmployees.find((e) => (e.id ?? "").trim().toLowerCase() === idNorm);
+    const label = (emp?.name && String(emp.name).trim()
+      ? String(emp.name).trim()
+      : `数字员工 · ${idNorm}`);
+    await ensureSessionForKey(state, { key: sessionKey, label });
+  } else {
+    await loadSessions(state, {
+      activeMinutes: 10080,
+      limit: 5000,
+      includeLastMessage: true,
+    });
+  }
+
+  state.sessionKey = sessionKey;
+  state.chatMessage = "";
+  state.chatAttachments = [];
+  state.chatStream = null;
+  state.chatStreamStartedAt = null;
+  state.chatRunId = null;
+  state.chatQueue = [];
+  state.resetToolStream();
+  state.resetChatScroll();
+  state.applySettings({
+    ...state.settings,
+    sessionKey,
+    lastActiveSessionKey: sessionKey,
+  });
+  await state.loadAssistantIdentity();
+  await loadChatHistory(state);
+  await refreshChatAvatar(state);
+  state.setTab("message");
+  if (isNewSlot) {
+    void state.handleSendChat(
+      "当前已开启数字员工会话。请以你配置的人设（如有）向用户打招呼，保持你的语气、风格和情绪。用 1～3 句话问候并询问用户想做什么。",
+      { refreshSessions: true },
+    );
+  }
 }
 
 /** 侧栏搜索：汇总 key、展示名、副标题及网关返回的标签类字段（label、channel、origin 等） */
@@ -469,7 +553,7 @@ export function renderApp(state: AppViewState) {
             { tab: "skillLibrary", label: "技能库" },
             { tab: "toolLibrary", label: "工具库" },
             { tab: "tutorials", label: "教程" },
-            { tab: "community", label: "社区", href: "https://community.databuff.com/" },
+            { tab: "community", label: "社区", href: "https://community.databuff.com/c/10-category/10" },
             { tab: "config", label: "配置" },
           ].map((item) => {
             const tab = (item as any).tab;
@@ -1608,45 +1692,7 @@ export function renderApp(state: AppViewState) {
                   }
                 },
                 onOpenEmployee: async (employeeId) => {
-                  const idPart = employeeId.trim() || "default";
-                  await loadSessions(state, { activeMinutes: 10080, limit: 200, includeLastMessage: true });
-                  const sessions = state.sessionsResult?.sessions ?? [];
-                  const employeePatterns = [
-                    `agent:main:employee:${idPart}:`,
-                    `agent:main:employee-${idPart}`,
-                    `employee:${idPart}:`,
-                    `employee-${idPart}`,
-                  ];
-                  const existing = sessions.find((s) =>
-                    employeePatterns.some((p) => s.key.includes(p) || s.key === p),
-                  );
-                  const sessionKey = existing
-                    ? existing.key
-                    : `agent:main:employee:${idPart}:run:${generateUUID()}`;
-                  state.sessionKey = sessionKey;
-                  state.chatMessage = "";
-                  state.chatAttachments = [];
-                  state.chatStream = null;
-                  state.chatStreamStartedAt = null;
-                  state.chatRunId = null;
-                  state.chatQueue = [];
-                  state.resetToolStream();
-                  state.resetChatScroll();
-                  state.applySettings({
-                    ...state.settings,
-                    sessionKey,
-                    lastActiveSessionKey: sessionKey,
-                  });
-                  void state.loadAssistantIdentity();
-                  void loadChatHistory(state);
-                  void refreshChatAvatar(state);
-                  state.setTab("message");
-                  if (!existing) {
-                    state.handleSendChat(
-                      "当前已开启数字员工会话。请以你配置的人设（如有）向用户打招呼，保持你的语气、风格和情绪。用 1～3 句话问候并询问用户想做什么。",
-                      { refreshSessions: true },
-                    );
-                  }
+                  await openDigitalEmployeeWebchat(state, employeeId);
                 },
                 onEdit: async (localId) => {
                   const emp = state.digitalEmployees.find((e) => e.id === localId);
@@ -2830,45 +2876,7 @@ export function renderApp(state: AppViewState) {
                   state.digitalEmployeeSkillUploadFiles = files ?? [];
                 },
                 onOpenEmployee: async (employeeId) => {
-                  const idPart = employeeId.trim() || "default";
-                  await loadSessions(state, { activeMinutes: 10080, limit: 200, includeLastMessage: true });
-                  const sessions = state.sessionsResult?.sessions ?? [];
-                  const employeePatterns = [
-                    `agent:main:employee:${idPart}:`,
-                    `agent:main:employee-${idPart}`,
-                    `employee:${idPart}:`,
-                    `employee-${idPart}`,
-                  ];
-                  const existing = sessions.find((s) =>
-                    employeePatterns.some((p) => s.key.includes(p) || s.key === p),
-                  );
-                  const sessionKey = existing
-                    ? existing.key
-                    : `agent:main:employee:${idPart}:run:${generateUUID()}`;
-                  state.sessionKey = sessionKey;
-                  state.chatMessage = "";
-                  state.chatAttachments = [];
-                  state.chatStream = null;
-                  state.chatStreamStartedAt = null;
-                  state.chatRunId = null;
-                  state.chatQueue = [];
-                  state.resetToolStream();
-                  state.resetChatScroll();
-                  state.applySettings({
-                    ...state.settings,
-                    sessionKey,
-                    lastActiveSessionKey: sessionKey,
-                  });
-                  void state.loadAssistantIdentity();
-                  void loadChatHistory(state);
-                  void refreshChatAvatar(state);
-                  state.setTab("message");
-                  if (!existing) {
-                    state.handleSendChat(
-                      "当前已开启数字员工会话。请以你配置的人设（如有）向用户打招呼，保持你的语气、风格和情绪。用 1～3 句话问候并询问用户想做什么。",
-                      { refreshSessions: true },
-                    );
-                  }
+                  await openDigitalEmployeeWebchat(state, employeeId);
                 },
                 onToggleEnabled: (employeeId, enabled) =>
                   updateDigitalEmployeeEnabled(state, employeeId, enabled),

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openocta/openocta/pkg/appinstance"
 	"github.com/openocta/openocta/pkg/desktop"
 	gatewayhttp "github.com/openocta/openocta/pkg/gateway/http"
 	"github.com/openocta/openocta/pkg/paths"
@@ -54,6 +55,8 @@ func main() {
 
 	// 从 .dmg 首次启动时提示安装到「应用程序」（macOS）；若已安装并重启则直接退出本实例
 	desktop.MaybePromptInstallFromDMG()
+
+	appinstance.KillOtherOpenOctaProcesses()
 
 	// Start gateway in goroutine before creating window
 	srv, err := desktop.StartGateway()

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/openocta/openocta/pkg/appinstance"
 )
 
 const (
@@ -17,6 +19,8 @@ const (
 )
 
 func main() {
+	appinstance.KillOtherOpenOctaProcesses()
+
 	port := defaultPort
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	baseURL := fmt.Sprintf("http://%s", addr)

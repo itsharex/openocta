@@ -92,4 +92,21 @@ describe("handleChatEvent", () => {
     expect(state.chatStream).toBe(null);
     expect(state.chatStreamStartedAt).toBe(null);
   });
+
+  it("accepts chat events when gateway sessionKey is lowercase but UI keeps original casing", () => {
+    const state = createState({
+      sessionKey: "agent:main:employee:ClickHouse:run:abc",
+      chatRunId: "run-1",
+      chatStream: "",
+      chatStreamStartedAt: 100,
+    });
+    const payload: ChatEventPayload = {
+      runId: "run-1",
+      sessionKey: "agent:main:employee:clickhouse:run:abc",
+      state: "final",
+    };
+    expect(handleChatEvent(state, payload)).toBe("final");
+    expect(state.chatRunId).toBe(null);
+    expect(state.chatStream).toBe(null);
+  });
 });

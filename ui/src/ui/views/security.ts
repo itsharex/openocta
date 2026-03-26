@@ -55,8 +55,8 @@ export function renderSecurity(props: SecurityProps) {
   const commandPolicy = s.commandPolicy ?? {};
   const approvalQueue = s.approvalQueue ?? {};
 
-  const sandboxEnabled = sandbox.enabled !== false;
-  const commandPolicyEnabled = commandPolicy.enabled !== false;
+  const sandboxEnabled = sandbox.enabled === true;
+  const commandPolicyEnabled = commandPolicy.enabled === true;
   const approvalEnabled = approvalQueue.enabled === true;
 
   const allowedPaths = joinLines(ensureArray(sandbox.allowedPaths));

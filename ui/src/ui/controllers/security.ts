@@ -122,11 +122,15 @@ export function getSecurityFromConfig(state: ConfigState): SecurityConfigForm | 
   const validator = (security.validator ?? {}) as SecurityConfigForm["validator"];
   const preset = security.preset as string | undefined;
 
-  // Use deny/ask/allow; merge from legacy validator/approvalQueue when absent
+  // Use deny/ask/allow; merge from legacy validator/approvalQueue when absent grouped lists.
+  // commandPolicy 显式字段（含 enabled: false）必须优先于 legacy，否则会误把关闭的命令策略显示为开启。
   let mergedCommandPolicy = commandPolicy;
   const hasGrouped = (commandPolicy?.deny?.length ?? 0) > 0 || (commandPolicy?.ask?.length ?? 0) > 0 || (commandPolicy?.allow?.length ?? 0) > 0;
   if (!hasGrouped && (validator || approvalQueue)) {
-    mergedCommandPolicy = mergeLegacyToCommandPolicy(validator, approvalQueue);
+    mergedCommandPolicy = {
+      ...mergeLegacyToCommandPolicy(validator, approvalQueue),
+      ...commandPolicy,
+    };
   }
 
   return {
@@ -193,7 +197,7 @@ function mergeLegacyToCommandPolicy(
     }
   }
   return {
-    enabled: validator?.enabled !== false,
+    enabled: validator?.enabled === true,
     defaultPolicy: "ask",
     deny,
     ask,
