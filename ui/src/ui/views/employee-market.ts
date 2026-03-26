@@ -295,6 +295,7 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
           .sort((a, b) => a[0].localeCompare(b[0], "zh-Hans-CN"))
           .map(([cat, items]) => ({ title: cat === "其它" ? "其它" : cat, items }))
       : [{ title: effectiveCategory, items: filteredItems }];
+  const showToolbarActions = !props.error || (props.items?.length ?? 0) > 0;
 
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
@@ -323,98 +324,108 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
       (props.installedRemoteIds?.has(remoteId) ?? false)
     );
   });
+  const showSections = !props.loading && !(filteredItems.length === 0 && installedItems.length === 0);
+  const showMainBody = showToolbarActions || installedItems.length > 0 || showSections;
 
   return html`
     <main class="emp-page">
       <section class="emp-list-wrap">
         <div class="emp-content">
           <div class="emp-main">
-            ${props.error ? html`<div class="callout danger" style="margin-bottom: 16px;">${props.error}</div>` : nothing}
-            ${toolbarActions}
-
-            ${(() => {
-              if (installedItems.length === 0) return nothing;
-              return html`
-                <div class="emp-installed-section">
-                  <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                  <div class="emp-grid emp-installed-grid">
-                    ${installedItems.map((it) => {
-                      const selected = props.selectedId === it.id;
-                      const logoUrl = resolveLogoUrl(it.logo_url);
+            ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
+            ${showMainBody
+              ? html`
+                  <div class="emp-main__body">
+                    ${showToolbarActions ? toolbarActions : nothing}
+                    ${(() => {
+                      if (installedItems.length === 0) return nothing;
                       return html`
-                        <div class="emp-card-wrap ${selected ? "active" : ""}">
-                          <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                            <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                              ${logoUrl ? html`<img src=${logoUrl} alt="" />` : html`
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                  <circle cx="12" cy="7" r="4"/>
-                                </svg>
-                              `}
-                            </div>
-                            <div class="emp-card__actions">
-                              ${renderEmployeeCardAction(props, it)}
-                            </div>
-                            <h3 class="emp-card__title">${it.name}</h3>
-                            <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                            ${renderCardTags(it.tags)}
+                        <div class="emp-installed-section">
+                          <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
+                          <div class="emp-grid emp-installed-grid">
+                            ${installedItems.map((it) => {
+                              const selected = props.selectedId === it.id;
+                              const logoUrl = resolveLogoUrl(it.logo_url);
+                              return html`
+                                <div class="emp-card-wrap ${selected ? "active" : ""}">
+                                  <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+                                    <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+                                      ${logoUrl ? html`<img src=${logoUrl} alt="" />` : html`
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                          <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                      `}
+                                    </div>
+                                    <div class="emp-card__actions">
+                                      ${renderEmployeeCardAction(props, it)}
+                                    </div>
+                                    <h3 class="emp-card__title">${it.name}</h3>
+                                    <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+                                    ${renderCardTags(it.tags)}
+                                  </div>
+                                </div>
+                              `;
+                            })}
                           </div>
                         </div>
                       `;
-                    })}
+                    })()}
+                    ${showSections
+                      ? html`
+                          <div class="emp-sections">
+                            ${sectionsFixed.map(
+                              (section) =>
+                                section.items.length > 0
+                                  ? html`
+                                      <div class="emp-section">
+                                        <div class="emp-section__header">
+                                          <h3 class="emp-section__title">${section.title}</h3>
+                                        </div>
+                                        <div class="emp-grid">
+                                          ${section.items.map((it) => {
+                                            const selected = props.selectedId === it.id;
+                                            const logoUrl = resolveLogoUrl(it.logo_url);
+                                            return html`
+                                              <div class="emp-card-wrap ${selected ? "active" : ""}">
+                                                <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+                                                  <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+                                                    ${logoUrl
+                                                      ? html`<img src=${logoUrl} alt="" />`
+                                                      : html`
+                                                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                                            <circle cx="12" cy="7" r="4"/>
+                                                          </svg>
+                                                        `}
+                                                  </div>
+                                                  <div class="emp-card__actions">
+                                                    ${renderEmployeeCardAction(props, it)}
+                                                  </div>
+                                                  <h3 class="emp-card__title">${it.name}</h3>
+                                                  <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+                                                  ${renderCardTags(it.tags)}
+                                                </div>
+                                              </div>
+                                            `;
+                                          })}
+                                        </div>
+                                      </div>
+                                    `
+                                  : nothing,
+                            )}
+                          </div>
+                        `
+                      : nothing}
                   </div>
-                </div>
-              `;
-            })()}
+                `
+              : nothing}
 
             ${props.loading
               ? html`<div class="emp-loading">加载中...</div>`
               : filteredItems.length === 0 && installedItems.length === 0
                 ? html`<div class="emp-empty">暂无匹配的数字员工</div>`
-                : html`
-                    <div class="emp-sections">
-                      ${sectionsFixed.map(
-                        (section) =>
-                          section.items.length > 0
-                            ? html`
-                                <div class="emp-section">
-                                  <div class="emp-section__header">
-                                    <h3 class="emp-section__title">${section.title}</h3>
-                                  </div>
-                                  <div class="emp-grid">
-                                    ${section.items.map((it) => {
-                                      const selected = props.selectedId === it.id;
-                                      const logoUrl = resolveLogoUrl(it.logo_url);
-                                      return html`
-                                        <div class="emp-card-wrap ${selected ? "active" : ""}">
-                                          <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                            <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                              ${logoUrl
-                                                ? html`<img src=${logoUrl} alt="" />`
-                                                : html`
-                                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                                    <circle cx="12" cy="7" r="4"/>
-                                                  </svg>
-                                                `}
-                                            </div>
-                                            <div class="emp-card__actions">
-                                              ${renderEmployeeCardAction(props, it)}
-                                            </div>
-                                            <h3 class="emp-card__title">${it.name}</h3>
-                                            <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                            ${renderCardTags(it.tags)}
-                                          </div>
-                                        </div>
-                                      `;
-                                    })}
-                                  </div>
-                                </div>
-                              `
-                            : nothing,
-                      )}
-                    </div>
-                  `}
+                : nothing}
           </div>
         </div>
 

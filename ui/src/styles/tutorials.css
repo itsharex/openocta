@@ -6,11 +6,6 @@
   font-size: 20px;
 }
 
-.tutorials-page .tutorials-card {
-  padding: 16px;
-  font-size: 15px;
-}
-
 .tutorials-course__title-row {
   display: flex;
   align-items: center;
@@ -82,13 +77,7 @@
   width: 100%;
   max-width: 1080px;
   margin: 0 auto;
-  min-height: calc(100vh - var(--shell-topbar-height) - 44px);
-}
-
-@supports (height: 100dvh) {
-  .content--tutorials .tutorials-page {
-    min-height: calc(100dvh - var(--shell-topbar-height) - 44px);
-  }
+  flex: 1;
 }
 
 .tutorials-page .emp-search__input {
@@ -156,6 +145,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow: auto;
 }
 
 .tutorials-category {
@@ -234,9 +224,11 @@
 }
 
 .tutorials-content {
+  padding: 16px;
   min-width: 0;
   border-left: 1px solid var(--border);
   flex: 1;
+  overflow: auto;
 }
 
 .tutorials-page .emp-toolbar__actions {
@@ -248,7 +240,6 @@
 }
 
 .tutorials-card {
-  padding: 0 6px;
   min-width: 0;
 }
 
@@ -275,12 +266,11 @@
 }
 
 .tutorials-course__title {
-  font-weight: 700;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
 }
 
 .tutorials-lessons {

@@ -224,6 +224,7 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
           .filter((name) => grouped.has(name))
           .map((name) => ({ name, items: grouped.get(name) ?? [] }))
       : [{ name: activeCategory, items: grouped.get(activeCategory) ?? [] }];
+  const showToolbarActions = !props.error || props.items.length > 0;
 
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
@@ -249,6 +250,8 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
     const text = `${it.name ?? ""} ${it.description ?? ""} ${it.folder ?? ""}`.toLowerCase();
     return text.includes(q);
   });
+  const showSections = !props.loading && !(orderedGroups.length === 0 && installedItems.length === 0);
+  const showMainBody = showToolbarActions || installedItems.length > 0 || showSections;
 
   const showDetailModal = Boolean(props.selectedFolder);
   const closeDetail = () =>
@@ -259,44 +262,101 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
       <section class="emp-list-wrap">
         <div class="emp-content">
           <div class="emp-main">
-            ${props.error ? html`<div class="callout danger" style="margin-bottom: 16px;">${props.error}</div>` : nothing}
-            ${props.installSuccess ? html`<div class="callout success" style="margin-bottom: 16px;">${props.installSuccess}</div>` : nothing}
-            ${toolbarActions}
-
-            ${(() => {
-              if (installedItems.length === 0) return nothing;
-              return html`
-                <div class="emp-installed-section">
-                  <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                  <div class="emp-grid emp-installed-grid">
-                    ${installedItems.map((it) => {
-                      const active = props.selectedFolder === it.folder;
-                      const disabled = props.disabledKeys?.has(it.folder) ?? false;
-                      const enabled = !disabled;
-                      const installing = props.installingFolder === it.folder;
-                      const tags = splitCsv(it.tags);
-                      const os = splitCsv(it.os);
-                      const status = statusLabel(it.status);
+            ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
+            ${props.installSuccess ? html`<div class="callout success">${props.installSuccess}</div>` : nothing}
+            ${showMainBody
+              ? html`
+                  <div class="emp-main__body">
+                    ${showToolbarActions ? toolbarActions : nothing}
+                    ${(() => {
+                      if (installedItems.length === 0) return nothing;
                       return html`
-                        <div class="emp-card-wrap ${active ? "active" : ""}">
-                          <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
-                            <div class="emp-card__icon ${!it.emoji ? "emp-card__icon--default" : ""}">
-                              ${it.emoji ? it.emoji : SKILL_ICON_SVG}
-                            </div>
-                            <div class="emp-card__actions">
-                              ${renderSkillCardActions(props, it.folder, true, enabled, installing, it.categoryCn)}
-                            </div>
-                            <h3 class="emp-card__title">${it.name || it.folder}</h3>
-                            <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
-                            ${renderSkillMeta(tags, os, status)}
+                        <div class="emp-installed-section">
+                          <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
+                          <div class="emp-grid emp-installed-grid">
+                            ${installedItems.map((it) => {
+                              const active = props.selectedFolder === it.folder;
+                              const disabled = props.disabledKeys?.has(it.folder) ?? false;
+                              const enabled = !disabled;
+                              const installing = props.installingFolder === it.folder;
+                              const tags = splitCsv(it.tags);
+                              const os = splitCsv(it.os);
+                              const status = statusLabel(it.status);
+                              return html`
+                                <div class="emp-card-wrap ${active ? "active" : ""}">
+                                  <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
+                                    <div class="emp-card__icon ${!it.emoji ? "emp-card__icon--default" : ""}">
+                                      ${it.emoji ? it.emoji : SKILL_ICON_SVG}
+                                    </div>
+                                    <div class="emp-card__actions">
+                                      ${renderSkillCardActions(props, it.folder, true, enabled, installing, it.categoryCn)}
+                                    </div>
+                                    <h3 class="emp-card__title">${it.name || it.folder}</h3>
+                                    <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
+                                    ${renderSkillMeta(tags, os, status)}
+                                  </div>
+                                </div>
+                              `;
+                            })}
                           </div>
                         </div>
                       `;
-                    })}
+                    })()}
+                    ${showSections
+                      ? html`
+                          <div class="emp-sections">
+                            ${orderedGroups.map(
+                              (group) => html`
+                                <div class="emp-section">
+                                  <div class="emp-section__header">
+                                    <h3 class="emp-section__title">${group.name}</h3>
+                                  </div>
+                                  <div class="emp-grid">
+                                    ${group.items.map((it) => {
+                                      const active = props.selectedFolder === it.folder;
+                                      const installed =
+                                        props.installedKeys && props.installedKeys.size > 0
+                                          ? props.installedKeys.has(it.folder)
+                                          : false;
+                                      const disabled = props.disabledKeys?.has(it.folder) ?? false;
+                                      const enabled = !disabled;
+                                      const installing = props.installingFolder === it.folder;
+                                      const tags = splitCsv(it.tags);
+                                      const os = splitCsv(it.os);
+                                      const status = statusLabel(it.status);
+                                      return html`
+                                        <div class="emp-card-wrap ${active ? "active" : ""}">
+                                          <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
+                                            <div class="emp-card__icon ${!it.emoji ? "emp-card__icon--default" : ""}">
+                                              ${it.emoji ? it.emoji : SKILL_ICON_SVG}
+                                            </div>
+                                            <div class="emp-card__actions">
+                                              ${renderSkillCardActions(
+                                                props,
+                                                it.folder,
+                                                installed,
+                                                enabled,
+                                                installing,
+                                                it.categoryCn,
+                                              )}
+                                            </div>
+                                            <h3 class="emp-card__title">${it.name || it.folder}</h3>
+                                            <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
+                                            ${renderSkillMeta(tags, os, status)}
+                                          </div>
+                                        </div>
+                                      `;
+                                    })}
+                                  </div>
+                                </div>
+                              `,
+                            )}
+                          </div>
+                        `
+                      : nothing}
                   </div>
-                </div>
-              `;
-            })()}
+                `
+              : nothing}
 
             ${props.addModalOpen
               ? html`
@@ -394,58 +454,7 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
               ? html`<div class="emp-loading">加载中...</div>`
               : orderedGroups.length === 0 && installedItems.length === 0
                 ? html`<div class="emp-empty">暂无匹配的技能</div>`
-                : html`
-                    <div class="emp-sections">
-                      ${orderedGroups.map(
-                        (group) => html`
-                          <div class="emp-section">
-                            <div class="emp-section__header">
-                              <h3 class="emp-section__title">${group.name}</h3>
-                            </div>
-                            <div class="emp-grid">
-                              ${group.items.map((it) => {
-                                const active = props.selectedFolder === it.folder;
-                                const installed =
-                                  props.installedKeys && props.installedKeys.size > 0
-                                    ? props.installedKeys.has(it.folder)
-                                    : false;
-                                const disabled = props.disabledKeys?.has(it.folder) ?? false;
-                                const enabled = !disabled;
-                                const installing = props.installingFolder === it.folder;
-                                const tags = splitCsv(it.tags);
-                                const os = splitCsv(it.os);
-                                const status = statusLabel(it.status);
-                                return html`
-                                  <div class="emp-card-wrap ${active ? "active" : ""}">
-                                    <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
-                                      <div class="emp-card__icon ${!it.emoji ? "emp-card__icon--default" : ""}">
-                                        ${it.emoji
-                                          ? it.emoji
-                                          : SKILL_ICON_SVG}
-                                      </div>
-                                      <div class="emp-card__actions">
-                                        ${renderSkillCardActions(
-                                          props,
-                                          it.folder,
-                                          installed,
-                                          enabled,
-                                          installing,
-                                          it.categoryCn,
-                                        )}
-                                      </div>
-                                      <h3 class="emp-card__title">${it.name || it.folder}</h3>
-                                      <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
-                                      ${renderSkillMeta(tags, os, status)}
-                                    </div>
-                                  </div>
-                                `;
-                              })}
-                            </div>
-                          </div>
-                        `,
-                      )}
-                    </div>
-                  `}
+                : nothing}
           </div>
         </div>
 

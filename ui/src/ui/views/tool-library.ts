@@ -244,6 +244,7 @@ export function renderToolLibrary(props: ToolLibraryProps) {
           .sort((a, b) => a[0].localeCompare(b[0], "zh-Hans-CN"))
           .map(([cat, items]) => ({ title: cat === "其它" ? "其它" : cat, items }))
       : [{ title: effectiveCategory, items: filteredItems }];
+  const showToolbarActions = !props.error || (props.items?.length ?? 0) > 0;
 
   const toolbarActions = html`
     <div class="emp-toolbar__actions">
@@ -272,6 +273,8 @@ export function renderToolLibrary(props: ToolLibraryProps) {
   const installedItems = filteredByQuery.filter((it) =>
     props.installedRemoteIds?.has(String(it.id)),
   );
+  const showSections = !props.loading && !(filteredItems.length === 0 && installedItems.length === 0);
+  const showMainBody = showToolbarActions || installedItems.length > 0 || showSections;
 
   const showDetailModal = props.selectedDetail !== null;
   // 勿用 ??：onDetailClose() 返回 void/undefined 时仍会误触发 onSelect(-1) → 请求 mcps/-1
@@ -396,97 +399,105 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                 : nothing
             }
 
-            ${props.error ? html`<div class="callout danger" style="margin-bottom: 16px;">${props.error}</div>` : nothing}
-            ${toolbarActions}
-
-            ${(() => {
-              if (installedItems.length === 0) return nothing;
-              return html`
-                <div class="emp-installed-section">
-                  <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                  <div class="emp-grid emp-installed-grid">
-                    ${installedItems.map((it) => {
-                      const active = props.selectedId === it.id;
-                      const logoUrl = resolveLogoUrl(it.logo_url);
-                      const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
-                      const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
-                      const enabled = !disabled;
-                      const installing = props.installingId === it.id;
+            ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
+            ${showMainBody
+              ? html`
+                  <div class="emp-main__body">
+                    ${showToolbarActions ? toolbarActions : nothing}
+                    ${(() => {
+                      if (installedItems.length === 0) return nothing;
                       return html`
-                        <div class="emp-card-wrap ${active ? "active" : ""}">
-                          <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                            <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                              ${logoUrl ? html`<img src=${logoUrl} alt="" />` : MCP_ICON_SVG}
-                            </div>
-                            <div class="emp-card__actions">
-                              ${renderToolCardActions(props, it, serverKey, enabled, installing)}
-                            </div>
-                            <h3 class="emp-card__title">${it.name}</h3>
-                            <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                            ${renderToolMeta(it)}
+                        <div class="emp-installed-section">
+                          <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
+                          <div class="emp-grid emp-installed-grid">
+                            ${installedItems.map((it) => {
+                              const active = props.selectedId === it.id;
+                              const logoUrl = resolveLogoUrl(it.logo_url);
+                              const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
+                              const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
+                              const enabled = !disabled;
+                              const installing = props.installingId === it.id;
+                              return html`
+                                <div class="emp-card-wrap ${active ? "active" : ""}">
+                                  <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+                                    <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+                                      ${logoUrl ? html`<img src=${logoUrl} alt="" />` : MCP_ICON_SVG}
+                                    </div>
+                                    <div class="emp-card__actions">
+                                      ${renderToolCardActions(props, it, serverKey, enabled, installing)}
+                                    </div>
+                                    <h3 class="emp-card__title">${it.name}</h3>
+                                    <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+                                    ${renderToolMeta(it)}
+                                  </div>
+                                </div>
+                              `;
+                            })}
                           </div>
                         </div>
                       `;
-                    })}
+                    })()}
+                    ${showSections
+                      ? html`
+                          <div class="emp-sections">
+                            ${sectionsFixed.map(
+                              (section) =>
+                                section.items.length > 0
+                                  ? html`
+                                      <div class="emp-section">
+                                        <div class="emp-section__header">
+                                          <h3 class="emp-section__title">${section.title}</h3>
+                                        </div>
+                                        <div class="emp-grid">
+                                          ${section.items.map((it) => {
+                                            const active = props.selectedId === it.id;
+                                            const logoUrl = resolveLogoUrl(it.logo_url);
+                                            const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
+                                            const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
+                                            const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
+                                            const enabled = !disabled;
+                                            const installing = props.installingId === it.id;
+                                            return html`
+                                              <div class="emp-card-wrap ${active ? "active" : ""}">
+                                                <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+                                                  <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+                                                    ${logoUrl
+                                                      ? html`<img src=${logoUrl} alt="" />`
+                                                      : MCP_ICON_SVG}
+                                                  </div>
+                                                  <div class="emp-card__actions">
+                                                    ${renderToolCardActions(
+                                                      props,
+                                                      it,
+                                                      installed ? serverKey : undefined,
+                                                      enabled,
+                                                      installing,
+                                                    )}
+                                                  </div>
+                                                  <h3 class="emp-card__title">${it.name}</h3>
+                                                  <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+                                                  ${renderToolMeta(it)}
+                                                </div>
+                                              </div>
+                                            `;
+                                          })}
+                                        </div>
+                                      </div>
+                                    `
+                                  : nothing,
+                            )}
+                          </div>
+                        `
+                      : nothing}
                   </div>
-                </div>
-              `;
-            })()}
+                `
+              : nothing}
 
             ${props.loading
               ? html`<div class="emp-loading">加载中...</div>`
               : filteredItems.length === 0 && installedItems.length === 0
                 ? html`<div class="emp-empty">暂无匹配的 MCP</div>`
-                : html`
-                      <div class="emp-sections">
-                        ${sectionsFixed.map(
-                          (section) =>
-                            section.items.length > 0
-                              ? html`
-                                  <div class="emp-section">
-                                    <div class="emp-section__header">
-                                      <h3 class="emp-section__title">${section.title}</h3>
-                                    </div>
-                                    <div class="emp-grid">
-                                      ${section.items.map((it) => {
-                                        const active = props.selectedId === it.id;
-                                        const logoUrl = resolveLogoUrl(it.logo_url);
-                                        const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
-                                        const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
-                                        const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
-                                        const enabled = !disabled;
-                                        const installing = props.installingId === it.id;
-                                        return html`
-                                          <div class="emp-card-wrap ${active ? "active" : ""}">
-                                            <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                              <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                                ${logoUrl
-                                                  ? html`<img src=${logoUrl} alt="" />`
-                                                  : MCP_ICON_SVG}
-                                              </div>
-                                              <div class="emp-card__actions">
-                                                ${renderToolCardActions(
-                                                  props,
-                                                  it,
-                                                  installed ? serverKey : undefined,
-                                                  enabled,
-                                                  installing,
-                                                )}
-                                              </div>
-                                              <h3 class="emp-card__title">${it.name}</h3>
-                                              <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                              ${renderToolMeta(it)}
-                                            </div>
-                                          </div>
-                                        `;
-                                      })}
-                                    </div>
-                                  </div>
-                                `
-                              : nothing,
-                        )}
-                      </div>
-                    `}
+                : nothing}
           </div>
         </div>
 

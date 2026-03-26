@@ -33,29 +33,9 @@ export default defineConfig(() => {
       sourcemap: true,
     },
     server: {
-      // host: true,
-      // port: 5173,
-      // strictPort: true,
-      proxy: {
-        "/api/v1/site": {
-          target: "http://192.168.50.254:8080",
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/api\/v1\/site/, ""),
-        },
-        "/api": {
-          target: "http://192.168.50.254:8080",
-          changeOrigin: true,
-          secure: false,
-        },
-        "/gateway-ws": {
-          target: "http://192.168.50.254:18900",
-          changeOrigin: true,
-          secure: false,
-          ws: true,
-          rewrite: (path) => path.replace(/^\/gateway-ws(?:\/)?$/, "/"),
-        },
-      },
+      host: true,
+      port: 5173,
+      strictPort: true
     },
   };
 });

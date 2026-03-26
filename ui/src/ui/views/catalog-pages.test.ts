@@ -196,10 +196,26 @@ describe("catalog pages", () => {
       container,
     );
 
-    expect(container.querySelector(".emp-main > .emp-toolbar__actions")).not.toBeNull();
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).not.toBeNull();
     expect(container.textContent).toContain("已安装 (1)");
     expect(container.textContent).toContain("Prometheus专家");
     expect(container.textContent).not.toContain("Zabbix专家");
+  });
+
+  it("hides employee market toolbar actions when load fails without data", () => {
+    const container = document.createElement("div");
+    renderIntoContainer(
+      renderEmployeeMarket(
+        employeeProps({
+          items: [],
+          error: "加载失败",
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).toBeNull();
+    expect(container.textContent).toContain("加载失败");
   });
 
   it("renders installed employee card actions", () => {
@@ -277,9 +293,25 @@ describe("catalog pages", () => {
       container,
     );
 
-    expect(container.querySelector(".emp-main > .emp-toolbar__actions")).not.toBeNull();
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).not.toBeNull();
     expect(container.textContent).toContain("已安装 (1)");
     expect(container.textContent).toContain("阿里云巡检");
+  });
+
+  it("hides skill library toolbar actions when load fails without data", () => {
+    const container = document.createElement("div");
+    renderIntoContainer(
+      renderSkillLibrary(
+        skillProps({
+          items: [],
+          error: "加载失败",
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).toBeNull();
+    expect(container.textContent).toContain("加载失败");
   });
 
   it("renders skill meta with main-compatible fallback tags", () => {
@@ -361,9 +393,25 @@ describe("catalog pages", () => {
       container,
     );
 
-    expect(container.querySelector(".emp-main > .emp-toolbar__actions")).not.toBeNull();
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).not.toBeNull();
     expect(container.textContent).toContain("已安装 (1)");
     expect(container.textContent).toContain("Alicloud-mcp");
+  });
+
+  it("hides tool library toolbar actions when load fails without data", () => {
+    const container = document.createElement("div");
+    renderIntoContainer(
+      renderToolLibrary(
+        toolProps({
+          items: [],
+          error: "加载失败",
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".emp-main > .emp-main__body > .emp-toolbar__actions")).toBeNull();
+    expect(container.textContent).toContain("加载失败");
   });
 
   it("renders employee detail actions inside modal", () => {
