@@ -47,6 +47,8 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	if opts.Config != nil && opts.Config.Security != nil && opts.Config.Security.Sandbox != nil &&
 		opts.Config.Security.Sandbox.Enabled != nil {
 		enableSandbox = *opts.Config.Security.Sandbox.Enabled
+	} else {
+		enableSandbox = false
 	}
 
 	// Built-in tools (bash, file_read, file_write, grep, glob, etc.) plus any caller-provided tools.
