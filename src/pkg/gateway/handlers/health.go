@@ -95,6 +95,8 @@ func NewRegistry(ctx *Context) Registry {
 		"channels.logout":            ChannelsLogoutHandler,
 		"channels.wework.qr.start":   WeWorkQRStartHandler,
 		"channels.wework.qr.poll":    WeWorkQRPollHandler,
+		"channels.weixin.qr.start":   WeixinQRStartHandler,
+		"channels.weixin.qr.poll":    WeixinQRPollHandler,
 		"status":                     StatusHandler,
 		"usage.status":               UsageStatusHandler,
 		"usage.cost":                 UsageCostHandler,

@@ -6,6 +6,7 @@ import (
 	"github.com/openocta/openocta/pkg/channels/dingtalk"
 	"github.com/openocta/openocta/pkg/channels/feishu"
 	"github.com/openocta/openocta/pkg/channels/qq"
+	"github.com/openocta/openocta/pkg/channels/weixin"
 	"github.com/openocta/openocta/pkg/channels/wework"
 )
 
@@ -22,4 +23,5 @@ func Register(r *channels.Registry) {
 	r.Register(feishu.Plugin)
 	r.Register(qq.Plugin)
 	r.Register(wework.Plugin)
+	r.Register(weixin.Plugin)
 }

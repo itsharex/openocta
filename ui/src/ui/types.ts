@@ -261,6 +261,18 @@ export type WeWorkStatus = {
   transport?: string | null;
 };
 
+/** 个人微信 iLink 渠道状态（与 WeWork 结构一致，便于卡片复用） */
+export type WeixinStatus = {
+  configured: boolean;
+  running: boolean;
+  connected?: boolean | null;
+  lastStartAt?: number | null;
+  lastStopAt?: number | null;
+  lastError?: string | null;
+  lastProbeAt?: number | null;
+  transport?: string | null;
+};
+
 export type MSTeamsProbe = {
   ok: boolean;
   error?: string | null;

@@ -40,6 +40,8 @@ import {
   handleNostrProfileToggleAdvanced as handleNostrProfileToggleAdvancedInternal,
   handleWeWorkQrStart as handleWeWorkQrStartInternal,
   handleWeWorkQrModalClose as handleWeWorkQrModalCloseInternal,
+  handleWeixinQrStart as handleWeixinQrStartInternal,
+  handleWeixinQrModalClose as handleWeixinQrModalCloseInternal,
   handleWhatsAppLogout as handleWhatsAppLogoutInternal,
   handleWhatsAppStart as handleWhatsAppStartInternal,
   handleWhatsAppWait as handleWhatsAppWaitInternal,
@@ -207,11 +209,25 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() weworkQrModalReplaceWarn = false;
   @state() weworkQrModalAuthUrl: string | null = null;
   @state() weworkQrModalGenPageUrl: string | null = null;
+  @state() weixinQrModalOpen = false;
+  @state() weixinQrModalLoading = false;
+  @state() weixinQrModalPolling = false;
+  @state() weixinQrModalSuccess = false;
+  @state() weixinQrModalError: string | null = null;
+  @state() weixinQrModalReplaceWarn = false;
+  @state() weixinQrModalImageSrc: string | null = null;
+  @state() weixinQrModalScanPageUrl: string | null = null;
+  @state() weixinQrModalScanned = false;
   @state() nativeDialog: NativeDialogModel = null;
   @state() nativePromptInput = "";
   /** Browser interval id for WeCom QR polling (not reactive) */
   weworkQrPollTimer: number | null = null;
   weworkQrSuccessCloseTimer: number | null = null;
+  weixinQrPollAbort = false;
+  weixinQrSuccessCloseTimer: number | null = null;
+  weixinQrSessionQrcode = "";
+  weixinQrSessionBaseUrl = "";
+  weixinQrSessionBotType = "";
   private nativeResolveConfirm: ((ok: boolean) => void) | null = null;
   private nativeResolveAlert: (() => void) | null = null;
   private nativeResolvePrompt: ((v: string | null) => void) | null = null;
@@ -684,6 +700,14 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
 
   handleWeWorkQrModalClose() {
     handleWeWorkQrModalCloseInternal(this);
+  }
+
+  async handleWeixinQrStart() {
+    await handleWeixinQrStartInternal(this);
+  }
+
+  handleWeixinQrModalClose() {
+    handleWeixinQrModalCloseInternal(this);
   }
 
   async handleChannelConfigSave() {

@@ -153,6 +153,7 @@ export function renderChannelConfigSection(params: { channelId: string; props: C
 
 const CHANNEL_LABELS: Record<string, string> = {
   wework: "微信",
+  weixin: "个人微信",
   dingtalk: "钉钉",
   feishu: "飞书",
   qq: "QQ",

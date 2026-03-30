@@ -4,6 +4,7 @@ import type {
   ChannelUiMetaEntry,
   ChannelsStatusSnapshot,
   WeWorkStatus,
+  WeixinStatus,
 } from "../types.ts";
 import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.types.ts";
 import { formatAgo } from "../format.ts";
@@ -11,10 +12,12 @@ import { t } from "../strings.js";
 import { renderChannelConfigPanel } from "./channels.config.ts";
 import { channelEnabled, renderChannelAccountCount } from "./channels.shared.ts";
 import { renderWeWorkCard } from "./channels.wework.ts";
+import { renderWeixinCard } from "./channels.weixin.ts";
 
 export function renderChannels(props: ChannelsProps) {
   const channels = props.snapshot?.channels as Record<string, unknown> | null;
   const wework = (channels?.wework ?? undefined) as WeWorkStatus | undefined;
+  const weixin = (channels?.weixin ?? undefined) as WeixinStatus | undefined;
   const channelOrder = resolveChannelOrder(props.snapshot);
   const orderedChannels = channelOrder
     .map((key, index) => ({
@@ -34,6 +37,7 @@ export function renderChannels(props: ChannelsProps) {
       ${orderedChannels.map((channel) =>
         renderChannel(channel.key, props, {
           wework,
+          weixin,
           channelAccounts: props.snapshot?.channelAccounts ?? null,
         }),
       )}
@@ -70,7 +74,7 @@ function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKe
   if (snapshot?.channelOrder?.length) {
     return snapshot.channelOrder;
   }
-  return ["wework", "dingtalk", "feishu", "qq"];
+  return ["wework", "weixin", "dingtalk", "feishu", "qq"];
 }
 
 function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChannelData) {
@@ -80,6 +84,12 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
       return renderWeWorkCard({
         props,
         wework: data.wework,
+        accountCountLabel,
+      });
+    case "weixin":
+      return renderWeixinCard({
+        props,
+        weixin: data.weixin,
         accountCountLabel,
       });
     default:

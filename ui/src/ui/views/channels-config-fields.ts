@@ -37,6 +37,73 @@ const CHANNEL_FORM_DEFS: Record<string, ChannelFormDef> = {
       { path: ["allowedIds"], label: "Allowed IDs", required: false, type: "string[]", placeholder: "user-id-1, user-id-2" },
     ],
   },
+  weixin: {
+    fields: [
+      {
+        path: ["credentials", "botToken"],
+        label: "Bot Token",
+        required: true,
+        type: "string",
+        placeholder: "iLink 扫码登录后的 bot_token",
+        help: "个人微信 iLink 通道凭据（与企业微信的 Bot Secret 不同）。扫码成功后自动写入。",
+      },
+      {
+        path: ["credentials", "botId"],
+        label: "Bot ID (iLink)",
+        required: true,
+        type: "string",
+        placeholder: "ilink_bot_id",
+        help: "iLink 侧 Bot ID，可与 openclaw-weixin / openilink 文档中的 ilink_bot_id 对应。",
+      },
+      {
+        path: ["credentials", "baseUrl"],
+        label: "API Base URL",
+        required: false,
+        type: "string",
+        placeholder: "https://ilinkai.weixin.qq.com",
+        help: "一般留空；若扫码返回了专属 baseurl 可填在此。",
+      },
+      {
+        path: ["credentials", "userId"],
+        label: "绑定的微信 userId（可选）",
+        required: false,
+        type: "string",
+        placeholder: "ilink_user_id",
+        help: "登录账号标识，便于辨认；不影响连接。",
+      },
+      {
+        path: ["credentials", "botType"],
+        label: "bot_type（可选）",
+        required: false,
+        type: "string",
+        placeholder: "默认 3",
+        help: "仅在使用非默认扫码参数时填写。",
+      },
+      {
+        path: ["credentials", "routeTag"],
+        label: "SKRouteTag（可选）",
+        required: false,
+        type: "string",
+        help: "与服务端路由相关的可选请求头。",
+      },
+      {
+        path: ["credentials", "getUpdatesBuf"],
+        label: "get_updates_buf（可选）",
+        required: false,
+        type: "string",
+        help: "长轮询同步游标；高级用法，用于断点续拉（多数场景留空）。",
+      },
+      { path: ["enabled"], label: "Enabled", required: false, type: "boolean" },
+      {
+        path: ["allowedIds"],
+        label: "Allowed peer user IDs",
+        required: false,
+        type: "string[]",
+        placeholder: "ilink_user_id_1, …",
+        help: "空表示不限制；仅允许列表内用户与 Bot 的对话进入系统。",
+      },
+    ],
+  },
   wework: {
     fields: [
       {

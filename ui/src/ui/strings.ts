@@ -380,6 +380,24 @@ type Strings = {
   channelWeWorkQrSuccessClosing: string;
   channelWeWorkQrSaveMissingForm: string;
   channelWeWorkQrModalCancel: string;
+  channelWeixin: string;
+  channelWeixinSub: string;
+  channelWeixinTransport: string;
+  channelWeixinBotId: string;
+  channelWeixinQrStart: string;
+  channelWeixinQrWorking: string;
+  channelWeixinQrStartFailed: string;
+  channelWeixinQrModalTitle: string;
+  channelWeixinQrReplaceWarn: string;
+  channelWeixinQrPreparing: string;
+  channelWeixinQrWaiting: string;
+  channelWeixinQrConfirmOnPhone: string;
+  channelWeixinQrScanHint: string;
+  channelWeixinOpenScanPage: string;
+  channelWeixinQrSuccessClosing: string;
+  channelWeixinQrSaveMissingForm: string;
+  channelWeixinQrModalCancel: string;
+  channelWeixinQrExpired: string;
   nostrEditProfile: string;
   nostrAccount: string;
   nostrUsername: string;
@@ -1344,6 +1362,27 @@ const EN: Strings = {
     "Credentials saved. The gateway is reconnecting WebSocket. This dialog will close shortly.",
   channelWeWorkQrSaveMissingForm: "Could not read channels.wework from the form after scan.",
   channelWeWorkQrModalCancel: "Cancel",
+  channelWeixin: "WeChat (personal)",
+  channelWeixinSub:
+    "Personal WeChat via Tencent iLink Bot API (long polling). Scan to log in; uses botToken + botId (not WeCom Bot Secret).",
+  channelWeixinTransport: "Transport",
+  channelWeixinBotId: "Bot ID (masked)",
+  channelWeixinQrStart: "Scan to log in",
+  channelWeixinQrWorking: "Working…",
+  channelWeixinQrStartFailed: "Could not start iLink QR session (missing qrcode).",
+  channelWeixinQrModalTitle: "Personal WeChat — scan to log in (iLink)",
+  channelWeixinQrReplaceWarn:
+    "This gateway already has personal WeChat iLink credentials. Scanning again will replace botToken and botId in the form (save applies patch).",
+  channelWeixinQrPreparing: "Fetching QR from iLink…",
+  channelWeixinQrWaiting: "Waiting for you to scan with WeChat…",
+  channelWeixinQrConfirmOnPhone: "Scanned — confirm login on your phone…",
+  channelWeixinQrScanHint: "Use WeChat to scan the QR code. After login, botToken and Bot ID are saved automatically.",
+  channelWeixinOpenScanPage: "Open scan page in browser",
+  channelWeixinQrSuccessClosing:
+    "Credentials saved. The gateway will reconnect the iLink channel. This dialog closes shortly.",
+  channelWeixinQrSaveMissingForm: "Could not read channels.weixin from the form after scan.",
+  channelWeixinQrModalCancel: "Cancel",
+  channelWeixinQrExpired: "The QR code expired. Close and tap “Scan to log in” again.",
   nostrEditProfile: "Edit Profile",
   nostrAccount: "Account",
   nostrUsername: "Username",
@@ -2301,6 +2340,26 @@ const ZH: Strings = {
     "凭据已保存，网关正在按新配置重建企业微信 WebSocket 连接。弹框即将自动关闭。",
   channelWeWorkQrSaveMissingForm: "扫码成功后无法从表单读取 channels.wework，请重试或手动保存配置。",
   channelWeWorkQrModalCancel: "取消",
+  channelWeixin: "微信（个人）",
+  channelWeixinSub:
+    "个人微信 iLink 智能机器人通道（HTTPS 长轮询）。使用微信扫码登录；凭据为 botToken 与 botId，与企业微信的 Bot Secret 不同。",
+  channelWeixinTransport: "链路",
+  channelWeixinBotId: "Bot ID（脱敏）",
+  channelWeixinQrStart: "扫码登录",
+  channelWeixinQrWorking: "处理中…",
+  channelWeixinQrStartFailed: "无法开始 iLink 扫码（缺少 qrcode）。",
+  channelWeixinQrModalTitle: "个人微信 — iLink 扫码登录",
+  channelWeixinQrReplaceWarn:
+    "已配置过个人微信 iLink 凭据。再次扫码将覆盖表单中的 botToken 与 botId（保存后通过补丁生效）。",
+  channelWeixinQrPreparing: "正在从 iLink 获取二维码…",
+  channelWeixinQrWaiting: "请使用微信扫描二维码…",
+  channelWeixinQrConfirmOnPhone: "已扫码 — 请在手机上确认登录…",
+  channelWeixinQrScanHint: "使用微信扫一扫。登录成功后 botToken、Bot ID 将自动写入配置。",
+  channelWeixinOpenScanPage: "浏览器打开扫码页",
+  channelWeixinQrSuccessClosing: "凭据已保存，网关将按新配置重建 iLink 通道。弹框即将关闭。",
+  channelWeixinQrSaveMissingForm: "扫码成功后无法从表单读取 channels.weixin，请重试或手动保存。",
+  channelWeixinQrModalCancel: "取消",
+  channelWeixinQrExpired: "二维码已失效，请关闭窗口后重新点击「扫码登录」。",
   nostrEditProfile: "编辑资料",
   nostrAccount: "账号",
   nostrUsername: "用户名",

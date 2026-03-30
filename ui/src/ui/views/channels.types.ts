@@ -4,6 +4,7 @@ import type {
   ConfigUiHints,
   NostrProfile,
   WeWorkStatus,
+  WeixinStatus,
 } from "../types.ts";
 import type { NostrProfileFormState } from "./channels.nostr-profile-form.ts";
 
@@ -27,6 +28,16 @@ export type ChannelsProps = {
   weworkQrModalReplaceWarn: boolean;
   weworkQrModalAuthUrl: string | null;
   weworkQrModalGenPageUrl: string | null;
+  weixinQrModalOpen: boolean;
+  weixinQrModalLoading: boolean;
+  weixinQrModalPolling: boolean;
+  weixinQrModalSuccess: boolean;
+  weixinQrModalError: string | null;
+  weixinQrModalReplaceWarn: boolean;
+  weixinQrModalImageSrc: string | null;
+  /** liteapp 等 http(s) 扫码页，用于新窗口打开 */
+  weixinQrModalScanPageUrl: string | null;
+  weixinQrModalScanned: boolean;
   configSchema: unknown;
   configSchemaLoading: boolean;
   configForm: Record<string, unknown> | null;
@@ -44,6 +55,8 @@ export type ChannelsProps = {
   onWhatsAppLogout: () => void;
   onWeWorkQrStart: () => void;
   onWeWorkQrModalClose: () => void;
+  onWeixinQrStart: () => void;
+  onWeixinQrModalClose: () => void;
   onConfigPatch: (path: Array<string | number>, value: unknown) => void;
   onConfigSave: () => void;
   onConfigReload: () => void;
@@ -57,5 +70,6 @@ export type ChannelsProps = {
 
 export type ChannelsChannelData = {
   wework?: WeWorkStatus;
+  weixin?: WeixinStatus;
   channelAccounts?: Record<string, ChannelAccountSnapshot[]> | null;
 };

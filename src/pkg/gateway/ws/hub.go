@@ -74,6 +74,7 @@ func NewHub(version string, h *handlers.Registry, ctx *handlers.Context) *Hub {
 	methods := []string{
 		"health", "logs.tail", "channels.status", "channels.logout",
 		"channels.wework.qr.start", "channels.wework.qr.poll",
+		"channels.weixin.qr.start", "channels.weixin.qr.poll",
 		"status",
 		"usage.status", "usage.cost",
 		"tts.status", "tts.providers", "tts.enable", "tts.disable", "tts.convert", "tts.setProvider",
