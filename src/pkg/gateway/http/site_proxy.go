@@ -180,7 +180,8 @@ func mergeSkillsListWithLocalManaged(skills []map[string]interface{}, env func(s
 	return append(skills, extras...)
 }
 
-// appendLocalOnlyMcpsToMarketList 追加仅存在于本地配置、且未与官网安装元数据关联的 MCP 服务器（用户手动添加）。
+// appendLocalOnlyMcpsToMarketList 追加仅存在于本地配置、且当前列表中尚未以「已安装 + serverKey」展示的 MCP（用户手动添加或元数据 remoteId 与官网列表脱节时兜底）。
+// 注意：不能仅用 install-metadata 的 localId 集合判断「已关联官网」——若元数据仍在但远程列表无对应 id，合并阶段不会打上 installed，仅用 localId 排除会导致该服务器从工具库彻底消失。
 func appendLocalOnlyMcpsToMarketList(mcps []map[string]interface{}, env func(string) string) []map[string]interface{} {
 	if mcps == nil {
 		mcps = []map[string]interface{}{}
@@ -189,12 +190,16 @@ func appendLocalOnlyMcpsToMarketList(mcps []map[string]interface{}, env func(str
 	if err != nil || snap.Config == nil || snap.Config.Mcp == nil || len(snap.Config.Mcp.Servers) == 0 {
 		return mcps
 	}
-	mcpInstallMap := installmetadata.McpInstallMap(env)
-	marketLinkedKeys := make(map[string]struct{})
-	for _, sk := range mcpInstallMap {
+	alreadyRepresented := make(map[string]struct{})
+	for _, item := range mcps {
+		installed, _ := item["installed"].(bool)
+		if !installed {
+			continue
+		}
+		sk, _ := item["serverKey"].(string)
 		sk = strings.TrimSpace(sk)
 		if sk != "" {
-			marketLinkedKeys[sk] = struct{}{}
+			alreadyRepresented[sk] = struct{}{}
 		}
 	}
 	var extras []map[string]interface{}
@@ -203,7 +208,7 @@ func appendLocalOnlyMcpsToMarketList(mcps []map[string]interface{}, env func(str
 		if key == "" {
 			continue
 		}
-		if _, linked := marketLinkedKeys[key]; linked {
+		if _, ok := alreadyRepresented[key]; ok {
 			continue
 		}
 		extras = append(extras, map[string]interface{}{
