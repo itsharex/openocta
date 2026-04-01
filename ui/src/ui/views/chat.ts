@@ -90,7 +90,7 @@ function formatDurationShort(ms: number): string {
   const mins = Math.floor(ms / 60000);
   const secs = Math.round((ms % 60000) / 1000);
   return `${mins}m${secs.toString().padStart(2, "0")}s`;
-}
+}=
 
 function formatBytes(bytes?: number) {
   if (bytes == null || !Number.isFinite(bytes)) {
