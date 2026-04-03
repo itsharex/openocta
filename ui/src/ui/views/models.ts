@@ -638,24 +638,38 @@ export function renderModels(props: ModelsProps) {
                   <div class="field">
                     <span>${t("modelsContextWindow")}</span>
                     <span class="input"><input
-                      type="text"
-                      inputmode="numeric"
+                      type="number"
+                      step="1"
+                      min="1"
                       .value=${props.addModelForm.contextWindow}
                       placeholder=${t("modelsContextWindowPlaceholder")}
                       @input=${(e: Event) =>
-                        props.onAddModelFormChange({ contextWindow: (e.target as HTMLInputElement).value })}
+                        (() => {
+                          const raw = (e.target as HTMLInputElement).value.trim();
+                          // 只允许正整数；非法输入立即清空，避免写入非整数值
+                          if (raw === "") return props.onAddModelFormChange({ contextWindow: "" });
+                          if (/^\d+$/.test(raw)) return props.onAddModelFormChange({ contextWindow: raw });
+                          return props.onAddModelFormChange({ contextWindow: "" });
+                        })()}
                     /></span>
                     <small class="muted" style="font-size: 11px;">${t("modelsContextWindowHint")}</small>
                   </div>
                   <div class="field">
                     <span>${t("modelsMaxTokens")}</span>
                     <span class="input"><input
-                      type="text"
-                      inputmode="numeric"
+                      type="number"
+                      step="1"
+                      min="1"
                       .value=${props.addModelForm.maxTokens}
                       placeholder=${t("modelsMaxTokensPlaceholder")}
                       @input=${(e: Event) =>
-                        props.onAddModelFormChange({ maxTokens: (e.target as HTMLInputElement).value })}
+                        (() => {
+                          const raw = (e.target as HTMLInputElement).value.trim();
+                          // 只允许正整数；非法输入立即清空，避免写入非整数值
+                          if (raw === "") return props.onAddModelFormChange({ maxTokens: "" });
+                          if (/^\d+$/.test(raw)) return props.onAddModelFormChange({ maxTokens: raw });
+                          return props.onAddModelFormChange({ maxTokens: "" });
+                        })()}
                     /></span>
                     <small class="muted" style="font-size: 11px;">${t("modelsMaxTokensHint")}</small>
                   </div>
@@ -797,8 +811,9 @@ export function renderModels(props: ModelsProps) {
                                     <div class="field" style="flex: 1; min-width: 120px; margin: 0;">
                                       <span style="font-size: 11px;">${t("modelsContextWindow")}</span>
                                       <span class="input"><input
-                                        type="text"
-                                        inputmode="numeric"
+                                        type="number"
+                                        step="1"
+                                        min="1"
                                         style="font-size: 12px; padding: 6px 8px;"
                                         .value=${m.contextWindow != null ? String(m.contextWindow) : ""}
                                         placeholder=${t("modelsContextWindowPlaceholder")}
@@ -808,8 +823,12 @@ export function renderModels(props: ModelsProps) {
                                             props.onPatchModel(props.selectedProvider!, m.id, { contextWindow: null });
                                             return;
                                           }
+                                          if (!/^\d+$/.test(raw)) {
+                                            props.onPatchModel(props.selectedProvider!, m.id, { contextWindow: null });
+                                            return;
+                                          }
                                           const n = Number(raw);
-                                          if (Number.isFinite(n) && n > 0 && Number.isInteger(n)) {
+                                          if (Number.isFinite(n) && n > 0) {
                                             props.onPatchModel(props.selectedProvider!, m.id, { contextWindow: n });
                                           }
                                         }}
@@ -818,8 +837,9 @@ export function renderModels(props: ModelsProps) {
                                     <div class="field" style="flex: 1; min-width: 120px; margin: 0;">
                                       <span style="font-size: 11px;">${t("modelsMaxTokens")}</span>
                                       <span class="input"><input
-                                        type="text"
-                                        inputmode="numeric"
+                                        type="number"
+                                        step="1"
+                                        min="1"
                                         style="font-size: 12px; padding: 6px 8px;"
                                         .value=${m.maxTokens != null ? String(m.maxTokens) : ""}
                                         placeholder=${t("modelsMaxTokensPlaceholder")}
@@ -829,8 +849,12 @@ export function renderModels(props: ModelsProps) {
                                             props.onPatchModel(props.selectedProvider!, m.id, { maxTokens: null });
                                             return;
                                           }
+                                          if (!/^\d+$/.test(raw)) {
+                                            props.onPatchModel(props.selectedProvider!, m.id, { maxTokens: null });
+                                            return;
+                                          }
                                           const n = Number(raw);
-                                          if (Number.isFinite(n) && n > 0 && Number.isInteger(n)) {
+                                          if (Number.isFinite(n) && n > 0) {
                                             props.onPatchModel(props.selectedProvider!, m.id, { maxTokens: n });
                                           }
                                         }}

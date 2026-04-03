@@ -244,6 +244,12 @@ func (r *Runtime) sendTypingIndicator(sessionWebhook string) error {
 
 // sendDirectReply 使用 sessionWebhook 发送 Markdown 文本回复。
 func (r *Runtime) sendDirectReply(sessionWebhook, content string) error {
+	// 添加一个全局的recover,dingtalk sdk 有时会panic
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Error("dingtalk runtime: recovered from panic: %v", r)
+		}
+	}()
 	if sessionWebhook == "" {
 		return fmt.Errorf("dingtalk runtime: empty sessionWebhook")
 	}
