@@ -21,7 +21,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "openocta: init config: %v\n", err)
 		os.Exit(1)
 	}
-	// Deploy: if ~/.openocta/workspace has no .md files, copy from cwd/prompt
+	// Deploy: if ~/.openocta/workspace/prompt has no .md files, copy from cwd/prompt
 	stateDir := paths.ResolveStateDir(config.DefaultEnv)
 	profile := strings.TrimSpace(config.DefaultEnv("OPENOCTA_PROFILE"))
 	workspaceDir := filepath.Join(stateDir, "workspace")

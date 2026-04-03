@@ -1,4 +1,4 @@
-// Package runtime: system prompt building from ~/.openocta/workspace and ./prompt markdown (deduped by basename).
+// Package runtime: system prompt building from ~/.openocta/workspace/prompt and ./prompt markdown (deduped by basename).
 package runtime
 
 import (
@@ -114,14 +114,19 @@ func BuildSystemPrompt(opts SystemPromptOptions) (string, error) {
 	return strings.TrimSpace(b.String()), nil
 }
 
-// EnsureWorkspacePrompts ensures workspaceDir exists and, if it has no .md files,
-// copies all .md files from promptSourceDir into workspaceDir (deploy-time sync).
+// EnsureWorkspacePrompts ensures workspaceDir exists and copies default prompts.
+//
+// Default behavior (to avoid mixing generated files into system prompts):
+//   - ensure prompt markdown lives under: <workspaceDir>/prompt/
+//   - copy from promptSourceDir into <workspaceDir>/prompt/ when that dir has no .md files.
 func EnsureWorkspacePrompts(workspaceDir, promptSourceDir string) error {
-	if err := os.MkdirAll(workspaceDir, 0750); err != nil {
+	promptDir := filepath.Join(workspaceDir, "prompt")
+	if err := os.MkdirAll(promptDir, 0750); err != nil {
 		return err
 	}
-	// Check if workspace already has any .md files
-	entries, err := os.ReadDir(workspaceDir)
+
+	// Check if workspace prompt already has any .md files.
+	entries, err := os.ReadDir(promptDir)
 	if err != nil {
 		return err
 	}
@@ -149,7 +154,7 @@ func EnsureWorkspacePrompts(workspaceDir, promptSourceDir string) error {
 		}
 		name := e.Name()
 		src := filepath.Join(promptSourceDir, name)
-		dst := filepath.Join(workspaceDir, name)
+		dst := filepath.Join(promptDir, name)
 		data, err := os.ReadFile(src)
 		if err != nil {
 			continue

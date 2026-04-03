@@ -13,7 +13,6 @@ import (
 
 	"github.com/stellarlinkco/agentsdk-go/pkg/middleware"
 
-	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/paths"
 	octasecurity "github.com/openocta/openocta/pkg/security"
@@ -256,9 +255,10 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 			if env == nil {
 				env = func(string) string { return "" }
 			}
-			workspaceDir := agent.ResolveAgentWorkspaceDir(opts.Config, "main", env)
 			prompt, err := BuildSystemPrompt(SystemPromptOptions{
-				WorkspaceDir: workspaceDir,
+				// 默认不再加载 ~/.openocta/workspace 根目录下的 .md，
+				// 避免不同会话把生成内容混入系统提示。
+				WorkspaceDir: "",
 				ProjectRoot:  projectRoot,
 			})
 			if err == nil {
