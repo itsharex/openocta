@@ -59,7 +59,7 @@ describe("iconForTab", () => {
     expect(iconForTab("employeeMarket", true)).toBe("usersActive");
     expect(iconForTab("skillLibrary", true)).toBe("zapActive");
     expect(iconForTab("toolLibrary", true)).toBe("wrenchActive");
-    expect(iconForTab("modelLibrary", true)).toBe("modelCube");
+    expect(iconForTab("modelLibrary", true)).toBe("modelCubeActive");
     expect(iconForTab("tutorials", true)).toBe("bookActive");
     expect(iconForTab("community", true)).toBe("globeActive");
     expect(iconForTab("config", true)).toBe("settingsActive");
