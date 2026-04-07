@@ -2,6 +2,8 @@ import type { AppViewState } from "./app-view-state.ts";
 import { loadConfig } from "./controllers/config.ts";
 import { saveConfigPatch } from "./controllers/config.ts";
 import { cloneConfigObject, setPathValue } from "./controllers/config/form-utils.ts";
+import { nativeConfirm } from "./native-dialog-bridge.ts";
+import { t } from "./strings.ts";
 import type { AddModelForm, AddProviderForm, ModelDefinitionEntry, ModelProvider } from "./views/models.ts";
 import { BUILTIN_PROVIDERS } from "./views/models-builtin.ts";
 
@@ -196,15 +198,34 @@ export function handleModelsPatchModelEnv(host: AppViewState, providerKey: strin
 export function handleModelsRemoveModel(host: AppViewState, providerKey: string, modelId: string) {
   const base = cloneConfigObject(host.configForm ?? host.configSnapshot?.config ?? {}) as {
     models?: { providers?: Record<string, ModelProvider> };
+    agents?: { defaults?: { model?: { primary?: string } } };
+    env?: { modelEnv?: Record<string, Record<string, string>> };
   };
   const providers = base.models?.providers;
   if (!providers) return;
   const prov = providers[providerKey];
   if (!prov?.models) return;
+
+  // 检查删除的模型是否是当前默认模型
+  const deletedModelRef = `${providerKey}/${modelId}`;
+  const currentDefaultRef = base.agents?.defaults?.model?.primary;
+  if (currentDefaultRef === deletedModelRef) {
+    // 清除默认模型设置
+    if (base.agents?.defaults?.model) {
+      delete base.agents.defaults.model.primary;
+    }
+  }
+
   providers[providerKey] = {
     ...prov,
     models: prov.models.filter((m: { id: string }) => m.id !== modelId),
   };
+  const modelRef = `${providerKey}/${modelId}`;
+  if (base.env?.modelEnv?.[modelRef]) {
+    const nextModelEnv = { ...base.env.modelEnv };
+    delete nextModelEnv[modelRef];
+    base.env.modelEnv = nextModelEnv;
+  }
   host.configForm = base;
   host.configFormDirty = true;
   host.modelsFormDirty = true;
@@ -266,8 +287,16 @@ export function handleModelsSave(host: AppViewState) {
   const patch: Record<string, unknown> = {
     models: { ...existingModels, providers: sanitizedProviders },
   };
+  // 如果默认模型被修改（如删除默认模型时清除），也需要保存 agents
+  if (host.configForm?.agents) {
+    patch.agents = host.configForm.agents;
+  }
   const envForm = host.configForm?.env as { vars?: Record<string, string>; modelEnv?: Record<string, Record<string, string>> } | undefined;
   const modelEnv = envForm?.modelEnv ?? {};
+  const originalEnv = host.configFormOriginal?.env as
+    | { modelEnv?: Record<string, Record<string, string>> }
+    | undefined;
+  const originalModelEnv = originalEnv?.modelEnv ?? {};
   const sanitizedModelEnv: Record<string, Record<string, string> | null> = {};
   for (const [k, v] of Object.entries(modelEnv)) {
     if (!v || typeof v !== "object") continue;
@@ -281,6 +310,11 @@ export function handleModelsSave(host: AppViewState) {
       sanitizedModelEnv[k] = null;
     }
   }
+  for (const key of Object.keys(originalModelEnv)) {
+    if (!(key in modelEnv)) {
+      sanitizedModelEnv[key] = null;
+    }
+  }
   patch.env = { vars: mergedEnv, modelEnv: sanitizedModelEnv };
   saveConfigPatch(host, patch);
   host.modelsFormDirty = false;
@@ -291,6 +325,9 @@ export function handleModelsCancel(host: AppViewState) {
   setSelectedProvider(host, null);
   host.modelsSaveError = null;
   if (host.modelsFormDirty) {
+    // 重置脏状态，确保 loadConfig 能正确重置 configForm
+    host.modelsFormDirty = false;
+    host.configFormDirty = false;
     loadConfig(host);
   }
 }
@@ -342,4 +379,72 @@ export function handleModelsCancelUse(host: AppViewState, provider: string) {
   host.configForm = base;
   host.configFormDirty = true;
   saveConfigPatch(host, patch);
+}
+
+// 删除自定义厂商相关处理函数
+export async function handleModelsDeleteProvider(host: AppViewState) {
+  const providerKey = host.modelsSelectedProvider;
+  if (!providerKey) return;
+  if (!host.client || !host.connected) return;
+
+  // 使用 nativeConfirm 进行确认
+  const ok = await nativeConfirm(t("modelsProviderDeleteConfirm"));
+  if (!ok) return;
+
+  const currentConfig = (host.configForm ?? host.configSnapshot?.config ?? {}) as {
+    models?: { providers?: Record<string, ModelProvider> };
+    env?: { modelEnv?: Record<string, Record<string, string>> };
+    agents?: { defaults?: { model?: { primary?: string } } };
+  };
+  const currentProviders = currentConfig.models?.providers ?? {};
+  const providerModels = currentProviders[providerKey]?.models ?? [];
+  const currentModelEnv = currentConfig.env?.modelEnv ?? {};
+
+  // 检查是否有模型使用该厂商作为默认模型
+  const currentDefaultRef = currentConfig.agents?.defaults?.model?.primary;
+
+  const providerPatch: Record<string, ModelProvider | null> = {
+    [providerKey]: null,
+  };
+  const modelEnvPatch: Record<string, null> = {};
+
+  for (const model of providerModels) {
+    modelEnvPatch[`${providerKey}/${model.id}`] = null;
+  }
+  for (const modelRef of Object.keys(currentModelEnv)) {
+    if (modelRef.startsWith(providerKey + "/")) {
+      modelEnvPatch[modelRef] = null;
+    }
+  }
+
+  // 构建 patch。config.patch 是 merge patch，删除必须显式传 null。
+  const patch: Record<string, unknown> = {
+    models: {
+      providers: providerPatch,
+    },
+  };
+  if (Object.keys(modelEnvPatch).length > 0) {
+    patch.env = {
+      modelEnv: modelEnvPatch,
+    };
+  }
+
+  // 如果当前默认模型是被删除的厂商，清除默认模型
+  if (currentDefaultRef && currentDefaultRef.startsWith(providerKey + "/")) {
+    patch.agents = {
+      defaults: {
+        model: {
+          primary: null,
+        },
+      },
+    };
+  }
+
+  // 保存配置
+  await saveConfigPatch(host, patch);
+  if (host.lastError) {
+    return;
+  }
+
+  setSelectedProvider(host, null);
 }

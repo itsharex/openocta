@@ -313,6 +313,14 @@
 .content--catalog .models-provider-actions {
   display: flex;
 }
+.content--catalog .models-provider-actions .btn {
+  display: none;
+}
+.content--catalog .emp-card-wrap:hover {
+  .emp-card__actions .btn {
+    display: inline-flex;
+  }
+}
 
 .content--catalog .emp-card__title {
   margin-bottom: 8px;

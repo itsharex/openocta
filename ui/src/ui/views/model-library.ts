@@ -106,7 +106,8 @@ export function getModelLibraryEntries(
       category: classifyModelLibraryProvider(provider, builtin),
       modelCount: models.length,
       previewModel: models[0]?.id ?? null,
-      isDefault: current?.provider === builtin.id,
+      // 只有厂商和模型都匹配时才显示默认模型标识
+      isDefault: current?.provider === builtin.id && models.some((m) => m.id === current?.modelId),
     };
   });
 
@@ -133,7 +134,8 @@ export function getModelLibraryEntries(
         category: classifyModelLibraryProvider(provider),
         modelCount: models.length,
         previewModel: models[0]?.id ?? null,
-        isDefault: current?.provider === key,
+        // 只有厂商和模型都匹配时才显示默认模型标识
+        isDefault: current?.provider === key && models.some((m) => m.id === current?.modelId),
       };
     });
 
@@ -159,14 +161,42 @@ function categoryLabel(category: Exclude<ModelLibraryCategory, "__all__">) {
   return category === "public" ? "公有模型" : "本地模型";
 }
 
-function renderModelCard(entry: ModelLibraryProviderEntry, selectedProvider: string | null, onSelect: (key: string) => void) {
+function renderModelCard(
+  entry: ModelLibraryProviderEntry,
+  selectedProvider: string | null,
+  onSelect: (key: string) => void,
+  onUseModelClick: (provider: string) => void,
+  onCancelUse: (provider: string) => void,
+) {
   const displayBaseUrl = entry.baseUrl || "未配置 Base URL";
+  const hasModels = entry.modelCount > 0;
   return html`
     <div class="emp-card-wrap ${selectedProvider === entry.key ? "active" : ""}">
       <div class="emp-card emp-card-btn" @click=${() => onSelect(entry.key)}>
         <div class="emp-card__icon emp-card__icon--default" aria-hidden="true">${icons.modelCube}</div>
         <div class="emp-card__actions models-provider-actions">
-          ${entry.isDefault ? html`<span class="market-card-chip market-card-chip--state">默认模型</span>` : nothing}
+          ${hasModels
+            ? entry.isDefault
+              ? html`
+                <button
+                  class="btn btn--sm"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    onCancelUse(entry.key);
+                  }}
+                >取消默认</button>
+                <span class="market-card-chip market-card-chip--state">默认模型</span>
+              `
+              : html`
+                <button
+                  class="btn btn--sm"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    onUseModelClick(entry.key);
+                  }}
+                >设为默认</button>
+              `
+            : nothing}
         </div>
         <h3 class="emp-card__title">${entry.displayName}</h3>
         <p class="emp-card__desc">${displayBaseUrl}</p>
@@ -238,6 +268,7 @@ export function renderModelLibrary(props: ModelLibraryProps) {
                                   ${section.items.map((entry) =>
                                     renderModelCard(entry, props.selectedProvider, (key) =>
                                       props.onSelect(props.selectedProvider === key ? null : key),
+                                      props.onUseModelClick, props.onCancelUse,
                                     ),
                                   )}
                                 </div>

@@ -321,6 +321,7 @@ type Strings = {
   modelsApiKey: string;
   modelsUseAsDefault: string;
   modelsCancelUse: string;
+  modelsProviderDeleteConfirm: string;
   modelsSelectModelToUse: string;
   modelsCurrentDefault: string;
   channelsHealth: string;
@@ -1314,6 +1315,7 @@ const EN: Strings = {
   modelsApiKey: "API Key",
   modelsUseAsDefault: "Use",
   modelsCancelUse: "Cancel use",
+  modelsProviderDeleteConfirm: "Are you sure you want to delete this provider? This action cannot be undone.",
   modelsSelectModelToUse: "Select model to use",
   modelsCurrentDefault: "Current default",
   channelsHealth: "Channel health",
@@ -2304,6 +2306,7 @@ const ZH: Strings = {
   modelsApiKey: "API Key",
   modelsUseAsDefault: "使用",
   modelsCancelUse: "取消使用",
+  modelsProviderDeleteConfirm: "确定要删除此厂商吗？此操作无法撤销。",
   modelsSelectModelToUse: "选择要使用的模型",
   modelsCurrentDefault: "当前默认",
   channelsHealth: "通道健康",

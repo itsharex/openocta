@@ -47,6 +47,8 @@ export type AddModelForm = {
 
 export type ModelsProps = {
   providers: Record<string, ModelProvider>;
+  /** 用于配置弹框的数据源（未保存的表单数据），如果不传则使用 providers */
+  formProviders?: Record<string, ModelProvider>;
   modelEnv: Record<string, Record<string, string>>; // key: "provider/modelId"
   defaultModelRef: string | null;
   loading: boolean;
@@ -89,6 +91,7 @@ export type ModelsProps = {
   onUseModelModalClose: () => void;
   onUseModel: (provider: string, modelId: string) => void;
   onCancelUse: (provider: string) => void;
+  onDeleteProvider: () => void;
 };
 
 export function getProviderDisplayName(providerKey: string, provider?: ModelProvider): string {
@@ -479,6 +482,8 @@ export function renderModels(props: ModelsProps) {
 
 export function renderModelsOverlays(props: ModelsProps) {
   const current = parseModelRef(props.defaultModelRef);
+  // 配置弹框使用 formProviders（未保存的表单数据），否则使用 providers
+  const providers = props.formProviders ?? props.providers;
 
   return html`
     ${props.addProviderModalOpen
@@ -571,14 +576,14 @@ export function renderModelsOverlays(props: ModelsProps) {
           <div class="channel-panel-overlay" style="z-index: 165;" @click=${props.onUseModelModalClose}>
             <div class="channel-panel card" style="max-width: 400px;" @click=${(e: Event) => e.stopPropagation()}>
               <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
-                <div class="card-title">${getProviderDisplayName(props.useModelModalProvider!, props.providers?.[props.useModelModalProvider!])} - ${t("modelsSelectModelToUse")}</div>
+                <div class="card-title">${getProviderDisplayName(props.useModelModalProvider!, providers?.[props.useModelModalProvider!])} - ${t("modelsSelectModelToUse")}</div>
                 <button class="btn btn--icon" type="button" aria-label="关闭" @click=${props.onUseModelModalClose}>
                   ${icons.x}
                 </button>
               </div>
               <div class="channel-panel-content">
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                  ${getModelsForProvider(props.useModelModalProvider!, props.providers?.[props.useModelModalProvider!]).map(
+                  ${getModelsForProvider(props.useModelModalProvider!, providers?.[props.useModelModalProvider!]).map(
                     (m) => {
                       const isCurrent = current?.provider === props.useModelModalProvider && current?.modelId === m.id;
                       return html`
@@ -607,7 +612,7 @@ export function renderModelsOverlays(props: ModelsProps) {
           <div class="channel-panel-overlay" style="z-index: 160;" @click=${props.onAddModelModalClose}>
             <div class="channel-panel card" style="max-width: 400px;" @click=${(e: Event) => e.stopPropagation()}>
               <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
-                <div class="card-title">${getProviderDisplayName(props.selectedProvider, props.providers?.[props.selectedProvider])} - ${t("modelsAddModel")}</div>
+                <div class="card-title">${getProviderDisplayName(props.selectedProvider, providers?.[props.selectedProvider])} - ${t("modelsAddModel")}</div>
                 <button class="btn btn--icon" type="button" aria-label="关闭" @click=${props.onAddModelModalClose}>
                   ${icons.x}
                 </button>
@@ -676,7 +681,7 @@ export function renderModelsOverlays(props: ModelsProps) {
       : nothing}
 
     ${
-      props.selectedProvider && (props.providers?.[props.selectedProvider] ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider))
+      props.selectedProvider && (providers?.[props.selectedProvider] ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider))
         ? html`
             <div class="channel-panel-overlay" @click=${(e: Event) => {
               if ((e.target as HTMLElement).classList.contains("channel-panel-overlay")) {
@@ -686,7 +691,7 @@ export function renderModelsOverlays(props: ModelsProps) {
               <div class="channel-panel card" @click=${(e: Event) => e.stopPropagation()}>
                 <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
                   <div class="card-title">
-                    ${getProviderDisplayName(props.selectedProvider!, props.providers?.[props.selectedProvider!])} ${t("configSettingsTitle")}
+                    ${getProviderDisplayName(props.selectedProvider!, providers?.[props.selectedProvider!])} ${t("configSettingsTitle")}
                   </div>
                   <button class="btn btn--icon" type="button" aria-label="关闭" @click=${props.onCancel}>
                     ${icons.x}
@@ -701,7 +706,7 @@ export function renderModelsOverlays(props: ModelsProps) {
                       <span>${t("modelsBaseUrl")}</span>
                       <span class="input"><input
                         type="text"
-                        .value=${props.providers?.[props.selectedProvider!]?.baseUrl ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.baseUrl ?? ""}
+                        .value=${providers?.[props.selectedProvider!]?.baseUrl ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.baseUrl ?? ""}
                         placeholder=${BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.baseUrl ?? ""}
                         @input=${(e: Event) =>
                           props.onPatch(props.selectedProvider!, {
@@ -713,7 +718,7 @@ export function renderModelsOverlays(props: ModelsProps) {
                       <span>${t("modelsApiKey")}</span>
                       <span class="input"><input
                         type="password"
-                        .value=${props.providers?.[props.selectedProvider!]?.apiKey ?? ""}
+                        .value=${providers?.[props.selectedProvider!]?.apiKey ?? ""}
                         placeholder="sk-... or $ENV_VAR"
                         @input=${(e: Event) =>
                           props.onPatch(props.selectedProvider!, {
@@ -727,7 +732,7 @@ export function renderModelsOverlays(props: ModelsProps) {
                             <span>${t("modelsDisplayName")}</span>
                             <span class="input"><input
                               type="text"
-                              .value=${props.providers?.[props.selectedProvider!]?.displayName ?? ""}
+                              .value=${providers?.[props.selectedProvider!]?.displayName ?? ""}
                               placeholder=${props.selectedProvider}
                               @input=${(e: Event) =>
                                 props.onPatch(props.selectedProvider!, {
@@ -747,7 +752,7 @@ export function renderModelsOverlays(props: ModelsProps) {
                         >?</span>
                       </div>
                       <span class="select"><select
-                        .value=${props.providers?.[props.selectedProvider!]?.api ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.defaultApi ?? "openai-completions"}
+                        .value=${providers?.[props.selectedProvider!]?.api ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider)?.defaultApi ?? "openai-completions"}
                         @change=${(e: Event) =>
                           props.onPatch(props.selectedProvider!, {
                             api: (e.target as HTMLSelectElement).value as string,
@@ -773,11 +778,11 @@ export function renderModelsOverlays(props: ModelsProps) {
                         <span class="btn__icon">${icons.plus}</span>${t("modelsAddModel")}
                       </button>
                     </div>
-                    ${(props.providers?.[props.selectedProvider!]?.models ?? []).length === 0
+                    ${(providers?.[props.selectedProvider!]?.models ?? []).length === 0
                       ? html`<p class="muted" style="font-size: 13px;">${t("modelsNoModels")}</p>`
                       : html`
                           <ul style="list-style: none; padding: 0; margin: 0;">
-                            ${(props.providers?.[props.selectedProvider!]?.models ?? []).map(
+                            ${(providers?.[props.selectedProvider!]?.models ?? []).map(
                               (m) => {
                                 const modelRef = `${props.selectedProvider}/${m.id}`;
                                 const mEnv = props.modelEnv?.[modelRef] ?? {};
@@ -917,11 +922,23 @@ export function renderModelsOverlays(props: ModelsProps) {
                   <div class="row" style="margin-top: 16px; gap: 8px;">
                     <button
                       class="btn primary"
-                      ?disabled=${props.saving || !props.formDirty}
+                      ?disabled=${props.saving}
                       @click=${props.onSave}
                     >
                       ${props.saving ? t("commonSaving") : t("commonSave")}
                     </button>
+                    ${!BUILTIN_PROVIDERS.some((p) => p.id === props.selectedProvider)
+                      ? html`
+                          <button
+                            class="btn btn--danger"
+                            type="button"
+                            ?disabled=${props.saving}
+                            @click=${props.onDeleteProvider}
+                          >
+                            ${t("commonDelete")}
+                          </button>
+                        `
+                      : nothing}
                     <button class="btn" type="button" aria-label="关闭" ?disabled=${props.saving} @click=${props.onCancel}>
                       ${t("commonCancel")}
                     </button>

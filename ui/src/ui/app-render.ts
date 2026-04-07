@@ -400,6 +400,7 @@ import {
   handleModelsUseModel,
   handleModelsUseModelClick,
   handleModelsUseModelModalClose,
+  handleModelsDeleteProvider,
 } from "./app-models.ts";
 import { generateUUID } from "./uuid.ts";
 import {
@@ -457,12 +458,13 @@ export function renderApp(state: AppViewState) {
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
     state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
+  // 列表始终使用已保存的数据 (configSnapshot)，避免显示未保存的修改
   const modelProviders =
-    (state.configForm?.models as { providers?: Record<string, import("./views/models.ts").ModelProvider> })
-      ?.providers ?? {};
+    (state.configSnapshot?.config as { models?: { providers?: Record<string, import("./views/models.ts").ModelProvider> } } | undefined)?.models?.providers ?? {};
   const modelEnv =
     (state.configForm?.env as { modelEnv?: Record<string, Record<string, string>> })?.modelEnv ?? {};
-  const defaultModelRef = resolveDefaultModelRef(state.configForm);
+  // 列表中的默认模型标识也使用 configSnapshot，保持数据源一致
+  const defaultModelRef = resolveDefaultModelRef(state.configSnapshot?.config as Record<string, unknown> | null | undefined);
   const basePath = normalizeBasePath(state.basePath ?? "");
   const isScheduledTasks =
     state.tab === "scheduledTasks" || state.tab === "cronHistory" || state.tab === "cron";
@@ -951,7 +953,6 @@ export function renderApp(state: AppViewState) {
                           <span class="nav-label__text">Agent</span>
                         </button>
                         <div class="nav-group__items">
-                          ${renderTab(state, "models")}
                           ${renderTab(state, "sandbox")}
                           ${renderTab(state, "llmTrace")}
                         </div>
@@ -3332,6 +3333,7 @@ export function renderApp(state: AppViewState) {
           state.tab === "modelLibrary"
             ? renderModelLibrary({
                 providers: modelProviders,
+                formProviders: (state.configForm?.models as { providers?: Record<string, import("./views/models.ts").ModelProvider> })?.providers,
                 modelEnv,
                 defaultModelRef,
                 loading: state.configLoading,
@@ -3372,6 +3374,7 @@ export function renderApp(state: AppViewState) {
                 onUseModelModalClose: () => handleModelsUseModelModalClose(state),
                 onUseModel: (provider, modelId) => handleModelsUseModel(state, provider, modelId),
                 onCancelUse: (provider) => handleModelsCancelUse(state, provider),
+                onDeleteProvider: () => handleModelsDeleteProvider(state),
               })
             : nothing
         }
@@ -3419,6 +3422,7 @@ export function renderApp(state: AppViewState) {
                 onUseModelModalClose: () => handleModelsUseModelModalClose(state),
                 onUseModel: (provider, modelId) => handleModelsUseModel(state, provider, modelId),
                 onCancelUse: (provider) => handleModelsCancelUse(state, provider),
+                onDeleteProvider: () => handleModelsDeleteProvider(state),
               })
             : nothing
         }
