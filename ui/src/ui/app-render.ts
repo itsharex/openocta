@@ -818,6 +818,7 @@ export function renderApp(state: AppViewState) {
                                 sessionKey: key,
                                 lastActiveSessionKey: key,
                               });
+                              syncUrlWithSessionKey(state, key, true);
                               await Promise.all([loadChatHistory(state), refreshChatAvatar(state)]);
                             }}
                             @dblclick=${(e: Event) => {
