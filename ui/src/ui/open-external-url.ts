@@ -126,7 +126,7 @@ export function handleExternalAnchorClick(
 
 /**
  * Open an http(s) URL using the current shell policy.
- * - Desktop shell: open in the current window.
+ * - Desktop shell: open in the system browser using wails runtime.
  * - Browser: prefer a new tab, then fall back to current-window navigation.
  */
 export async function openExternalUrl(
@@ -136,11 +136,25 @@ export async function openExternalUrl(
   const href = normalizeExternalHref(url);
   if (!href) return;
 
-  if (getExternalUrlOpenMode() === "current-window") {
-    window.location.assign(href);
-    return;
+  if (isDesktopShell()) {
+    // Desktop shell: 使用系统浏览器打开，避免在当前 webview 中打开导致无法返回
+    if (typeof window !== "undefined" && (window as { runtime?: { BrowserOpenURL?: (url: string) => void } }).runtime?.BrowserOpenURL) {
+      (window as { runtime: { BrowserOpenURL: (url: string) => void } }).runtime.BrowserOpenURL(href);
+      return;
+    }
+    // 如果 runtime 不可用，使用新窗口打开
+    const opened = window.open(href, "_blank");
+    if (opened) {
+      try {
+        opened.opener = null;
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
   }
 
+  // Browser: 使用新标签页打开
   const opened = window.open(href, "_blank");
   if (opened) {
     try {
