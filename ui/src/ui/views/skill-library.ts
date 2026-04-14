@@ -1,4 +1,4 @@
-import { html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { icons } from "../icons.js";
 import { resolveLogoUrl, type SkillDetail, type SkillListItem } from "../controllers/remote-market.ts";
@@ -678,6 +678,112 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
   `;
 }
 
+type FileTreeNode = { name: string; path: string | null; children: FileTreeNode[] };
+
+function buildFileTree(paths: string[]): FileTreeNode[] {
+  const root: FileTreeNode[] = [];
+  for (const p of paths) {
+    const parts = p.split('/');
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const isFile = i === parts.length - 1;
+      const existing = current.find((n) => n.name === name);
+      if (existing) {
+        current = existing.children;
+      } else {
+        const node: FileTreeNode = { name, path: isFile ? p : null, children: [] };
+        current.push(node);
+        if (!isFile) {
+          current = node.children;
+        }
+      }
+    }
+  }
+  const sortNodes = (nodes: FileTreeNode[]) => {
+    nodes.sort((a, b) => {
+      const aDir = a.path === null;
+      const bDir = b.path === null;
+      if (aDir !== bDir) return aDir ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach((n) => sortNodes(n.children));
+  };
+  sortNodes(root);
+  return root;
+}
+
+function renderFileTree(
+  nodes: FileTreeNode[],
+  selectedFile: string | null,
+  onSelect: (path: string) => void,
+  depth = 0,
+): TemplateResult {
+  return html`
+    <div style="display: flex; flex-direction: column;">
+      ${nodes.map((node) => {
+        const paddingLeft = depth * 10 + 8;
+        if (node.path === null) {
+          return html`
+            <div style="display: flex; flex-direction: column;">
+              <div
+                style="
+                  padding: 3px 8px 3px ${paddingLeft}px;
+                  font-size: 13px;
+                  cursor: pointer;
+                  user-select: none;
+                  color: var(--text-main);
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                "
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  const target = e.currentTarget as HTMLElement;
+                  const icon = target.querySelector('span[data-tree-icon]') as HTMLElement | null;
+                  const child = target.nextElementSibling as HTMLElement | null;
+                  if (child) {
+                    const isHidden = child.style.display === 'none';
+                    child.style.display = isHidden ? 'block' : 'none';
+                    if (icon) icon.textContent = isHidden ? '▾' : '▸';
+                  }
+                }}
+              >
+                <span data-tree-icon style="display:inline-block;width:12px;text-align:center;color:var(--text-muted);font-size:11px;">▾</span>
+                <span style="font-weight: 500;">${node.name}</span>
+              </div>
+              <div style="display: block;">
+                ${renderFileTree(node.children, selectedFile, onSelect, depth + 1)}
+              </div>
+            </div>
+          `;
+        }
+        const isSelected = selectedFile === node.path;
+        return html`
+          <div
+            style="
+              padding: 3px 8px 3px ${paddingLeft}px;
+              cursor: pointer;
+              font-size: 13px;
+              font-family: var(--mono);
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              ${isSelected
+                ? "background: var(--primary-light, #e6f2ff); color: var(--primary, #0066cc);"
+                : "color: var(--text-main);"}
+            "
+            @click=${() => onSelect(node.path!)}
+            title=${node.path}
+          >
+            ${node.name}
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
 function renderSkillEditorModal(props: SkillLibraryProps) {
   const skillKey = props.skillEditSkillKey ?? "";
   const files = props.skillEditFiles ?? [];
@@ -689,15 +795,18 @@ function renderSkillEditorModal(props: SkillLibraryProps) {
   const syntaxError = props.skillEditSyntaxError;
   const canSave = selectedFile && !loading && !saving;
 
+  const visibleFiles = files.filter((f) => !f.split('/').some((part) => part.startsWith('.')));
+  const fileTree = buildFileTree(visibleFiles);
+
   return html`
     <div class="modal-overlay" @click=${props.onSkillEditClose} role="dialog" aria-modal="true">
       <div
         class="modal card"
         style="
-          width: min(960px, 95vw);
-          height: min(720px, 90vh);
-          max-width: 95vw;
-          max-height: 90vh;
+          width: min(1200px, 96vw);
+          height: min(840px, 92vh);
+          max-width: 96vw;
+          max-height: 92vh;
           display: flex;
           flex-direction: column;
           padding: 0;
@@ -725,43 +834,20 @@ function renderSkillEditorModal(props: SkillLibraryProps) {
           <!-- File tree -->
           <div
             style="
-              width: 220px;
+              width: 180px;
               flex-shrink: 0;
               border-right: 1px solid var(--border, #e5e5e5);
               overflow: auto;
-              padding: 12px;
+              padding: 0;
               background: var(--bg-subtle, #fafafa);
             "
           >
-            ${loading && files.length === 0
+            ${loading && visibleFiles.length === 0
               ? html`<div class="muted" style="padding: 8px;">加载中...</div>`
               : html`
-                  <div style="font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px;">
-                    文件列表
+                  <div style="padding: 8px 0;">
+                    ${renderFileTree(fileTree, selectedFile ?? null, (path) => props.onSkillEditFileSelect?.(path))}
                   </div>
-                  ${files.map(
-                    (f) => html`
-                      <div
-                        style="
-                          padding: 6px 8px;
-                          border-radius: 4px;
-                          cursor: pointer;
-                          font-size: 13px;
-                          font-family: var(--mono);
-                          white-space: nowrap;
-                          overflow: hidden;
-                          text-overflow: ellipsis;
-                          ${selectedFile === f
-                            ? "background: var(--primary-light, #e6f2ff); color: var(--primary, #0066cc);"
-                            : "color: var(--text-main);"}
-                        "
-                        @click=${() => props.onSkillEditFileSelect?.(f)}
-                        title=${f}
-                      >
-                        ${f}
-                      </div>
-                    `,
-                  )}
                 `}
           </div>
 
