@@ -293,13 +293,16 @@ function renderToolMeta(item: McpListItem | McpDetail, currentCategory?: string)
   // 单分类页面：隐藏与当前分类同名的标签，避免冗余
   const isInSingleCategoryView = currentCategory && currentCategory !== "__all__";
   const shouldHideCategoryTag = isInSingleCategoryView && itemCategory === currentCategory;
+  const visibleTags = isInSingleCategoryView
+    ? tags.filter((t) => t !== currentCategory).slice(0, 3)
+    : tags.slice(0, 3);
   return html`
     <div class="market-card-meta">
       ${(item.category ?? "").trim() && !shouldHideCategoryTag
         ? html`<span class="market-card-chip market-card-chip--muted">${itemCategory}</span>`
         : nothing}
       ${status ? html`<span class="market-card-chip">${status}</span>` : nothing}
-      ${tags.slice(0, 3).map((t) => html`<span class="market-card-chip">${t}</span>`)}
+      ${visibleTags.map((t) => html`<span class="market-card-chip">${t}</span>`)}
     </div>
   `;
 }
