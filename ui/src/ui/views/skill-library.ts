@@ -834,7 +834,7 @@ function renderSkillEditorModal(props: SkillLibraryProps) {
           </button>
         </div>
 
-        <div class="row" style="flex: 1; min-height: 0; overflow: hidden;">
+        <div class="row" style="flex: 1; min-height: 0; overflow: hidden; align-items: stretch;">
           <!-- File tree -->
           <div
             style="
@@ -853,31 +853,30 @@ function renderSkillEditorModal(props: SkillLibraryProps) {
 
           <!-- Editor -->
           <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;">
-            <div style="flex: 1; min-height: 0; position: relative; overflow: hidden;">
-              ${loading
-                ? html`<div class="muted" style="padding: 24px;">加载中...</div>`
-                : html`
-                    <textarea
-                      style="
-                        width: 100%;
-                        height: 100%;
-                        resize: none;
-                        border: none;
-                        outline: none;
-                        padding: 12px;
-                        font-family: var(--mono);
-                        font-size: 13px;
-                        line-height: 1.6;
-                        background: transparent;
-                        color: var(--text-main);
-                      "
-                      .value=${content}
-                      ?disabled=${!selectedFile || saving}
-                      @input=${(e: Event) =>
-                        props.onSkillEditContentChange?.((e.target as HTMLTextAreaElement).value)}
-                    ></textarea>
-                  `}
-            </div>
+            ${loading
+              ? html`<div class="muted" style="padding: 24px;">加载中...</div>`
+              : html`
+                  <textarea
+                    style="
+                      flex: 1;
+                      min-height: 0;
+                      width: 100%;
+                      resize: none;
+                      border: none;
+                      outline: none;
+                      padding: 12px;
+                      font-family: var(--mono);
+                      font-size: 13px;
+                      line-height: 1.6;
+                      background: transparent;
+                      color: var(--text-main);
+                    "
+                    .value=${content}
+                    ?disabled=${!selectedFile || saving}
+                    @input=${(e: Event) =>
+                      props.onSkillEditContentChange?.((e.target as HTMLTextAreaElement).value)}
+                  ></textarea>
+                `}
           </div>
         </div>
 
