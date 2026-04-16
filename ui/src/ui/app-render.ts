@@ -2065,16 +2065,12 @@ export function renderApp(state: AppViewState) {
                   state.skillLibraryLoading = true;
                   state.skillLibraryError = null;
                   try {
-                    const category =
-                      state.skillLibraryCategory && state.skillLibraryCategory !== "__all__"
-                        ? state.skillLibraryCategory
-                        : undefined;
                     const status =
                       state.skillLibraryStatus && state.skillLibraryStatus !== "__all__"
                         ? state.skillLibraryStatus
                         : undefined;
                     state.skillLibraryItems = await fetchSkills(
-                      { q: state.skillLibraryQuery, category, status },
+                      { q: state.skillLibraryQuery, status },
                       { gatewayHost: state.settings?.gatewayUrl?.trim(), token: state.settings?.token?.trim() },
                     );
                   } catch (err) {

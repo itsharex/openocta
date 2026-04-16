@@ -863,7 +863,7 @@ function renderSkillEditorModal(props: SkillLibraryProps) {
           <!-- File tree -->
           <div
             style="
-              width: 200px;
+              width: 250px;
               flex-shrink: 0;
               border-right: 1px solid var(--border, #e5e5e5);
               overflow: auto;
