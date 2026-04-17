@@ -117,6 +117,16 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
     nextSettings.lastActiveSessionKey !== host.settings.lastActiveSessionKey;
   if (nextSessionKey !== host.sessionKey) {
     host.sessionKey = nextSessionKey;
+    // session defaults 可能触发“隐式会话切换”，此时必须清理进行中的流式状态，
+    // 避免切换后仍显示 “...” 或把旧 runId 绑定到新会话上。
+    host.chatMessage = "";
+    host.chatAttachments = [];
+    host.chatModelRef = null;
+    host.chatRunId = null;
+    (host as unknown as { chatStream: string | null }).chatStream = null;
+    (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
+    host.chatQueue = [];
+    resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
   }
   if (shouldUpdateSettings) {
     applySettings(host as unknown as Parameters<typeof applySettings>[0], nextSettings);

@@ -150,6 +150,7 @@ function enqueueChatMessage(
     ...host.chatQueue,
     {
       id: generateUUID(),
+      sessionKey: host.sessionKey,
       text: trimmed,
       createdAt: Date.now(),
       attachments: hasAttachments ? attachments?.map((att) => ({ ...att })) : undefined,
@@ -210,16 +211,16 @@ async function flushChatQueue(host: ChatHost) {
   if (!host.connected || isChatBusy(host)) {
     return;
   }
-  const [next, ...rest] = host.chatQueue;
-  if (!next) {
-    return;
-  }
-  host.chatQueue = rest;
+  const idx = host.chatQueue.findIndex((item) => item.sessionKey === host.sessionKey);
+  if (idx === -1) return;
+  const next = host.chatQueue[idx];
+  host.chatQueue = [...host.chatQueue.slice(0, idx), ...host.chatQueue.slice(idx + 1)];
   const ok = await sendChatMessageNow(host, next.text, {
     attachments: next.attachments,
     refreshSessions: next.refreshSessions,
   });
   if (!ok) {
+    // 发送失败：放回队列头部，避免丢失
     host.chatQueue = [next, ...host.chatQueue];
   }
 }

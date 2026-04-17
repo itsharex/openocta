@@ -66,7 +66,7 @@ describe("chat view", () => {
     render(
       renderChat(
         createProps({
-          queue: [{ id: "q-1", text: "queued", attachments: [] }],
+          queue: [{ id: "q-1", sessionKey: "main", text: "queued", attachments: [] }],
           onQueueRemove,
           confirmQueueRemove: true,
         }),

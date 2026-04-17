@@ -387,6 +387,7 @@ export function renderChat(props: ChatProps) {
 
   const conversationOnly = props.conversationOnly ?? true;
   const showToolTrace = !conversationOnly;
+  const visibleQueue = props.queue.filter((item) => item.sessionKey === props.sessionKey);
 
   return html`
     <section class="chat ${isEmptyThread ? "chat-empty" : ""} ${props.focusMode ? "chat--focus" : ""}">
@@ -465,12 +466,12 @@ export function renderChat(props: ChatProps) {
       </div>
 
       ${
-        props.queue.length
+        visibleQueue.length
           ? html`
             <div class="chat-queue" role="status" aria-live="polite">
-              <div class="chat-queue__title">Queued (${props.queue.length})</div>
+              <div class="chat-queue__title">Queued (${visibleQueue.length})</div>
               <div class="chat-queue__list">
-                ${props.queue.map(
+                ${visibleQueue.map(
                   (item) => html`
                     <div class="chat-queue__item">
                       <div class="chat-queue__text">

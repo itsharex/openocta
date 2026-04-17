@@ -284,6 +284,12 @@ function renderSessionOverflowFlyout(state: AppViewState, basePath: string) {
               state.sessionsResult?.sessions?.[0]?.key ?? "agent.main.main";
             state.sessionKey = nextKey;
             state.chatMessage = "";
+            state.chatAttachments = [];
+            state.chatModelRef = null;
+            state.chatStream = null;
+            state.chatStreamStartedAt = null;
+            state.chatRunId = null;
+            state.chatQueue = [];
             state.resetToolStream();
             state.applySettings({
               ...state.settings,
@@ -723,7 +729,13 @@ export function renderApp(state: AppViewState) {
                         state.sessionKey = res.key;
                         state.chatMessage = "";
                         state.chatAttachments = [];
+                        state.chatModelRef = null;
+                        state.chatStream = null;
+                        state.chatStreamStartedAt = null;
+                        state.chatRunId = null;
+                        state.chatQueue = [];
                         state.resetToolStream();
+                        state.resetChatScroll();
                         state.applySettings({
                           ...state.settings,
                           sessionKey: res.key,
@@ -818,7 +830,14 @@ export function renderApp(state: AppViewState) {
                               if (!key) return;
                               state.sessionKey = key;
                               state.chatMessage = "";
+                              state.chatAttachments = [];
+                              state.chatModelRef = null;
+                              state.chatStream = null;
+                              state.chatStreamStartedAt = null;
+                              state.chatRunId = null;
+                              state.chatQueue = [];
                               state.resetToolStream();
+                              state.resetChatScroll();
                               state.applySettings({
                                 ...state.settings,
                                 sessionKey: key,
@@ -1190,6 +1209,12 @@ export function renderApp(state: AppViewState) {
                 onSessionKeyChange: (next) => {
                   state.sessionKey = next;
                   state.chatMessage = "";
+                  state.chatAttachments = [];
+                  state.chatModelRef = null;
+                  state.chatStream = null;
+                  state.chatStreamStartedAt = null;
+                  state.chatRunId = null;
+                  state.chatQueue = [];
                   state.resetToolStream();
                   state.applySettings({
                     ...state.settings,

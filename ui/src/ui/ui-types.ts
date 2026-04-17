@@ -9,6 +9,8 @@ export type ChatAttachment = {
 
 export type ChatQueueItem = {
   id: string;
+  /** 所属会话，用于多会话并行时隔离队列展示与发送 */
+  sessionKey: string;
   text: string;
   createdAt: number;
   attachments?: ChatAttachment[];
