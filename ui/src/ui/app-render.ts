@@ -596,7 +596,6 @@ export function renderApp(state: AppViewState) {
     isSideNavCollapsed ? "shell--nav-collapsed" : "",
     state.onboarding ? "shell--onboarding" : "",
     state.setupWizardActive ? "shell--setup-wizard" : "",
-    state.isDesktopShell ? "shell--desktop" : "",
     state.isWindowsDesktop ? "shell--windows-desktop" : "",
     state.isWindowMaximised ? "shell--window-maximised" : "",
   ]
@@ -883,11 +882,7 @@ export function renderApp(state: AppViewState) {
                             origin,
                             employeeName: emp?.name,
                           });
-                          const subtitle = resolveSessionSidebarSubtitle(
-                            displayName,
-                            lastPreview,
-                            derivedTitle,
-                          );
+                          const subtitle = resolveSessionSidebarSubtitle(displayName, lastPreview);
                           const pinnedAt =
                             typeof row.pinnedAt === "number" ? row.pinnedAt : null;
                           const updatedAt =
@@ -3042,7 +3037,9 @@ export function renderApp(state: AppViewState) {
                 runPhase: state.chatRunPhase,
                 a2uiMessages: state.chatA2UIMessages,
                 client: state.client,
-                onA2UIAction: (action) => dispatchA2UIActionFromChat(state, action),
+                onA2UIAction: async (action) => {
+                  await dispatchA2UIActionFromChat(state, action);
+                },
                 filePreview: state.chatFilePreview,
                 onFilePreview: (req) => {
                   state.chatFilePreview = req;
