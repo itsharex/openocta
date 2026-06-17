@@ -6,7 +6,7 @@ export type A2uiMessageRecord = Record<string, unknown>;
 
 const layoutComponentTypes = new Set(["Column", "Row", "Modal", "Tabs", "Card", "List"]);
 
-/** Accept array, id-keyed map, or single component object. */
+/** Accept array, id-keyed map, {"item":[...]} wrapper, or single component object. */
 export function componentsArrayFromRaw(raw: unknown): ComponentRecord[] {
   if (raw == null) {
     return [];
@@ -18,6 +18,10 @@ export function componentsArrayFromRaw(raw: unknown): ComponentRecord[] {
     return [];
   }
   const obj = raw as ComponentRecord;
+  const itemWrapped = obj.item;
+  if (Array.isArray(itemWrapped)) {
+    return itemWrapped.map((item) => (item ?? {}) as ComponentRecord);
+  }
   if ("id" in obj || "component" in obj) {
     return [obj];
   }
@@ -64,10 +68,11 @@ function addReferencedIds(referenced: Set<string>, raw: unknown): void {
     referenced.add(raw);
     return;
   }
-  if (!Array.isArray(raw)) {
+  const items = anyArrayFromRaw(raw);
+  if (!items) {
     return;
   }
-  for (const item of raw) {
+  for (const item of items) {
     if (typeof item === "string" && item) {
       referenced.add(item);
     }
@@ -130,6 +135,23 @@ export function placeholderComponents(id: string): ComponentRecord[] {
   return [{ id, component: "Text", text: "" }];
 }
 
+/** Accept []any, string[], or {"item":[...]} wrappers from some tool serializers. */
+export function anyArrayFromRaw(raw: unknown): unknown[] | null {
+  if (raw == null) {
+    return null;
+  }
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw === "object") {
+    const item = (raw as ComponentRecord).item;
+    if (Array.isArray(item)) {
+      return item;
+    }
+  }
+  return null;
+}
+
 /** Hoist inline component objects from children arrays into top-level components. */
 export function flattenInlineComponents(components: ComponentRecord[]): ComponentRecord[] {
   const out: ComponentRecord[] = [];
@@ -143,8 +165,8 @@ export function flattenInlineComponents(components: ComponentRecord[]): Componen
       return;
     }
 
-    const rawChildren = normalized.children;
-    if (Array.isArray(rawChildren)) {
+    const rawChildren = anyArrayFromRaw(normalized.children);
+    if (rawChildren) {
       const childIds: string[] = [];
       for (const item of rawChildren) {
         if (typeof item === "string" && item) {
@@ -470,10 +492,11 @@ export function stripCommandConfirmationButtons(components: ComponentRecord[]): 
 /** Place trailing confirm/cancel buttons on one Row instead of a vertical Column stack. */
 export function wrapTrailingButtonsInRow(components: ComponentRecord[]): ComponentRecord[] {
   const root = components.find((comp) => comp.id === "root");
-  if (!root || !Array.isArray(root.children)) {
+  const rawChildren = root ? anyArrayFromRaw(root.children) : null;
+  if (!root || !rawChildren) {
     return components;
   }
-  const childIds = root.children.filter((id): id is string => typeof id === "string" && id.length > 0);
+  const childIds = rawChildren.filter((id): id is string => typeof id === "string" && id.length > 0);
   const byId = componentById(components);
   let start = childIds.length;
   while (start > 0 && isButtonRef(byId, childIds[start - 1] ?? "")) {

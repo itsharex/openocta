@@ -1679,7 +1679,11 @@ button.nav-item {
   justify-content: flex-start;
   gap: 8px;
   flex: 0 0 auto;
+  flex-shrink: 0;
   min-width: 0;
+  position: relative;
+  z-index: 2;
+  background: var(--bg);
 }
 
 .topbar-version {
@@ -1687,6 +1691,9 @@ button.nav-item {
   font-size: 10px;
   line-height: 1;
   white-space: nowrap;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .top-tabs {
@@ -1694,10 +1701,11 @@ button.nav-item {
   display: flex;
   align-items: center;
   flex: 1;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 4px;
   min-width: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 
