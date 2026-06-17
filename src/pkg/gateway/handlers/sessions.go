@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +21,24 @@ import (
 )
 
 var sessionsLog = logging.Sub("sessions")
+
+var autoCustomSessionLabelRE = regexp.MustCompile(`^自定义(会话|对话)(\d+)$`)
+
+func nextAutoCustomSessionLabel(store session.SessionStore) string {
+	max := 0
+	for key, entry := range store {
+		if !strings.HasPrefix(strings.ToLower(key), "custom:") {
+			continue
+		}
+		matches := autoCustomSessionLabelRE.FindStringSubmatch(strings.TrimSpace(entry.Label))
+		if len(matches) == 3 {
+			if n, err := strconv.Atoi(matches[2]); err == nil && n > max {
+				max = n
+			}
+		}
+	}
+	return fmt.Sprintf("自定义会话%d", max+1)
+}
 
 // SessionsCreateParams matches SessionsCreateParams from TypeScript.
 type SessionsCreateParams struct {
@@ -222,6 +242,9 @@ func SessionsCreateHandler(opts HandlerOpts) error {
 		label := ""
 		if params != nil && params.Label != nil && strings.TrimSpace(*params.Label) != "" {
 			label = strings.TrimSpace(*params.Label)
+		}
+		if label == "" {
+			label = nextAutoCustomSessionLabel(store)
 		}
 		now := time.Now().UnixMilli()
 		next = session.SessionEntry{
@@ -1265,7 +1288,13 @@ func resolveSessionModelRef(cfg *config.OpenOctaConfig, entry session.SessionEnt
 func resolveSessionTranscriptCandidates(sessionID, storePath, sessionFile, agentID string, env func(string) string) []string {
 	candidates := []string{}
 	if sessionFile != "" {
-		candidates = append(candidates, sessionFile)
+		if filepath.IsAbs(sessionFile) {
+			candidates = append(candidates, sessionFile)
+		} else if storePath != "" {
+			candidates = append(candidates, filepath.Join(filepath.Dir(storePath), sessionFile))
+		} else {
+			candidates = append(candidates, sessionFile)
+		}
 	}
 	if storePath != "" {
 		sessionsDir := filepath.Dir(storePath)
@@ -2324,6 +2353,57 @@ func getSessionDefaults(cfg *config.OpenOctaConfig) GatewaySessionsDefaults {
 	return defaults
 }
 
+// extractPreviewFromTranscriptLine extracts user/assistant text from one JSONL line.
+// roleFilter: "user", "assistant", or "" for either.
+func extractPreviewFromTranscriptLine(line, roleFilter string) string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+	var header struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal([]byte(line), &header) == nil && header.Type == "session" {
+		return ""
+	}
+
+	var wrapped struct {
+		Type    string `json:"type"`
+		Message *struct {
+			Role    string      `json:"role"`
+			Content interface{} `json:"content"`
+		} `json:"message"`
+	}
+	if json.Unmarshal([]byte(line), &wrapped) == nil && wrapped.Message != nil {
+		role := wrapped.Message.Role
+		if roleFilter != "" && role != roleFilter {
+			return ""
+		}
+		if roleFilter == "" && role != "user" && role != "assistant" {
+			return ""
+		}
+		if text := extractTextFromContentAny(wrapped.Message.Content); text != "" {
+			return text
+		}
+	}
+
+	var direct session.TranscriptMessage
+	if json.Unmarshal([]byte(line), &direct) == nil && direct.Role != "" {
+		if roleFilter != "" && direct.Role != roleFilter {
+			return ""
+		}
+		if roleFilter == "" && direct.Role != "user" && direct.Role != "assistant" {
+			return ""
+		}
+		for _, block := range direct.Content {
+			if (block.Type == "text" || block.Type == "output_text" || block.Type == "input_text") && block.Text != "" {
+				return strings.TrimSpace(block.Text)
+			}
+		}
+	}
+	return ""
+}
+
 // readFirstUserMessageFromTranscript reads the first user message from a transcript.
 func readFirstUserMessageFromTranscript(sessionID, storePath, sessionFile, agentID string, env func(string) string) string {
 	candidates := resolveSessionTranscriptCandidates(sessionID, storePath, sessionFile, agentID, env)
@@ -2349,35 +2429,9 @@ func readFirstUserMessageFromTranscript(sessionID, storePath, sessionFile, agent
 			lines = lines[:maxLines]
 		}
 
-		first := true
 		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			if first {
-				first = false
-				var h struct {
-					Type string `json:"type"`
-				}
-				if json.Unmarshal([]byte(line), &h) == nil && h.Type == "session" {
-					continue
-				}
-			}
-			var parsed struct {
-				Message *struct {
-					Role    string      `json:"role"`
-					Content interface{} `json:"content"`
-				} `json:"message"`
-			}
-			if json.Unmarshal([]byte(line), &parsed) != nil {
-				continue
-			}
-			if parsed.Message != nil && parsed.Message.Role == "user" {
-				text := extractTextFromContentAny(parsed.Message.Content)
-				if text != "" {
-					return text
-				}
+			if text := extractPreviewFromTranscriptLine(line, "user"); text != "" {
+				return text
 			}
 		}
 	}
@@ -2431,21 +2485,8 @@ func readLastMessagePreviewFromTranscript(sessionID, storePath, sessionFile, age
 
 		// Read from end
 		for i := len(nonEmptyLines) - 1; i >= 0; i-- {
-			line := nonEmptyLines[i]
-			var parsed struct {
-				Message *struct {
-					Role    string      `json:"role"`
-					Content interface{} `json:"content"`
-				} `json:"message"`
-			}
-			if json.Unmarshal([]byte(line), &parsed) != nil {
-				continue
-			}
-			if parsed.Message != nil && (parsed.Message.Role == "user" || parsed.Message.Role == "assistant") {
-				text := extractTextFromContentAny(parsed.Message.Content)
-				if text != "" {
-					return text
-				}
+			if text := extractPreviewFromTranscriptLine(nonEmptyLines[i], ""); text != "" {
+				return text
 			}
 		}
 	}

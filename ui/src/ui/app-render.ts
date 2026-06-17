@@ -596,6 +596,7 @@ export function renderApp(state: AppViewState) {
     isSideNavCollapsed ? "shell--nav-collapsed" : "",
     state.onboarding ? "shell--onboarding" : "",
     state.setupWizardActive ? "shell--setup-wizard" : "",
+    state.isDesktopShell ? "shell--desktop" : "",
     state.isWindowsDesktop ? "shell--windows-desktop" : "",
     state.isWindowMaximised ? "shell--window-maximised" : "",
   ]
@@ -882,7 +883,11 @@ export function renderApp(state: AppViewState) {
                             origin,
                             employeeName: emp?.name,
                           });
-                          const subtitle = resolveSessionSidebarSubtitle(displayName, lastPreview);
+                          const subtitle = resolveSessionSidebarSubtitle(
+                            displayName,
+                            lastPreview,
+                            derivedTitle,
+                          );
                           const pinnedAt =
                             typeof row.pinnedAt === "number" ? row.pinnedAt : null;
                           const updatedAt =

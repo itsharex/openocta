@@ -86,7 +86,7 @@ func DefaultToolsWithInvoker(invoker GatewayInvoker) []tool.Tool {
 		EchoTool{},
 		OsInfoTool{},
 		//EnvProbeTool{},
-		WindowsCmdTool{},
+		//WindowsCmdTool{},
 	}
 	if invoker != nil {
 		list = append(list, GatewayTool{Invoker: invoker})

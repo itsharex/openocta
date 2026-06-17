@@ -1661,6 +1661,35 @@ button.nav-item {
   box-sizing: border-box;
 }
 
+.shell--desktop .topbar__main {
+  gap: 12px;
+  min-width: 0;
+}
+
+.shell--desktop .topbar-left {
+  flex-shrink: 0;
+}
+
+.shell--desktop .topbar-version {
+  display: none;
+}
+
+.shell--desktop .brand-logo,
+.shell--desktop .brand-logo img {
+  max-width: 120px;
+}
+
+.shell--desktop .top-tab {
+  padding-inline: 10px;
+}
+
+/* 桌面 app 顶栏空间有限，优先保证 tab 可见 */
+@media (max-width: 1400px) {
+  .shell--desktop .topbar-status {
+    display: none;
+  }
+}
+
 .shell--windows-desktop .topbar__main {
   --wails-draggable: drag;
   padding-right: 0;
@@ -1693,12 +1722,21 @@ button.nav-item {
   height: 100%;
   display: flex;
   align-items: center;
-  flex: 1;
-  justify-content: center;
+  flex: 1 1 auto;
+  justify-content: flex-start;
   gap: 4px;
   min-width: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline: 8px;
   scrollbar-width: none;
+}
+
+/* 浏览器宽屏时居中 tab；桌面 app 保持左对齐，避免溢出时左侧 tab 被裁切 */
+@media (min-width: 1280px) {
+  .shell:not(.shell--desktop) .top-tabs {
+    justify-content: center;
+  }
 }
 
 .top-tabs::-webkit-scrollbar {
@@ -1710,6 +1748,7 @@ button.nav-item {
   align-items: center;
   gap: 6px;
   height: 100%;
+  flex-shrink: 0;
   padding: 0 14px;
   border: none;
   background: transparent;
