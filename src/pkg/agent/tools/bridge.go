@@ -75,7 +75,7 @@ func DefaultTools() []tool.Tool {
 		EchoTool{},
 		OsInfoTool{},
 		//EnvProbeTool{},
-		WindowsCmdTool{},
+		//WindowsCmdTool{},
 	}
 }
 

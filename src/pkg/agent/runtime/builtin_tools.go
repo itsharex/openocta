@@ -28,12 +28,7 @@ func BuiltinTools(projectRoot string, sandboxDisabled bool) []tool.Tool {
 
 	// Use custom bash tool on Windows to avoid window flashing
 	var bash tool.Tool
-	if isWindows() {
-		bash = &tools.CustomBashTool{}
-	} else {
-		bash = toolbuiltin.NewBashToolWithRoot(projectRoot)
-	}
-
+	bash = toolbuiltin.NewBashToolWithRoot(projectRoot)
 	read := toolbuiltin.NewReadToolWithRoot(projectRoot)
 	write := toolbuiltin.NewWriteToolWithRoot(projectRoot)
 	edit := toolbuiltin.NewEditToolWithRoot(projectRoot)
