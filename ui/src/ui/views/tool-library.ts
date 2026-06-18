@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import "../components/generic-list-page.ts";
+import { genericListPage } from "../components/generic-list-page.ts";
 import type { McpDetail, McpListItem } from "../controllers/remote-market.ts";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
 import { groupByCategoryKey } from "../utils/category-helpers.ts";
@@ -532,19 +532,19 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                       return html`
                         <div class="emp-installed-section">
                           <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                          <generic-list-page
-                            .items=${installedItems}
-                            .keyFn=${(it: McpListItem) => `installed-${String(it.id)}`}
-                            .renderItem=${(it: McpListItem) =>
+                          ${genericListPage({
+                            items: installedItems,
+                            keyFn: (it: McpListItem) => `installed-${String(it.id)}`,
+                            renderItem: (it: McpListItem) =>
                               renderToolCard(
                                 props,
                                 it,
                                 effectiveCategory,
                                 lookupInstalledServerKey(props.installedMcpMap, it.id),
-                              )}
-                            containerClass="emp-grid emp-installed-grid"
-                            sentinelLabel="继续显示已安装工具"
-                          ></generic-list-page>
+                              ),
+                            containerClass: "emp-grid emp-installed-grid",
+                            sentinelLabel: "继续显示已安装工具",
+                          })}
                         </div>
                       `;
                     })()}
@@ -559,10 +559,10 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                                         <div class="emp-section__header">
                                           <h3 class="emp-section__title">${section.title}</h3>
                                         </div>
-                                        <generic-list-page
-                                          .items=${section.items}
-                                          .keyFn=${(it: McpListItem) => String(it.id)}
-                                          .renderItem=${(it: McpListItem) => {
+                                        ${genericListPage({
+                                          items: section.items,
+                                          keyFn: (it: McpListItem) => String(it.id),
+                                          renderItem: (it: McpListItem) => {
                                             const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
                                             const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
                                             return renderToolCard(
@@ -571,10 +571,10 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                                               effectiveCategory,
                                               installed ? serverKey : undefined,
                                             );
-                                          }}
-                                          containerClass="emp-grid"
-                                          sentinelLabel="继续显示工具"
-                                        ></generic-list-page>
+                                          },
+                                          containerClass: "emp-grid",
+                                          sentinelLabel: "继续显示工具",
+                                        })}
                                       </div>
                                     `
                                   : nothing,

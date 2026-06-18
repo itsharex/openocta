@@ -1,100 +1,121 @@
-import { LitElement, html, nothing, type TemplateResult } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import { createRef, ref, type Ref } from "lit/directives/ref.js";
+import { html, type TemplateResult } from "lit";
+import { AsyncDirective } from "lit/async-directive.js";
+import { directive, type PartInfo, PartType } from "lit/directive.js";
 import { repeat } from "lit/directives/repeat.js";
 
-@customElement("generic-list-page")
-export class GenericListPage<T> extends LitElement {
-  createRenderRoot() {
-    return this;
-  }
+let genericListPageId = 0;
 
-  @property({ attribute: false }) items: T[] = [];
-  @property({ attribute: false }) renderItem: (item: T, index: number) => TemplateResult = () => html``;
-  @property({ attribute: false }) keyFn: (item: T, index: number) => unknown = (_item, index) => index;
-  @property({ type: Number }) initialCount = 24;
-  @property({ type: Number }) batchSize = 24;
-  @property({ type: String }) containerClass = "";
-  @property({ type: String }) sentinelLabel = "继续加载";
-  @property({ type: Boolean }) disabled = false;
+export type GenericListPageOptions<T> = {
+  items: T[];
+  renderItem: (item: T, index: number) => TemplateResult;
+  keyFn?: (item: T, index: number) => unknown;
+  initialCount?: number;
+  batchSize?: number;
+  containerClass?: string;
+  sentinelLabel?: string;
+  disabled?: boolean;
+};
 
-  @state() private visibleCount = this.initialCount;
-
+class GenericListPageDirective<T> extends AsyncDirective {
+  private readonly sentinelId = `generic-list-sentinel-${++genericListPageId}`;
+  private visibleCount = 0;
   private observer?: IntersectionObserver;
-  private sentinelRef: Ref<HTMLDivElement> = createRef();
-  private observedSentinel?: HTMLDivElement;
-  private previousKeys = "";
+  private keys = "";
+  private options?: GenericListPageOptions<T>;
 
-  protected willUpdate() {
-    const keys = this.items.map((item, index) => String(this.keyFn(item, index))).join("");
-    if (keys !== this.previousKeys) {
-      this.previousKeys = keys;
-      this.visibleCount = this.initialCount;
+  constructor(partInfo: PartInfo) {
+    super(partInfo);
+    if (partInfo.type !== PartType.CHILD) {
+      throw new Error("genericListPage can only be used in child expressions");
     }
   }
 
-  protected updated() {
-    this.observeSentinel();
-  }
-
-  disconnectedCallback() {
+  disconnected() {
     this.observer?.disconnect();
-    super.disconnectedCallback();
+    this.observer = undefined;
   }
 
-  private observeSentinel() {
-    const sentinel = this.sentinelRef.value;
-    if (this.disabled || !sentinel || this.visibleCount >= this.items.length) {
-      this.observer?.disconnect();
-      this.observer = undefined;
-      this.observedSentinel = undefined;
-      return;
+  reconnected() {
+    this.scheduleObserve();
+  }
+
+  render(options: GenericListPageOptions<T>) {
+    this.options = options;
+    const items = options.items ?? [];
+    const keyFn = options.keyFn ?? ((_item: T, index: number) => index);
+    const initialCount = options.initialCount ?? 24;
+    const nextKeys = items.map((item, index) => String(keyFn(item, index))).join("");
+
+    if (nextKeys !== this.keys) {
+      this.keys = nextKeys;
+      this.visibleCount = initialCount;
+    } else if (this.visibleCount === 0) {
+      this.visibleCount = initialCount;
     }
 
-    if (this.observer && this.observedSentinel === sentinel) return;
+    const visibleItems = options.disabled ? items : items.slice(0, this.visibleCount);
+    const hasMore = !options.disabled && this.visibleCount < items.length;
 
-    this.observer?.disconnect();
-    this.observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        this.visibleCount = Math.min(this.items.length, this.visibleCount + this.batchSize);
-      },
-      { root: null, rootMargin: "600px 0px", threshold: 0.01 },
-    );
-    this.observedSentinel = sentinel;
-    this.observer.observe(sentinel);
-  }
-
-  render() {
-    const visibleItems = this.disabled ? this.items : this.items.slice(0, this.visibleCount);
-    const hasMore = !this.disabled && this.visibleCount < this.items.length;
+    this.scheduleObserve();
 
     return html`
-      <div class=${this.containerClass}>
+      <div class=${options.containerClass ?? ""}>
         ${repeat(
           visibleItems,
-          (item, index) => this.keyFn(item, index),
-          (item, index) => this.renderItem(item, index),
+          (item, index) => keyFn(item, index),
+          (item, index) => options.renderItem(item, index),
         )}
       </div>
       ${hasMore
         ? html`
             <div
-              ${ref(this.sentinelRef)}
+              id=${this.sentinelId}
               class="generic-list-sentinel"
               role="status"
-              aria-label=${`${this.sentinelLabel}，已显示 ${visibleItems.length} / ${this.items.length}`}
+              aria-label=${`${options.sentinelLabel ?? "继续加载"}，已显示 ${visibleItems.length} / ${items.length}`}
             >
-              <span>${this.sentinelLabel}</span>
+              <span>${options.sentinelLabel ?? "继续加载"}</span>
             </div>
           `
-        : nothing}
+        : ""}
     `;
+  }
+
+  update(_part: unknown, [options]: [GenericListPageOptions<T>]) {
+    return this.render(options);
+  }
+
+  private scheduleObserve() {
+    queueMicrotask(() => this.observeSentinel());
+  }
+
+  private observeSentinel() {
+    const sentinel = document.getElementById(this.sentinelId);
+
+    if (!sentinel || !this.options || this.visibleCount >= (this.options.items?.length ?? 0)) {
+      this.observer?.disconnect();
+      this.observer = undefined;
+      return;
+    }
+
+    this.observer?.disconnect();
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting) || !this.options) return;
+        this.visibleCount = Math.min(
+          this.options.items.length,
+          this.visibleCount + (this.options.batchSize ?? 24),
+        );
+        this.setValue(this.render(this.options));
+      },
+      { root: null, rootMargin: "600px 0px", threshold: 0.01 },
+    );
+    this.observer.observe(sentinel);
   }
 }
 
-declare global {
-  interface HTMLElementTagNameMap {
-    "generic-list-page": GenericListPage<unknown>;
-  }
+const genericListPageDirective = directive(GenericListPageDirective);
+
+export function genericListPage<T>(options: GenericListPageOptions<T>) {
+  return genericListPageDirective(options as GenericListPageOptions<unknown>);
 }
