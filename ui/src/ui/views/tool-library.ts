@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { genericListPage } from "../components/generic-list-page.ts";
+import { genericListPage, genericSectionListPage } from "../components/generic-list-page.ts";
 import type { McpDetail, McpListItem } from "../controllers/remote-market.ts";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
 import { groupByCategoryKey } from "../utils/category-helpers.ts";
@@ -542,6 +542,8 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                                 effectiveCategory,
                                 lookupInstalledServerKey(props.installedMcpMap, it.id),
                               ),
+                            initialCount: 24,
+                            batchSize: 24,
                             containerClass: "emp-grid emp-installed-grid",
                             sentinelLabel: "继续显示已安装工具",
                           })}
@@ -549,38 +551,32 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                       `;
                     })()}
                     ${showSections
-                      ? html`
-                          <div class="emp-sections">
-                            ${sectionsFixed.map(
-                              (section) =>
-                                section.items.length > 0
-                                  ? html`
-                                      <div class="emp-section">
-                                        <div class="emp-section__header">
-                                          <h3 class="emp-section__title">${section.title}</h3>
-                                        </div>
-                                        ${genericListPage({
-                                          items: section.items,
-                                          keyFn: (it: McpListItem) => String(it.id),
-                                          renderItem: (it: McpListItem) => {
-                                            const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
-                                            const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
-                                            return renderToolCard(
-                                              props,
-                                              it,
-                                              effectiveCategory,
-                                              installed ? serverKey : undefined,
-                                            );
-                                          },
-                                          containerClass: "emp-grid",
-                                          sentinelLabel: "继续显示工具",
-                                        })}
-                                      </div>
-                                    `
-                                  : nothing,
-                            )}
-                          </div>
-                        `
+                      ? genericSectionListPage({
+                          sections: sectionsFixed
+                            .filter((section) => section.items.length > 0)
+                            .map((section) => ({
+                              key: section.title,
+                              title: section.title,
+                              items: section.items,
+                              sectionClass: "emp-section",
+                              gridClass: "emp-grid",
+                            })),
+                          keyFn: (it: McpListItem) => String(it.id),
+                          renderItem: (it: McpListItem) => {
+                            const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
+                            const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
+                            return renderToolCard(
+                              props,
+                              it,
+                              effectiveCategory,
+                              installed ? serverKey : undefined,
+                            );
+                          },
+                          initialCount: 96,
+                          batchSize: 96,
+                          sectionsClass: "emp-sections",
+                          sentinelLabel: "继续显示工具",
+                        })
                       : nothing}
                   </div>
                 `
