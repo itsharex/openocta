@@ -386,3 +386,12 @@
 .market-card-chip--muted {
   color: var(--text-secondary);
 }
+
+.generic-list-sentinel {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}

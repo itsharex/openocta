@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { genericListPage, genericSectionListPage } from "../components/generic-list-page.ts";
 import type { EmployeeDetail, EmployeeListItem } from "../controllers/remote-market.ts";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
 import { groupByCategoryKey } from "../utils/category-helpers.ts";
@@ -182,6 +183,36 @@ function renderEmployeeCardAction(
   `;
 }
 
+function renderEmployeeCard(
+  props: EmployeeMarketProps,
+  it: EmployeeListItem,
+  effectiveCategory: string,
+) {
+  const selected = props.selectedId === it.id;
+  const logoUrl = resolveLogoUrl(it.logo_url);
+
+  return html`
+    <div class="emp-card-wrap ${selected ? "active" : ""}">
+      <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+        <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+          ${logoUrl ? html`<img src=${logoUrl} alt="" />` : html`
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          `}
+        </div>
+        <div class="emp-card__actions">
+          ${renderEmployeeCardAction(props, it)}
+        </div>
+        <h3 class="emp-card__title">${it.name}</h3>
+        <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+        ${renderCardTags(it.tags, effectiveCategory)}
+      </div>
+    </div>
+  `;
+}
+
 function renderEmployeeDetailActions(props: EmployeeMarketProps, detail: EmployeeDetail) {
   const installed = isInstalledEmployee(props, detail);
   const localId = localEmployeeId(props, detail);
@@ -300,80 +331,36 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
                       return html`
                         <div class="emp-installed-section">
                           <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                          <div class="emp-grid emp-installed-grid">
-                            ${installedItems.map((it) => {
-                              const selected = props.selectedId === it.id;
-                              const logoUrl = resolveLogoUrl(it.logo_url);
-                              return html`
-                                <div class="emp-card-wrap ${selected ? "active" : ""}">
-                                  <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                    <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                      ${logoUrl ? html`<img src=${logoUrl} alt="" />` : html`
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                          <circle cx="12" cy="7" r="4"/>
-                                        </svg>
-                                      `}
-                                    </div>
-                                    <div class="emp-card__actions">
-                                      ${renderEmployeeCardAction(props, it)}
-                                    </div>
-                                    <h3 class="emp-card__title">${it.name}</h3>
-                                    <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                    ${renderCardTags(it.tags, effectiveCategory)}
-                                  </div>
-                                </div>
-                              `;
-                            })}
-                          </div>
+                          ${genericListPage({
+                            items: installedItems,
+                            keyFn: (it: EmployeeListItem) => `installed-${String(it.id)}`,
+                            renderItem: (it: EmployeeListItem) => renderEmployeeCard(props, it, effectiveCategory),
+                            initialCount: 24,
+                            batchSize: 24,
+                            containerClass: "emp-grid emp-installed-grid",
+                            sentinelLabel: "继续显示已安装员工",
+                          })}
                         </div>
                       `;
                     })()}
                     ${showSections
-                      ? html`
-                          <div class="emp-sections">
-                            ${sectionsFixed.map(
-                              (section) =>
-                                section.items.length > 0
-                                  ? html`
-                                      <div class="emp-section">
-                                        <div class="emp-section__header">
-                                          <h3 class="emp-section__title">${section.title}</h3>
-                                        </div>
-                                        <div class="emp-grid">
-                                          ${section.items.map((it) => {
-                                            const selected = props.selectedId === it.id;
-                                            const logoUrl = resolveLogoUrl(it.logo_url);
-                                            return html`
-                                              <div class="emp-card-wrap ${selected ? "active" : ""}">
-                                                <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                                  <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                                    ${logoUrl
-                                                      ? html`<img src=${logoUrl} alt="" />`
-                                                      : html`
-                                                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                                            <circle cx="12" cy="7" r="4"/>
-                                                          </svg>
-                                                        `}
-                                                  </div>
-                                                  <div class="emp-card__actions">
-                                                    ${renderEmployeeCardAction(props, it)}
-                                                  </div>
-                                                  <h3 class="emp-card__title">${it.name}</h3>
-                                                  <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                                  ${renderCardTags(it.tags, effectiveCategory)}
-                                                </div>
-                                              </div>
-                                            `;
-                                          })}
-                                        </div>
-                                      </div>
-                                    `
-                                  : nothing,
-                            )}
-                          </div>
-                        `
+                      ? genericSectionListPage({
+                          sections: sectionsFixed
+                            .filter((section) => section.items.length > 0)
+                            .map((section) => ({
+                              key: section.title,
+                              title: section.title,
+                              items: section.items,
+                              sectionClass: "emp-section",
+                              gridClass: "emp-grid",
+                            })),
+                          keyFn: (it: EmployeeListItem) => String(it.id),
+                          renderItem: (it: EmployeeListItem) => renderEmployeeCard(props, it, effectiveCategory),
+                          initialCount: 96,
+                          batchSize: 96,
+                          sectionsClass: "emp-sections",
+                          sentinelLabel: "继续显示员工",
+                        })
                       : nothing}
                   </div>
                 `

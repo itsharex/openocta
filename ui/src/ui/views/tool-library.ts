@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { genericListPage, genericSectionListPage } from "../components/generic-list-page.ts";
 import type { McpDetail, McpListItem } from "../controllers/remote-market.ts";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
 import { groupByCategoryKey } from "../utils/category-helpers.ts";
@@ -305,6 +306,35 @@ function renderToolMeta(item: McpListItem | McpDetail, currentCategory?: string)
   `;
 }
 
+function renderToolCard(
+  props: ToolLibraryProps,
+  it: McpListItem,
+  effectiveCategory: string,
+  serverKey: string | undefined,
+) {
+  const active = props.selectedId === it.id;
+  const logoUrl = resolveLogoUrl(it.logo_url);
+  const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
+  const enabled = !disabled;
+  const installing = props.installingId === it.id;
+
+  return html`
+    <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
+      <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
+        <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
+          ${logoUrl ? html`<img src=${logoUrl} alt="" />` : MCP_ICON_SVG}
+        </div>
+        <div class="emp-card__actions">
+          ${renderToolCardActions(props, it, serverKey, enabled, installing)}
+        </div>
+        <h3 class="emp-card__title">${it.name}</h3>
+        <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
+        ${renderToolMeta(it, effectiveCategory)}
+      </div>
+    </div>
+  `;
+}
+
 export function renderToolLibrary(props: ToolLibraryProps) {
   const effectiveCategory = (props.category ?? "").trim() || "__all__";
   const q = normalizeQuery(props.query);
@@ -502,85 +532,51 @@ export function renderToolLibrary(props: ToolLibraryProps) {
                       return html`
                         <div class="emp-installed-section">
                           <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                          <div class="emp-grid emp-installed-grid">
-                            ${installedItems.map((it) => {
-                              const active = props.selectedId === it.id;
-                              const logoUrl = resolveLogoUrl(it.logo_url);
-                              const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
-                              const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
-                              const enabled = !disabled;
-                              const installing = props.installingId === it.id;
-                              return html`
-                                <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
-                                  <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                    <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                      ${logoUrl ? html`<img src=${logoUrl} alt="" />` : MCP_ICON_SVG}
-                                    </div>
-                                    <div class="emp-card__actions">
-                                      ${renderToolCardActions(props, it, serverKey, enabled, installing)}
-                                    </div>
-                                    <h3 class="emp-card__title">${it.name}</h3>
-                                    <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                    ${renderToolMeta(it, effectiveCategory)}
-                                  </div>
-                                </div>
-                              `;
-                            })}
-                          </div>
+                          ${genericListPage({
+                            items: installedItems,
+                            keyFn: (it: McpListItem) => `installed-${String(it.id)}`,
+                            renderItem: (it: McpListItem) =>
+                              renderToolCard(
+                                props,
+                                it,
+                                effectiveCategory,
+                                lookupInstalledServerKey(props.installedMcpMap, it.id),
+                              ),
+                            initialCount: 24,
+                            batchSize: 24,
+                            containerClass: "emp-grid emp-installed-grid",
+                            sentinelLabel: "继续显示已安装工具",
+                          })}
                         </div>
                       `;
                     })()}
                     ${showSections
-                      ? html`
-                          <div class="emp-sections">
-                            ${sectionsFixed.map(
-                              (section) =>
-                                section.items.length > 0
-                                  ? html`
-                                      <div class="emp-section">
-                                        <div class="emp-section__header">
-                                          <h3 class="emp-section__title">${section.title}</h3>
-                                        </div>
-                                        <div class="emp-grid">
-                                          ${section.items.map((it) => {
-                                            const active = props.selectedId === it.id;
-                                            const logoUrl = resolveLogoUrl(it.logo_url);
-                                            const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
-                                            const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
-                                            const disabled = serverKey ? (props.disabledMcpKeys?.has(serverKey) ?? false) : false;
-                                            const enabled = !disabled;
-                                            const installing = props.installingId === it.id;
-                                            return html`
-                                              <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
-                                                <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.id)}>
-                                                  <div class="emp-card__icon ${!logoUrl ? "emp-card__icon--default" : ""}">
-                                                    ${logoUrl
-                                                      ? html`<img src=${logoUrl} alt="" />`
-                                                      : MCP_ICON_SVG}
-                                                  </div>
-                                                  <div class="emp-card__actions">
-                                                    ${renderToolCardActions(
-                                                      props,
-                                                      it,
-                                                      installed ? serverKey : undefined,
-                                                      enabled,
-                                                      installing,
-                                                    )}
-                                                  </div>
-                                                  <h3 class="emp-card__title">${it.name}</h3>
-                                                  <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-                                                  ${renderToolMeta(it, effectiveCategory)}
-                                                </div>
-                                              </div>
-                                            `;
-                                          })}
-                                        </div>
-                                      </div>
-                                    `
-                                  : nothing,
-                            )}
-                          </div>
-                        `
+                      ? genericSectionListPage({
+                          sections: sectionsFixed
+                            .filter((section) => section.items.length > 0)
+                            .map((section) => ({
+                              key: section.title,
+                              title: section.title,
+                              items: section.items,
+                              sectionClass: "emp-section",
+                              gridClass: "emp-grid",
+                            })),
+                          keyFn: (it: McpListItem) => String(it.id),
+                          renderItem: (it: McpListItem) => {
+                            const installed = props.installedRemoteIds?.has(String(it.id)) ?? false;
+                            const serverKey = lookupInstalledServerKey(props.installedMcpMap, it.id);
+                            return renderToolCard(
+                              props,
+                              it,
+                              effectiveCategory,
+                              installed ? serverKey : undefined,
+                            );
+                          },
+                          initialCount: 96,
+                          batchSize: 96,
+                          sectionsClass: "emp-sections",
+                          sentinelLabel: "继续显示工具",
+                        })
                       : nothing}
                   </div>
                 `

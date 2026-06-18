@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { genericListPage, genericSectionListPage } from "../components/generic-list-page.ts";
 import { icons } from "../icons.js";
 import { resolveLogoUrl, type SkillDetail, type SkillListItem } from "../controllers/remote-market.ts";
 import { itemBelongsToCategory } from "../utils/category-helpers.ts";
@@ -328,6 +328,35 @@ function renderSkillMeta(tags: string[], os: string[], status: string, currentCa
   `;
 }
 
+function renderSkillLibraryCard(
+  props: SkillLibraryProps,
+  it: SkillListItem,
+  activeCategory: string,
+  installed: boolean,
+) {
+  const active = props.selectedFolder === it.folder;
+  const disabled = props.disabledKeys?.has(it.folder) ?? false;
+  const enabled = !disabled;
+  const installing = props.installingFolder === it.folder;
+  const tags = splitCsv(it.tags);
+  const os = splitCsv(it.os);
+  const status = statusLabel(it.status);
+
+  return html`
+    <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
+      <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
+        ${renderSkillCardIcon(props.gatewayHost, it.logo_url, it.emoji)}
+        <div class="emp-card__actions">
+          ${renderSkillCardActions(props, it.folder, installed, enabled, installing, it.categoryCn)}
+        </div>
+        <h3 class="emp-card__title">${it.name || it.folder}</h3>
+        <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
+        ${renderSkillMeta(tags, os, status, activeCategory)}
+      </div>
+    </div>
+  `;
+}
+
 export function renderSkillLibrary(props: SkillLibraryProps) {
   const categoryList = uniqueCategories(props.items);
   const activeCategory = props.selectedCategory || "__all__";
@@ -412,90 +441,42 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
                       return html`
                         <div class="emp-installed-section">
                           <h3 class="emp-section__title">已安装 (${installedItems.length})</h3>
-                          <div class="emp-grid emp-installed-grid">
-                            ${repeat(
-                              installedItems,
-                              (it) => it.folder,
-                              (it) => {
-                                const active = props.selectedFolder === it.folder;
-                                const disabled = props.disabledKeys?.has(it.folder) ?? false;
-                                const enabled = !disabled;
-                                const installing = props.installingFolder === it.folder;
-                                const tags = splitCsv(it.tags);
-                                const os = splitCsv(it.os);
-                                const status = statusLabel(it.status);
-                                return html`
-                                  <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
-                                    <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
-                                      ${renderSkillCardIcon(props.gatewayHost, it.logo_url, it.emoji)}
-                                      <div class="emp-card__actions">
-                                        ${renderSkillCardActions(props, it.folder, true, enabled, installing, it.categoryCn)}
-                                      </div>
-                                      <h3 class="emp-card__title">${it.name || it.folder}</h3>
-                                      <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
-                                      ${renderSkillMeta(tags, os, status, activeCategory)}
-                                    </div>
-                                  </div>
-                                `;
-                              },
-                            )}
-                          </div>
+                          ${genericListPage({
+                            items: installedItems,
+                            keyFn: (it: SkillListItem) => it.folder,
+                            renderItem: (it: SkillListItem) => renderSkillLibraryCard(props, it, activeCategory, true),
+                            initialCount: 24,
+                            batchSize: 24,
+                            containerClass: "emp-grid emp-installed-grid",
+                            sentinelLabel: "继续显示已安装技能",
+                          })}
                         </div>
                       `;
                     })()}
                     ${showSections
-                      ? html`
-                          <div class="emp-sections">
-                            ${orderedGroups.map(
-                              (group) => html`
-                                <div class="emp-section">
-                                  <div class="emp-section__header">
-                                    <h3 class="emp-section__title">${group.name}</h3>
-                                  </div>
-                                  <div class="emp-grid">
-                                    ${repeat(
-                                      group.items,
-                                      (it) => it.folder,
-                                      (it) => {
-                                        const active = props.selectedFolder === it.folder;
-                                        const installed =
-                                          props.installedKeys && props.installedKeys.size > 0
-                                            ? props.installedKeys.has(it.folder)
-                                            : false;
-                                        const disabled = props.disabledKeys?.has(it.folder) ?? false;
-                                        const enabled = !disabled;
-                                        const installing = props.installingFolder === it.folder;
-                                        const tags = splitCsv(it.tags);
-                                        const os = splitCsv(it.os);
-                                        const status = statusLabel(it.status);
-                                        return html`
-                                          <div class="emp-card-wrap ${active ? "active" : ""} ${disabled ? "is-disabled" : ""}">
-                                            <div class="emp-card emp-card-btn" @click=${() => props.onSelect(it.folder)}>
-                                              ${renderSkillCardIcon(props.gatewayHost, it.logo_url, it.emoji)}
-                                              <div class="emp-card__actions">
-                                                ${renderSkillCardActions(
-                                                  props,
-                                                  it.folder,
-                                                  installed,
-                                                  enabled,
-                                                  installing,
-                                                  it.categoryCn,
-                                                )}
-                                              </div>
-                                              <h3 class="emp-card__title">${it.name || it.folder}</h3>
-                                              <p class="emp-card__desc">${it.description ?? it.folder ?? "暂无描述"}</p>
-                                              ${renderSkillMeta(tags, os, status, activeCategory)}
-                                            </div>
-                                          </div>
-                                        `;
-                                      },
-                                    )}
-                                  </div>
-                                </div>
-                              `,
-                            )}
-                          </div>
-                        `
+                      ? genericSectionListPage({
+                          sections: orderedGroups
+                            .filter((group) => group.items.length > 0)
+                            .map((group) => ({
+                              key: group.name,
+                              title: group.name,
+                              items: group.items,
+                              sectionClass: "emp-section",
+                              gridClass: "emp-grid",
+                            })),
+                          keyFn: (it: SkillListItem) => it.folder,
+                          renderItem: (it: SkillListItem) => {
+                            const installed =
+                              props.installedKeys && props.installedKeys.size > 0
+                                ? props.installedKeys.has(it.folder)
+                                : false;
+                            return renderSkillLibraryCard(props, it, activeCategory, installed);
+                          },
+                          initialCount: 96,
+                          batchSize: 96,
+                          sectionsClass: "emp-sections",
+                          sentinelLabel: "继续显示技能",
+                        })
                       : nothing}
                   </div>
                 `
