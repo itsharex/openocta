@@ -201,23 +201,6 @@
   overflow: hidden;
 }
 
-.shell--catalog {
-  min-height: 100vh;
-  height: auto;
-  overflow-y: auto;
-}
-
-@supports (height: 100dvh) {
-  .shell--catalog {
-    min-height: 100dvh;
-    height: auto;
-  }
-}
-
-.shell--catalog .content {
-  overflow: visible;
-}
-
 .content--catalog {
   padding: 20px;
   background: var(--bg-content);

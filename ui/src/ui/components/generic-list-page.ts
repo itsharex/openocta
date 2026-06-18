@@ -40,6 +40,19 @@ export type GenericSectionListPageOptions<
   disabled?: boolean;
 };
 
+function findScrollRoot(element: HTMLElement) {
+  let current = element.parentElement;
+  while (current && current !== document.body) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
 class GenericListPageDirective<T> extends AsyncDirective {
   private readonly sentinelId = `generic-list-sentinel-${++genericListPageId}`;
   private visibleCount = 0;
@@ -132,7 +145,7 @@ class GenericListPageDirective<T> extends AsyncDirective {
         );
         this.setValue(this.render(this.options));
       },
-      { root: null, rootMargin: "600px 0px", threshold: 0.01 },
+      { root: findScrollRoot(sentinel), rootMargin: "600px 0px", threshold: 0.01 },
     );
     this.observer.observe(sentinel);
   }
@@ -169,9 +182,10 @@ class GenericSectionListPageDirective<
     const sections = options.sections ?? [];
     const keyFn = options.keyFn ?? ((item: T, index: number) => index);
     const initialCount = options.initialCount ?? 96;
-    const flatKeys = sections.flatMap((section) =>
-      section.items.map((item, index) => String(keyFn(item, index, section))),
-    );
+    const flatKeys = sections.flatMap((section) => [
+      String(section.key),
+      ...section.items.map((item, index) => String(keyFn(item, index, section))),
+    ]);
     const nextKeys = flatKeys.join("");
 
     if (nextKeys !== this.keys) {
@@ -251,7 +265,7 @@ class GenericSectionListPageDirective<
         this.visibleCount = Math.min(totalCount, this.visibleCount + (this.options.batchSize ?? 96));
         this.setValue(this.render(this.options));
       },
-      { root: null, rootMargin: "600px 0px", threshold: 0.01 },
+      { root: findScrollRoot(sentinel), rootMargin: "600px 0px", threshold: 0.01 },
     );
     this.observer.observe(sentinel);
   }
