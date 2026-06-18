@@ -178,6 +178,10 @@ type GatewayConfig struct {
 // GatewayLlmTraceConfig holds LLM trace middleware settings.
 type GatewayLlmTraceConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
+	// HTMLRender when false writes JSONL only (skips HTML viewer regeneration).
+	HTMLRender *bool `json:"htmlRender,omitempty"`
+	// HTMLDebounceMs coalesces HTML regeneration (default 1000ms). 0 = per-event immediate render.
+	HTMLDebounceMs *int `json:"htmlDebounceMs,omitempty"`
 }
 
 // GatewayControlUIConfig holds control UI configuration.
@@ -1352,14 +1356,17 @@ type ToolsElevatedConfig struct {
 
 // ToolsExecConfig holds exec tools configuration.
 type ToolsExecConfig struct {
-	Host                    *string                    `json:"host,omitempty"`     // "sandbox" | "gateway" | "node"
-	Security                *string                    `json:"security,omitempty"` // "deny" | "allowlist" | "full"
-	Ask                     *string                    `json:"ask,omitempty"`      // "off" | "on-miss" | "always"
-	Node                    *string                    `json:"node,omitempty"`
-	PathPrepend             []string                   `json:"pathPrepend,omitempty"`
-	SafeBins                []string                   `json:"safeBins,omitempty"`
-	BackgroundMs            *int                       `json:"backgroundMs,omitempty"`
-	TimeoutSec              *int                       `json:"timeoutSec,omitempty"`
+	Host         *string  `json:"host,omitempty"`     // "sandbox" | "gateway" | "node"
+	Security     *string  `json:"security,omitempty"` // "deny" | "allowlist" | "full"
+	Ask          *string  `json:"ask,omitempty"`      // "off" | "on-miss" | "always"
+	Node         *string  `json:"node,omitempty"`
+	PathPrepend  []string `json:"pathPrepend,omitempty"`
+	SafeBins     []string `json:"safeBins,omitempty"`
+	BackgroundMs *int     `json:"backgroundMs,omitempty"`
+	TimeoutSec   *int     `json:"timeoutSec,omitempty"`
+	// Parallel when true allows multiple tool calls in one model turn to run concurrently.
+	// Default false: serial execution avoids one slow bash blocking siblings until shared timeout.
+	Parallel                *bool                      `json:"parallel,omitempty"`
 	ApprovalRunningNoticeMs *int                       `json:"approvalRunningNoticeMs,omitempty"`
 	CleanupMs               *int                       `json:"cleanupMs,omitempty"`
 	NotifyOnExit            *bool                      `json:"notifyOnExit,omitempty"`

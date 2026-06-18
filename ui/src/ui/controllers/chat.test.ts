@@ -169,6 +169,39 @@ describe("handleChatEvent", () => {
     expect(state.chatA2UIMessages).toEqual([]);
   });
 
+  it("accumulates incremental delta chunks", () => {
+    const state = createState({
+      sessionKey: "main",
+      chatRunId: "run-1",
+      chatStream: "Hel",
+    });
+    const payload: ChatEventPayload = {
+      runId: "run-1",
+      sessionKey: "main",
+      state: "delta",
+      text: "lo",
+      message: { role: "assistant", content: [{ type: "text", text: "lo" }] },
+    };
+    expect(handleChatEvent(state, payload)).toBe("delta");
+    expect(state.chatStream).toBe("Hello");
+  });
+
+  it("accepts legacy full-snapshot delta payloads", () => {
+    const state = createState({
+      sessionKey: "main",
+      chatRunId: "run-1",
+      chatStream: "Hel",
+    });
+    const payload: ChatEventPayload = {
+      runId: "run-1",
+      sessionKey: "main",
+      state: "delta",
+      message: { role: "assistant", content: [{ type: "text", text: "Hello world" }] },
+    };
+    expect(handleChatEvent(state, payload)).toBe("delta");
+    expect(state.chatStream).toBe("Hello world");
+  });
+
   it("processes final from own run and clears state", () => {
     const state = createState({
       sessionKey: "main",

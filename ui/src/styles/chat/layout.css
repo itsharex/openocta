@@ -431,7 +431,9 @@
 
 .chat-message-image-actions {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .chat-message-image {

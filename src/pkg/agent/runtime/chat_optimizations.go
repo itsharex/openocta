@@ -36,3 +36,13 @@ func applyChatAgentOptimizations(apiOpts *api.Options, opts Options) {
 	}
 	apiOpts.ToolPromptSchema = api.ToolPromptSchemaMinimal
 }
+
+// applyToolExecutionPolicy enforces bash timeout (via wrapBashCompat) and serial tool execution by default.
+func applyToolExecutionPolicy(apiOpts *api.Options, opts Options) {
+	if apiOpts == nil {
+		return
+	}
+	if !resolveParallelToolCalls(opts) {
+		apiOpts.DisableParallelToolCalls = true
+	}
+}

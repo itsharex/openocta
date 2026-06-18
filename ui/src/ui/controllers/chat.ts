@@ -10,6 +10,13 @@ import {
   resetChatA2UISurfaces,
 } from "../chat/a2ui-bridge.ts";
 import { canonicalGatewaySessionKey, gatewaySessionKeysEqual } from "../sessions/session-key-utils.js";
+import {
+  applyBackgroundChatEvent,
+  getSessionChatRunState,
+  persistActiveSessionRunState,
+  persistSessionRunState,
+  switchChatSessionRunState,
+} from "../chat/chat-session-runs.ts";
 import { generateUUID } from "../uuid.ts";
 
 export type ChatState = {
@@ -35,6 +42,19 @@ export type ChatState = {
 };
 
 const CHAT_TERMINAL_RUN_LIMIT = 24;
+
+function clearActiveChatRunState(state: ChatState, runId?: string) {
+  state.chatStream = null;
+  if (runId?.trim()) {
+    markChatRunTerminal(state, runId);
+  }
+  state.chatRunId = null;
+  state.chatRunPhase = "idle";
+  state.chatStreamStartedAt = null;
+  state.chatA2UIMessages = [];
+  state.chatSending = false;
+  resetChatA2UISurfaces();
+}
 
 function markChatRunTerminal(state: ChatState, runId: string) {
   const id = runId.trim();
@@ -83,8 +103,17 @@ function persistA2UIBlocksToChatMessages(state: ChatState, blocks: unknown[]) {
   const timestamp =
     typeof last?.timestamp === "number" ? last.timestamp : Date.now();
 
-  if (last?.role === "assistant" && isA2UIOnlyAssistantContent(last.content)) {
-    const existing = Array.isArray(last.content) ? [...last.content] : [];
+  if (last?.role === "assistant") {
+    const existing: Array<Record<string, unknown>> = [];
+    if (Array.isArray(last.content)) {
+      for (const part of last.content) {
+        if (part != null && typeof part === "object") {
+          existing.push(part as Record<string, unknown>);
+        }
+      }
+    } else if (typeof last.content === "string" && last.content.trim()) {
+      existing.push({ type: "text", text: last.content });
+    }
     for (const block of blocks) {
       existing.push(a2uiContentBlock(block));
     }
@@ -108,7 +137,11 @@ function applyA2UIChatEvent(state: ChatState, payload: ChatEventPayload) {
   }
   state.chatA2UIMessages = [...state.chatA2UIMessages, payload.a2ui];
   state.chatRunPhase = "streaming";
-  persistA2UIBlocksToChatMessages(state, [payload.a2ui]);
+  const runId = typeof payload.runId === "string" ? payload.runId.trim() : "";
+  // Late A2UI after final: merge into the last assistant bubble instead of appending a duplicate row.
+  if (runId && isChatRunTerminal(state, runId)) {
+    persistA2UIBlocksToChatMessages(state, [payload.a2ui]);
+  }
 }
 
 function mergeLiveA2UIIntoFinalMessage(state: ChatState, finalMessage: Record<string, unknown>) {
@@ -181,7 +214,7 @@ export async function dispatchA2UIActionFromChat(
     state.chatRunId = runId;
     state.chatErrorRunId = null;
     state.chatRunPhase = "thinking";
-    state.chatStream = "";
+    state.chatStream = null;
     state.chatStreamStartedAt = Date.now();
     state.chatA2UIMessages = [];
     resetChatA2UISurfaces();
@@ -194,10 +227,14 @@ export async function dispatchA2UIActionFromChat(
   }
 }
 
+export { switchChatSessionRunState, isSessionChatBusy, persistActiveSessionRunState } from "../chat/chat-session-runs.ts";
+
 export type ChatEventPayload = {
   runId: string;
   sessionKey: string;
   state: "delta" | "turn" | "final" | "complete" | "aborted" | "error" | "a2ui";
+  /** Incremental streaming chunk (preferred over full snapshot in message.content). */
+  text?: string;
   message?: unknown;
   a2ui?: unknown;
   errorMessage?: string;
@@ -255,6 +292,17 @@ function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string }
   return { mimeType: match[1], content: match[2] };
 }
 
+function markSessionSendAcknowledged(sendSessionKey: string, state: ChatState) {
+  const snap = getSessionChatRunState(sendSessionKey);
+  persistSessionRunState(sendSessionKey, {
+    ...snap,
+    sending: false,
+  });
+  if (gatewaySessionKeysEqual(sendSessionKey, state.sessionKey)) {
+    state.chatSending = false;
+  }
+}
+
 export async function sendChatMessage(
   state: ChatState,
   message: string,
@@ -272,6 +320,9 @@ export async function sendChatMessage(
   }
 
   const now = Date.now();
+  const sendSessionKey = canonicalGatewaySessionKey(state.sessionKey);
+
+  const isSessionReset = /^\/(?:new|reset)\b/i.test(msg);
 
   // Build user message content blocks
   const contentBlocks: Array<{ type: string; text?: string; source?: unknown }> = [];
@@ -297,7 +348,7 @@ export async function sendChatMessage(
   }
 
   state.chatMessages = [
-    ...state.chatMessages,
+    ...(isSessionReset ? [] : state.chatMessages),
     {
       role: "user",
       content: contentBlocks,
@@ -311,10 +362,22 @@ export async function sendChatMessage(
   state.chatRunId = runId;
   state.chatErrorRunId = null;
   state.chatRunPhase = "thinking";
-  state.chatStream = "";
+  state.chatStream = null;
   state.chatStreamStartedAt = now;
   state.chatA2UIMessages = [];
   resetChatA2UISurfaces();
+
+  const priorSnap = getSessionChatRunState(sendSessionKey);
+  persistSessionRunState(sendSessionKey, {
+    runId,
+    runPhase: "thinking",
+    stream: null,
+    streamStartedAt: now,
+    a2uiMessages: [],
+    terminalRunIds: priorSnap.terminalRunIds,
+    errorRunId: null,
+    sending: true,
+  });
 
   // Convert attachments to API format
   const apiAttachments = hasAttachments
@@ -340,7 +403,7 @@ export async function sendChatMessage(
 
   try {
     await state.client.request("chat.send", {
-      sessionKey: canonicalGatewaySessionKey(state.sessionKey),
+      sessionKey: sendSessionKey,
       message: msg,
       deliver: false,
       idempotencyKey: runId,
@@ -350,25 +413,37 @@ export async function sendChatMessage(
         resources ?? { configured: false, skillKeys: [], mcpServers: [], webSearch: false },
       ),
     });
+    markSessionSendAcknowledged(sendSessionKey, state);
     return runId;
   } catch (err) {
     const error = String(err);
-    state.chatRunId = null;
-    state.chatRunPhase = "idle";
-    state.chatStream = null;
-    state.chatStreamStartedAt = null;
-    state.lastError = error;
-    state.chatMessages = [
-      ...state.chatMessages,
-      {
-        role: "assistant",
-        content: [{ type: "text", text: "Error: " + error }],
-        timestamp: Date.now(),
-      },
-    ];
+    const failedSnap = getSessionChatRunState(sendSessionKey);
+    persistSessionRunState(sendSessionKey, {
+      ...failedSnap,
+      runId: null,
+      runPhase: "idle",
+      stream: null,
+      streamStartedAt: null,
+      sending: false,
+    });
+    if (gatewaySessionKeysEqual(sendSessionKey, state.sessionKey)) {
+      state.chatRunId = null;
+      state.chatRunPhase = "idle";
+      state.chatStream = null;
+      state.chatStreamStartedAt = null;
+      state.lastError = error;
+      state.chatMessages = [
+        ...state.chatMessages,
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "Error: " + error }],
+          timestamp: Date.now(),
+        },
+      ];
+    } else {
+      state.lastError = error;
+    }
     return null;
-  } finally {
-    state.chatSending = false;
   }
 }
 
@@ -399,6 +474,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     return null;
   }
   if (!gatewaySessionKeysEqual(payload.sessionKey, state.sessionKey)) {
+    applyBackgroundChatEvent(payload.sessionKey, payload);
     return null;
   }
 
@@ -407,10 +483,18 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   // Final from another run (e.g. sub-agent announce): refresh history to show new message.
   // See https://github.com/openocta/openocta/issues/1909
   if (runId && state.chatRunId && runId !== state.chatRunId) {
-    if (payload.state === "final" || payload.state === "complete") {
+    const stored = getSessionChatRunState(state.sessionKey);
+    if (stored.runId === runId) {
+      state.chatRunId = runId;
+      state.chatStream = stored.stream;
+      state.chatRunPhase = stored.runPhase;
+      state.chatStreamStartedAt = stored.streamStartedAt ?? state.chatStreamStartedAt;
+      state.chatA2UIMessages = [...stored.a2uiMessages];
+    } else if (payload.state === "final" || payload.state === "complete") {
       return payload.state;
+    } else {
+      return null;
     }
-    return null;
   }
 
   // Late A2UI after final/complete: still merge into history (common when final wins the race).
@@ -430,24 +514,34 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   // Ignore stale streaming events after a run already ended (timeout/error/abort/final).
   if (runId && isChatRunTerminal(state, runId)) {
     if (payload.state === "complete") {
+      if (state.chatRunId === runId) {
+        clearActiveChatRunState(state, runId);
+      }
       return "complete";
     }
     return null;
   }
 
   // After run ends locally, drop orphan delta/turn from the same run (keep a2ui — handled above).
+  // Re-attach streaming after session switch (run state restored without local runId).
   if (runId && !state.chatRunId && (payload.state === "delta" || payload.state === "turn")) {
-    return null;
+    state.chatRunId = runId;
+    state.chatStreamStartedAt = state.chatStreamStartedAt ?? Date.now();
+    state.chatRunPhase = payload.state === "turn" ? "tool" : "streaming";
   }
 
   if (payload.state === "delta") {
-    const next = extractText(payload.message);
-    if (typeof next === "string") {
+    const chunk =
+      typeof payload.text === "string" ? payload.text : extractText(payload.message);
+    if (typeof chunk === "string" && chunk.length > 0) {
       const current = state.chatStream ?? "";
-      if (!current || next.length >= current.length) {
-        state.chatStream = next;
-        state.chatRunPhase = "streaming";
+      // Backward compat: older gateways sent full accumulated text each delta.
+      if (current && chunk.length >= current.length && chunk.startsWith(current)) {
+        state.chatStream = chunk;
+      } else {
+        state.chatStream = current + chunk;
       }
+      state.chatRunPhase = "streaming";
     }
   } else if (payload.state === "turn") {
     if (payload.message && typeof payload.message === "object") {
@@ -465,48 +559,19 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     } else if (state.chatA2UIMessages.length > 0) {
       persistA2UIBlocksToChatMessages(state, state.chatA2UIMessages);
     }
-    state.chatStream = null;
-    if (runId) {
-      markChatRunTerminal(state, runId);
-    }
-    state.chatRunId = null;
-    state.chatRunPhase = "idle";
-    state.chatStreamStartedAt = null;
-    state.chatA2UIMessages = [];
-    resetChatA2UISurfaces();
+    clearActiveChatRunState(state, runId);
   } else if (payload.state === "aborted") {
-    state.chatStream = null;
-    if (runId) {
-      markChatRunTerminal(state, runId);
-    }
-    state.chatRunId = null;
-    state.chatRunPhase = "idle";
-    state.chatStreamStartedAt = null;
-    state.chatA2UIMessages = [];
-    resetChatA2UISurfaces();
+    clearActiveChatRunState(state, runId);
   } else if (payload.state === "complete") {
-    state.chatStream = null;
-    if (runId) {
-      markChatRunTerminal(state, runId);
-    }
-    state.chatRunId = null;
-    state.chatRunPhase = "idle";
-    state.chatStreamStartedAt = null;
-    state.chatA2UIMessages = [];
-    resetChatA2UISurfaces();
+    clearActiveChatRunState(state, runId);
   } else if (payload.state === "error") {
-    state.chatStream = null;
     if (runId) {
-      markChatRunTerminal(state, runId);
       state.chatErrorRunId = runId;
     }
-    state.chatRunId = null;
-    state.chatRunPhase = "idle";
-    state.chatStreamStartedAt = null;
-    state.chatA2UIMessages = [];
-    resetChatA2UISurfaces();
+    clearActiveChatRunState(state, runId);
     // Error text is appended to transcript; reload history instead of duplicating in callout.
     state.lastError = null;
   }
+  persistActiveSessionRunState(state);
   return payload.state;
 }

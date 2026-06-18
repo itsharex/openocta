@@ -11,7 +11,7 @@ import {
   markSetupWizardSkipPendingConfigSync,
 } from "./setup-wizard.ts";
 
-const APP_VERSION = "0.2.7-45-g99c7403";
+const APP_VERSION = "0.3.0";
 
 const loadConfigMock = vi.hoisted(() => vi.fn());
 const saveConfigPatchMock = vi.hoisted(() => vi.fn());

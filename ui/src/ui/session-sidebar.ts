@@ -73,10 +73,10 @@ export function resolveSessionSidebarSubtitle(
   lastMessagePreview?: string | null,
   derivedTitle?: string | null,
 ): string {
-  const preview = lastMessagePreview?.trim() ?? "";
   const derived = derivedTitle?.trim() ?? "";
   const derivedIsMessage = derived && !isSessionIdDerivedFallback(derived);
-  const conversation = preview || (derivedIsMessage ? derived : "");
+  // 优先使用第一条用户消息（derivedTitle）作为副标题
+  const conversation = derivedIsMessage ? derived : (lastMessagePreview?.trim() ?? "");
   if (!conversation) return "";
   if (conversation === title) return "";
   return truncateSessionSidebarTitle(conversation, 48);

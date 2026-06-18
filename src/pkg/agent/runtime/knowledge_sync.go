@@ -9,6 +9,29 @@ import (
 	"github.com/stellarlinkco/agentsdk-go/pkg/skylark"
 )
 
+// InitKnowledgeEngine preloads the shared Bleve index at process startup.
+func InitKnowledgeEngine(ctx context.Context, cfg *config.OpenOctaConfig) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	opts := resolveKnowledgeOptions(cfg, os.Getenv, "")
+	if opts == nil || !opts.Enabled {
+		return nil
+	}
+	var emb = opts.Embedder
+	if emb == nil && !opts.DisableEmbedding {
+		var err error
+		emb, err = skylark.NewEmbedderFromEnv()
+		if err != nil {
+			return fmt.Errorf("knowledge preload embedder: %w", err)
+		}
+	}
+	if err := skylark.PreloadEngine(opts.IndexDir, emb); err != nil {
+		return fmt.Errorf("knowledge preload index: %w", err)
+	}
+	return nil
+}
+
 // RebuildKnowledgeIndex rescans the vault and rebuilds the shared Bleve index on disk.
 func RebuildKnowledgeIndex(ctx context.Context, cfg *config.OpenOctaConfig, agentID string) (fileCount, chunkCount int, err error) {
 	if ctx == nil {
@@ -26,12 +49,7 @@ func RebuildKnowledgeIndex(ctx context.Context, cfg *config.OpenOctaConfig, agen
 	if err != nil {
 		return 0, 0, fmt.Errorf("embedder: %w", err)
 	}
-	eng, err := skylark.NewEngine(opts.IndexDir, emb)
-	if err != nil {
-		return 0, 0, fmt.Errorf("open index: %w", err)
-	}
-	defer eng.Close()
-	if err := eng.Rebuild(ctx, docs); err != nil {
+	if err := skylark.RebuildShared(ctx, opts.IndexDir, emb, docs); err != nil {
 		return 0, 0, fmt.Errorf("rebuild index: %w", err)
 	}
 	paths := map[string]struct{}{}

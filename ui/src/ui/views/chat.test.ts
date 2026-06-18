@@ -5,7 +5,7 @@ const nativeConfirmMock = vi.hoisted(() => vi.fn());
 vi.mock("../native-dialog-bridge.ts", () => ({
   nativeConfirm: nativeConfirmMock,
 }));
-import { renderChat, validateChatAttachmentFile, type ChatProps } from "./chat.ts";
+import { isChatRunActive, renderChat, validateChatAttachmentFile, type ChatProps } from "./chat.ts";
 
 function createSessions(): SessionsListResult {
   return {
@@ -191,6 +191,23 @@ describe("chat view", () => {
     expect(container.textContent).toContain("不支持压缩包或可执行文件");
   });
 
+  it("does not show a reading indicator after run ends with empty stream placeholder", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          canAbort: false,
+          stream: "",
+          messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }],
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".chat-reading-indicator")).toBeNull();
+    expect(isChatRunActive(createProps({ canAbort: false, stream: "", sending: false }))).toBe(false);
+  });
+
   it("shows a stop button when aborting is available", () => {
     const container = document.createElement("div");
     const onAbort = vi.fn();
@@ -299,6 +316,74 @@ describe("chat view", () => {
     newSessionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onNewSession).toHaveBeenCalledTimes(1);
     expect(container.textContent).not.toContain("停止");
+  });
+
+  it("renders live A2UI messages during an active run", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          canAbort: true,
+          a2uiMessages: [
+            {
+              version: "v0.9",
+              createSurface: { surfaceId: "main", catalogId: "basic" },
+            },
+            {
+              version: "v0.9",
+              updateComponents: {
+                surfaceId: "main",
+                components: [{ id: "root", component: "Text", text: "Hello A2UI" }],
+              },
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    expect(container.textContent).toContain("Hello A2UI");
+  });
+
+  it("renders A2UI file attachments with preview and download actions", () => {
+    const container = document.createElement("div");
+    const onFilePreview = vi.fn();
+    render(
+      renderChat(
+        createProps({
+          canAbort: true,
+          a2uiMessages: [
+            {
+              version: "v0.9",
+              createSurface: { surfaceId: "main", catalogId: "basic" },
+            },
+            {
+              version: "v0.9",
+              updateComponents: {
+                surfaceId: "main",
+                components: [
+                  {
+                    id: "root",
+                    component: "Text",
+                    text: '文件已就绪\n@@OPENOCTA_ATTACHMENTS@@\n[{"type":"file","filename":"demo.txt","mimeType":"text/plain","data":"aGk="}]',
+                  },
+                ],
+              },
+            },
+          ],
+          onFilePreview,
+        }),
+      ),
+      container,
+    );
+
+    expect(container.textContent).toContain("demo.txt");
+    expect(container.querySelector(".chat-file-preview-wrap, .chat-file-card--compact")).not.toBeNull();
+    expect(container.querySelector(".chat-file-icon-btn")).not.toBeNull();
+    const previewBtn = container.querySelector<HTMLButtonElement>(".chat-file-icon-btn[title='预览']");
+    expect(previewBtn).not.toBeNull();
+    previewBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onFilePreview).toHaveBeenCalled();
   });
 });
 

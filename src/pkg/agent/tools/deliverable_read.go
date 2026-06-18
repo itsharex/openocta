@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 
 	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
@@ -39,56 +38,43 @@ func (d deliverableReadTool) Execute(ctx context.Context, params map[string]inte
 	if rawPath == "" {
 		return result, err
 	}
-	ext := strings.ToLower(filepath.Ext(rawPath))
-	if ext == ".html" || ext == ".htm" {
-		blocks := attachmentBlocksFromLocalHTMLFile(d.projectRoot, rawPath)
-		if len(blocks) == 0 {
-			return result, err
-		}
-		src := blocks[0]
-		filename, _ := src["filename"].(string)
-		mimeType, _ := src["mimeType"].(string)
-		data := ""
-		if source, ok := src["source"].(map[string]interface{}); ok {
-			data, _ = source["data"].(string)
-		}
-		if data == "" {
-			return result, err
-		}
-		summary := strings.TrimSpace(result.Output)
-		if summary == "" {
-			summary = "Read local HTML file."
-		}
-		result.Output = formatAttachmentOutput(summary, []openOctaAttachment{{
-			Type:     "file",
-			Filename: filename,
-			MimeType: mimeType,
-			Data:     data,
-		}})
-		return result, err
+	if blocks := attachmentBlocksFromLocalHTMLFile(d.projectRoot, rawPath); len(blocks) > 0 {
+		return attachReadResult(result, blocks[0], "Read local HTML file.")
 	}
 	if blocks := attachmentBlocksFromLocalImageFile(d.projectRoot, rawPath); len(blocks) > 0 {
-		src := blocks[0]
-		filename, _ := src["filename"].(string)
-		mimeType, _ := src["mimeType"].(string)
-		data := ""
-		if source, ok := src["source"].(map[string]interface{}); ok {
-			data, _ = source["data"].(string)
-		}
-		if data != "" {
-			summary := strings.TrimSpace(result.Output)
-			if summary == "" {
-				summary = "Read local image file."
-			}
-			result.Output = formatAttachmentOutput(summary, []openOctaAttachment{{
-				Type:     "image",
-				Filename: filename,
-				MimeType: mimeType,
-				Data:     data,
-			}})
-		}
+		return attachReadResult(result, blocks[0], "Read local image file.")
+	}
+	if blocks := attachmentBlocksFromLocalPreviewableFile(d.projectRoot, rawPath); len(blocks) > 0 {
+		return attachReadResult(result, blocks[0], "Read local file.")
 	}
 	return result, err
+}
+
+func attachReadResult(result *tool.ToolResult, src map[string]interface{}, fallbackSummary string) (*tool.ToolResult, error) {
+	filename, _ := src["filename"].(string)
+	mimeType, _ := src["mimeType"].(string)
+	data := ""
+	if source, ok := src["source"].(map[string]interface{}); ok {
+		data, _ = source["data"].(string)
+	}
+	if data == "" {
+		return result, nil
+	}
+	blockType, _ := src["type"].(string)
+	if strings.TrimSpace(blockType) == "" {
+		blockType = "file"
+	}
+	summary := strings.TrimSpace(result.Output)
+	if summary == "" {
+		summary = fallbackSummary
+	}
+	result.Output = formatAttachmentOutput(summary, []openOctaAttachment{{
+		Type:     blockType,
+		Filename: filename,
+		MimeType: mimeType,
+		Data:     data,
+	}})
+	return result, nil
 }
 
 func firstNonEmptyPathParam(params map[string]interface{}) string {

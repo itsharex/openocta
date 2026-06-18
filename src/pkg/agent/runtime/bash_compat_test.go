@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
@@ -21,7 +22,7 @@ func (s stubBashTool) Execute(_ context.Context, _ map[string]interface{}) (*too
 }
 
 func TestWrapBashCompatEmptySuccess(t *testing.T) {
-	wrapped := wrapBashCompat(stubBashTool{output: ""})
+	wrapped := wrapBashCompat(stubBashTool{output: ""}, 60*time.Second)
 	result, err := wrapped.Execute(context.Background(), map[string]interface{}{"command": "mkdir -p /tmp/foo"})
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +39,7 @@ func TestWrapBashCompatEmptySuccess(t *testing.T) {
 }
 
 func TestWrapBashCompatPreservesNonEmpty(t *testing.T) {
-	wrapped := wrapBashCompat(stubBashTool{output: "hello\n"})
+	wrapped := wrapBashCompat(stubBashTool{output: "hello\n"}, 60*time.Second)
 	result, err := wrapped.Execute(context.Background(), map[string]interface{}{"command": "echo hello"})
 	if err != nil {
 		t.Fatal(err)
@@ -49,8 +50,8 @@ func TestWrapBashCompatPreservesNonEmpty(t *testing.T) {
 }
 
 func TestWrapBashCompatIdempotent(t *testing.T) {
-	inner := wrapBashCompat(stubBashTool{output: ""})
-	outer := wrapBashCompat(inner)
+	inner := wrapBashCompat(stubBashTool{output: ""}, 60*time.Second)
+	outer := wrapBashCompat(inner, 90*time.Second)
 	if _, ok := outer.(bashCompatTool); !ok {
 		t.Fatal("expected bashCompatTool wrapper")
 	}

@@ -17,6 +17,7 @@ import { extractA2UIBlocks, extractA2UITextMarkdown } from "./a2ui-bridge.ts";
 import { isA2UIProtocolTool } from "./constants.ts";
 import {
   extractFileBlocks,
+  extractFileBlocksFromA2UIBlocks,
   extractGroupFileBlocks,
   extractReferencedPathsFromGroup,
   renderFileAttachments,
@@ -189,13 +190,21 @@ function extractImages(message: unknown): ImageBlock[] {
       }
       const b = block as Record<string, unknown>;
 
-      if (b.type === "image") {
-        // Handle source object format (from sendChatMessage)
+      const blockKind = typeof b.type === "string" ? b.type.toLowerCase() : "";
+      const blockMime =
+        (typeof b.mimeType === "string" && b.mimeType) ||
+        (typeof b.media_type === "string" && b.media_type) ||
+        "";
+      const isImageBlock =
+        blockKind === "image" ||
+        ((blockKind === "file" || blockKind === "document" || blockKind === "attachment") &&
+          blockMime.toLowerCase().startsWith("image/"));
+
+      if (isImageBlock) {
         const source = b.source as Record<string, unknown> | undefined;
         if (source?.type === "base64" && typeof source.data === "string") {
           const data = source.data;
-          const mediaType = (source.media_type as string) || "image/png";
-          // If data is already a data URL, use it directly
+          const mediaType = (source.media_type as string) || blockMime || "image/png";
           const url = data.startsWith("data:") ? data : `data:${mediaType};base64,${data}`;
           const filename = typeof b.filename === "string" ? b.filename : undefined;
           pushUniqueImage(images, { url, filename });
@@ -204,7 +213,7 @@ function extractImages(message: unknown): ImageBlock[] {
           pushUniqueImage(images, { url: b.url, filename });
         } else if (typeof b.data === "string") {
           const data = b.data;
-          const mediaType = (b.mimeType as string) || (b.media_type as string) || "image/png";
+          const mediaType = blockMime || "image/png";
           const url = data.startsWith("data:") ? data : `data:${mediaType};base64,${data}`;
           const filename = typeof b.filename === "string" ? b.filename : undefined;
           pushUniqueImage(images, { url, filename });
@@ -283,6 +292,7 @@ export function renderA2UIGroup(
   client?: GatewayBrowserClient | null,
   sessionKey?: string,
   onA2UIAction?: (action: import("@a2ui/web_core/v0_9").A2uiClientAction) => Promise<void> | void,
+  onFilePreview?: (req: FilePreviewRequest) => void,
 ) {
   return html`
     <div class="chat-group assistant">
@@ -291,6 +301,7 @@ export function renderA2UIGroup(
         client,
         sessionKey,
         onA2UIAction,
+        onFilePreview,
       })}</div>
     </div>
   `;
@@ -1155,24 +1166,44 @@ function renderA2UIContent(
     client?: GatewayBrowserClient | null;
     sessionKey?: string;
     onA2UIAction?: (action: import("@a2ui/web_core/v0_9").A2uiClientAction) => Promise<void> | void;
+    onFilePreview?: (req: FilePreviewRequest) => void;
     inline?: boolean;
   },
 ) {
   if (blocks.length === 0) {
     return nothing;
   }
+  const files = extractFileBlocksFromA2UIBlocks(blocks);
+  const fileSection = html`
+    ${renderImageFileBlocks(files, opts.onFilePreview)}
+    ${renderFileAttachments(
+      files.filter((file) => !file.mimeType.toLowerCase().startsWith("image/")),
+      opts.onFilePreview,
+    )}
+  `;
   const textMarkdown = extractA2UITextMarkdown(blocks);
   if (textMarkdown) {
-    return html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(textMarkdown))}</div>`;
+    const displayMarkdown = stripOpenOctaAttachmentsMarker(textMarkdown);
+    return html`
+      ${fileSection}
+      ${
+        displayMarkdown.trim()
+          ? html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(displayMarkdown))}</div>`
+          : nothing
+      }
+    `;
   }
-  return html`<chat-a2ui-panel
-    ?inline=${opts.inline ?? false}
-    .showTitle=${!(opts.inline ?? false)}
-    .client=${opts.client ?? null}
-    .sessionKey=${opts.sessionKey ?? "main"}
-    .messages=${blocks}
-    .onA2UIAction=${opts.onA2UIAction ?? null}
-  ></chat-a2ui-panel>`;
+  return html`
+    ${fileSection}
+    <chat-a2ui-panel
+      ?inline=${opts.inline ?? false}
+      .showTitle=${!(opts.inline ?? false)}
+      .client=${opts.client ?? null}
+      .sessionKey=${opts.sessionKey ?? "main"}
+      .messages=${blocks}
+      .onA2UIAction=${opts.onA2UIAction ?? null}
+    ></chat-a2ui-panel>
+  `;
 }
 
 function renderA2UIBlocks(
@@ -1181,6 +1212,7 @@ function renderA2UIBlocks(
     client?: GatewayBrowserClient | null;
     sessionKey?: string;
     onA2UIAction?: (action: import("@a2ui/web_core/v0_9").A2uiClientAction) => Promise<void> | void;
+    onFilePreview?: (req: FilePreviewRequest) => void;
   },
 ) {
   const blocks = extractA2UIBlocks(message);

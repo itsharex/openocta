@@ -23,10 +23,16 @@ const (
 	// EnvHookTimeout：shell hook 执行默认超时（api.Options.HookTimeout）。
 	// 未设置时传 0，由 agentsdk 内部使用其默认（约 600s）。
 	EnvHookTimeout = "OPENOCTA_HOOK_TIMEOUT"
+	// EnvBashToolTimeout：bash/windows_exec_cmd 单次命令硬超时（秒或 Go duration）。
+	// 未设置时默认 DefaultBashToolTimeout；同时作为模型传入 timeout 的上限。
+	EnvBashToolTimeout = "OPENOCTA_BASH_TIMEOUT"
 )
 
 // DefaultAgentRunTimeout 与 gateway chat 默认 timeoutMs=600000 对齐。
 const DefaultAgentRunTimeout = 10 * time.Minute
+
+// DefaultBashToolTimeout 为 bash 默认/最大执行时间（交互对话需快速反馈，默认约 10 秒）。
+const DefaultBashToolTimeout = 10 * time.Second
 
 // lookupEnvMerged prefers config.env.vars[key] when it is present and non-empty (after trim),
 // so UI 保存的 openocta.json 无需重启即可生效，且可覆盖仅启动时注入的旧 os 环境。
@@ -145,4 +151,38 @@ func wrapRunContext(ctx context.Context, agentRunBudget time.Duration) (context.
 		return ctx, func() {}
 	}
 	return context.WithTimeout(ctx, agentRunBudget)
+}
+
+// resolveBashToolTimeout 返回 bash 工具默认超时，兼作模型显式 timeout 参数的上限。
+// 优先级：Options.BashToolTimeout > config.tools.exec.timeoutSec > OPENOCTA_BASH_TIMEOUT > DefaultBashToolTimeout。
+func resolveBashToolTimeout(opts Options) time.Duration {
+	if opts.BashToolTimeout > 0 {
+		return opts.BashToolTimeout
+	}
+	if opts.Config != nil && opts.Config.Tools != nil && opts.Config.Tools.Exec != nil {
+		if sec := opts.Config.Tools.Exec.TimeoutSec; sec != nil && *sec > 0 {
+			return time.Duration(*sec) * time.Second
+		}
+	}
+	v := getenv(opts, EnvBashToolTimeout)
+	if v != "" {
+		if d, ok := parseDurationOrSeconds(v); ok && d > 0 {
+			return d
+		}
+	}
+	return DefaultBashToolTimeout
+}
+
+// resolveParallelToolCalls 是否允许同一轮模型输出并行执行多个 tool。
+// 默认 false（串行），避免一个慢 bash 与其他 tool 并行时整轮被拖住且 trace 计时误导。
+func resolveParallelToolCalls(opts Options) bool {
+	if opts.ParallelToolCalls != nil {
+		return *opts.ParallelToolCalls
+	}
+	if opts.Config != nil && opts.Config.Tools != nil && opts.Config.Tools.Exec != nil {
+		if p := opts.Config.Tools.Exec.Parallel; p != nil {
+			return *p
+		}
+	}
+	return false
 }

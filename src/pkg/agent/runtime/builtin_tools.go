@@ -21,7 +21,8 @@ const (
 // BuiltinTools returns built-in tools from agentsdk-go v2, rooted at projectRoot.
 // Core builtins: bash, read, write, edit, grep, glob（skill 由 Runtime 单独注册）.
 // When sandboxDisabled is true, tools use nil FileSystemPolicy so path validation is skipped.
-func BuiltinTools(projectRoot string, sandboxDisabled bool) []tool.Tool {
+// bashMaxTimeout caps each bash invocation (default/max when model omits or exceeds timeout).
+func BuiltinTools(projectRoot string, sandboxDisabled bool, bashMaxTimeout time.Duration) []tool.Tool {
 	if projectRoot == "" {
 		projectRoot = "."
 	}
@@ -51,7 +52,7 @@ func BuiltinTools(projectRoot string, sandboxDisabled bool) []tool.Tool {
 	readCompat := compatTool{Tool: readDeliverable}
 	writeCompat := compatTool{Tool: write}
 	editCompat := compatTool{Tool: edit}
-	bash = wrapBashCompat(bash)
+	bash = wrapBashCompat(bash, bashMaxTimeout)
 
 	// Canonical tool names only (read/write/edit). Param aliases are normalized at Execute time
 	// to keep tool schemas small and reduce LLM input tokens.

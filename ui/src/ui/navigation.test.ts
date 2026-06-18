@@ -19,7 +19,7 @@ import {
   type Tab,
 } from "./navigation.ts";
 
-const APP_VERSION = "0.2.7-45-g99c7403";
+const APP_VERSION = "0.3.0";
 
 /** All valid tab identifiers derived from getTabGroups() */
 const ALL_TABS: Tab[] = getTabGroups().flatMap((group) => group.tabs) as Tab[];

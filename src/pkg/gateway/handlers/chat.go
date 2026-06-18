@@ -37,6 +37,7 @@ import (
 var chatLog = logging.Sub("chat")
 
 const chatAttachmentMaxBytes = 1 << 20 // 1 MiB
+const chatRuntimePoolWait = 30 * time.Second
 
 var (
 	chatAttachmentBlockedExt = map[string]struct{}{
@@ -259,10 +260,10 @@ type DeliverContext struct {
 	Header        string                 // 卡片 header 标题（如定时任务运行内容）
 }
 
-// broadcastChatDelta sends an incremental streaming text delta to the frontend.
-// The UI uses these to render partial assistant responses in real time (typing effect).
-func broadcastChatDelta(ctx *Context, runId string, sessionKey string, accumulatedText string) {
-	if ctx == nil || ctx.Broadcast == nil {
+// broadcastChatDelta sends an incremental streaming text chunk to the frontend.
+// The UI appends these chunks to build the live assistant response (typing effect).
+func broadcastChatDelta(ctx *Context, runId string, sessionKey string, delta string) {
+	if ctx == nil || ctx.Broadcast == nil || delta == "" {
 		return
 	}
 	seq := int64(0)
@@ -274,10 +275,11 @@ func broadcastChatDelta(ctx *Context, runId string, sessionKey string, accumulat
 		"sessionKey": sessionKey,
 		"seq":        seq,
 		"state":      "delta",
+		"text":       delta,
 		"message": map[string]interface{}{
 			"role": "assistant",
 			"content": []map[string]interface{}{
-				{"type": "text", "text": accumulatedText},
+				{"type": "text", "text": delta},
 			},
 		},
 	}
@@ -1533,6 +1535,7 @@ func runSessionResetForChat(sessionKey string, ctx *Context) (sessionID, session
 		}
 		runtime.ClearSessionHistory(projectRoot, oldSessionID)
 	}
+	abortInFlightChatRunsForSession(sessionKey, "")
 	runtime.EvictSessionRuntime(sessionKey)
 
 	transcriptPath = session.ResolveSessionFilePath(next.SessionID, nil, env)
@@ -1733,6 +1736,16 @@ func ChatSendHandler(opts HandlerOpts) error {
 			})
 			return nil
 		}
+	}
+
+	// Avoid pooled-runtime deadlocks when a prior run is still winding down.
+	abortedRuns := abortInFlightChatRunsForSession(sessionKey, runId)
+	if err := waitForSessionRuntimePool(sessionKey, runId, abortedRuns); err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeServiceUnavailable,
+			Message: "chat.send: " + err.Error(),
+		}, nil)
+		return nil
 	}
 
 	if err := session.EnsureTranscriptFile(transcriptPath, sessionID); err != nil {
@@ -2025,6 +2038,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 				systemPromptOverrides,
 			)
 
+			poolAcquireStart := time.Now()
 			rt, releasePooledRT, err := runtime.DefaultPool().Acquire(sessionKey, runtimeFP, func() (*runtime.Runtime, func(), error) {
 				var invoker tools.GatewayInvoker
 				if ctxForBroadcast != nil && ctxForBroadcast.InvokeMethod != nil {
@@ -2141,6 +2155,10 @@ func ChatSendHandler(opts HandlerOpts) error {
 				errMsg := fmt.Sprintf("无法创建运行时: %s", err.Error())
 				appendErrorToTranscript(transcriptPath, errMsg, runId, sessionKey, ctxForBroadcast)
 				return
+			}
+			if waited := time.Since(poolAcquireStart); waited >= 50*time.Millisecond {
+				chatLog.Info("chat runtime pool acquired sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
+					sessionKey, runId, waited.Milliseconds(), runtime.PooledSessionCount())
 			}
 			defer releasePooledRT()
 
@@ -2327,7 +2345,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 								"text":  delta,
 								"delta": delta,
 							})
-							broadcastChatDelta(ctxForBroadcast, runId, sessionKey, visible)
+							broadcastChatDelta(ctxForBroadcast, runId, sessionKey, delta)
 						}
 					}
 					if evt.Delta != nil && evt.Delta.StopReason != "" {
@@ -2743,15 +2761,49 @@ func ChatSendHandler(opts HandlerOpts) error {
 	return nil
 }
 
-// handleChatStopCommand handles stop commands (simplified version).
-func handleChatStopCommand(opts HandlerOpts) error {
-	sessionKey, _ := opts.Params["sessionKey"].(string)
+// waitForSessionRuntimePool waits until the pooled runtime for sessionKey is free to acquire.
+// A prior run may still be releasing the pool entry after abort; without this wait, the next
+// chat.send goroutine can block forever in DefaultPool().Acquire on ent.mu.Lock().
+func waitForSessionRuntimePool(sessionKey, runId string, abortedRuns []string) error {
 	sessionKey = strings.TrimSpace(strings.ToLower(sessionKey))
+	runId = strings.TrimSpace(runId)
+	if len(abortedRuns) > 0 {
+		chatLog.Info("chat runtime pool wait start sessionKey=%s runId=%s abortedRuns=%d abortedRunIds=%v poolSize=%d",
+			sessionKey, runId, len(abortedRuns), abortedRuns, runtime.PooledSessionCount())
+	}
+	start := time.Now()
+	if runtime.WaitUntilAvailable(sessionKey, chatRuntimePoolWait) {
+		if waited := time.Since(start); len(abortedRuns) > 0 || waited >= 50*time.Millisecond {
+			chatLog.Info("chat runtime pool wait ok sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
+				sessionKey, runId, waited.Milliseconds(), runtime.PooledSessionCount())
+		}
+		return nil
+	}
+	chatLog.Warn("chat runtime pool wait timed out, evicting sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
+		sessionKey, runId, time.Since(start).Milliseconds(), runtime.PooledSessionCount())
+	runtime.EvictSessionRuntime(sessionKey)
+	retryStart := time.Now()
+	if runtime.WaitUntilAvailable(sessionKey, 5*time.Second) {
+		chatLog.Info("chat runtime pool wait ok after evict sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
+			sessionKey, runId, retryStart.Sub(start).Milliseconds(), runtime.PooledSessionCount())
+		return nil
+	}
+	chatLog.Error("chat runtime pool still busy after evict sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
+		sessionKey, runId, time.Since(start).Milliseconds(), runtime.PooledSessionCount())
+	return fmt.Errorf("session runtime is still busy; please retry")
+}
 
-	// Find and cancel all runs for this session
+// abortInFlightChatRunsForSession cancels active chat runs for sessionKey.
+// exceptRunId is kept when non-empty (idempotent chat.send retry for the same runId).
+func abortInFlightChatRunsForSession(sessionKey, exceptRunId string) []string {
+	sessionKey = strings.TrimSpace(strings.ToLower(sessionKey))
+	exceptRunId = strings.TrimSpace(exceptRunId)
 	var aborted []string
 	chatAbortControllers.Range(func(key, value interface{}) bool {
 		runId := key.(string)
+		if exceptRunId != "" && runId == exceptRunId {
+			return true
+		}
 		ctrl := value.(*ChatAbortController)
 		if ctrl.SessionKey == sessionKey {
 			ctrl.Controller()
@@ -2760,6 +2812,15 @@ func handleChatStopCommand(opts HandlerOpts) error {
 		}
 		return true
 	})
+	return aborted
+}
+
+// handleChatStopCommand handles stop commands (simplified version).
+func handleChatStopCommand(opts HandlerOpts) error {
+	sessionKey, _ := opts.Params["sessionKey"].(string)
+	sessionKey = strings.TrimSpace(strings.ToLower(sessionKey))
+
+	aborted := abortInFlightChatRunsForSession(sessionKey, "")
 
 	opts.Respond(true, map[string]interface{}{
 		"ok":      true,
@@ -2836,6 +2897,7 @@ func handleChatNewCommand(opts HandlerOpts) error {
 		}
 		runtime.ClearSessionHistory(projectRoot, oldSessionID)
 	}
+	abortInFlightChatRunsForSession(sessionKey, "")
 	runtime.EvictSessionRuntime(sessionKey)
 
 	transcriptPath := session.ResolveSessionFilePath(next.SessionID, nil, env)

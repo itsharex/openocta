@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/openocta/openocta/embed"
 	"github.com/openocta/openocta/pkg/acp/mcp"
+	"github.com/openocta/openocta/pkg/agent/runtime"
 	"github.com/openocta/openocta/pkg/channels"
 	"github.com/openocta/openocta/pkg/channels/builtin"
 	"github.com/openocta/openocta/pkg/channels/dingtalk"
@@ -146,6 +147,10 @@ func NewServer(addr string, version string) *Server {
 	// Initialize built-in employees (e.g. skill-creator) if not already present in state dir
 	if err := initpkg.InitEmployee(cfg); err != nil {
 		slog.Warn("init employees at startup failed", "error", err)
+	}
+
+	if err := runtime.InitKnowledgeEngine(context.Background(), cfg); err != nil {
+		slog.Warn("knowledge index preload failed", "error", err)
 	}
 
 	// MCP: connect to configured MCP servers and expose tools to the agent

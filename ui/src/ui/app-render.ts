@@ -2,7 +2,7 @@ import { html, nothing } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
 import type { UsageState } from "./controllers/usage.ts";
 import { parseAgentSessionKey } from "./routing/session-key.js";
-import { refreshChatAvatar } from "./app-chat.ts";
+import { refreshChatAvatar, prepareChatSessionSwitch } from "./app-chat.ts";
 import { syncUrlWithSessionKey } from "./app-settings.ts";
 import {
   compareSessionSidebarRows,
@@ -149,15 +149,7 @@ async function openDigitalEmployeeWebchat(state: AppViewState, employeeIdRaw: st
     });
   }
 
-  state.sessionKey = sessionKey;
-  state.chatMessage = "";
-  state.chatAttachments = [];
-  state.chatStream = null;
-  state.chatStreamStartedAt = null;
-  state.chatRunId = null;
-  state.chatQueue = [];
-  state.resetToolStream();
-  state.resetChatScroll();
+  prepareChatSessionSwitch(state, sessionKey);
   state.applySettings({
     ...state.settings,
     sessionKey,
@@ -316,17 +308,7 @@ function renderSessionOverflowFlyout(state: AppViewState, basePath: string) {
           if (wasActive) {
             const nextKey =
               state.sessionsResult?.sessions?.[0]?.key ?? "agent.main.main";
-            state.sessionKey = nextKey;
-            state.chatMessage = "";
-            state.chatAttachments = [];
-            state.chatModelRef = null;
-            state.chatResources = defaultChatSessionResources();
-            resetChatResourcesPanelUi(state);
-            state.chatStream = null;
-            state.chatStreamStartedAt = null;
-            state.chatRunId = null;
-            state.chatQueue = [];
-            state.resetToolStream();
+            prepareChatSessionSwitch(state, nextKey);
             state.applySettings({
               ...state.settings,
               sessionKey: nextKey,
@@ -829,18 +811,7 @@ export function renderApp(state: AppViewState) {
                     @click=${async () => {
                       const res = await createSession(state);
                       if (res?.key) {
-                        state.sessionKey = res.key;
-                        state.chatMessage = "";
-                        state.chatAttachments = [];
-                        state.chatModelRef = null;
-                        state.chatResources = defaultChatSessionResources();
-                        resetChatResourcesPanelUi(state);
-                        state.chatStream = null;
-                        state.chatStreamStartedAt = null;
-                        state.chatRunId = null;
-                        state.chatQueue = [];
-                        state.resetToolStream();
-                        state.resetChatScroll();
+                        prepareChatSessionSwitch(state, res.key);
                         state.applySettings({
                           ...state.settings,
                           sessionKey: res.key,
@@ -882,7 +853,7 @@ export function renderApp(state: AppViewState) {
                             origin,
                             employeeName: emp?.name,
                           });
-                          const subtitle = resolveSessionSidebarSubtitle(displayName, lastPreview);
+                          const subtitle = resolveSessionSidebarSubtitle(displayName, lastPreview, derivedTitle);
                           const pinnedAt =
                             typeof row.pinnedAt === "number" ? row.pinnedAt : null;
                           const updatedAt =
@@ -944,18 +915,7 @@ export function renderApp(state: AppViewState) {
                               }
                               state.sessionOverflow = null;
                               if (!key) return;
-                              state.sessionKey = key;
-                              state.chatMessage = "";
-                              state.chatAttachments = [];
-                              state.chatModelRef = null;
-                              state.chatResources = defaultChatSessionResources();
-                              resetChatResourcesPanelUi(state);
-                              state.chatStream = null;
-                              state.chatStreamStartedAt = null;
-                              state.chatRunId = null;
-                              state.chatQueue = [];
-                              state.resetToolStream();
-                              state.resetChatScroll();
+                              prepareChatSessionSwitch(state, key);
                               state.applySettings({
                                 ...state.settings,
                                 sessionKey: key,
@@ -2886,18 +2846,7 @@ export function renderApp(state: AppViewState) {
                 sessionKey: state.sessionKey,
                 quickPrompts: resolveChatQuickPrompts(configValue),
                 onSessionKeyChange: (next) => {
-                  state.sessionKey = next;
-                  state.chatMessage = "";
-                  state.chatAttachments = [];
-                  state.chatModelRef = null;
-                  state.chatResources = defaultChatSessionResources();
-                  resetChatResourcesPanelUi(state);
-                  state.chatStream = null;
-                  state.chatStreamStartedAt = null;
-                  state.chatRunId = null;
-                  state.chatQueue = [];
-                  state.resetToolStream();
-                  state.resetChatScroll();
+                  prepareChatSessionSwitch(state, next);
                   state.applySettings({
                     ...state.settings,
                     sessionKey: next,

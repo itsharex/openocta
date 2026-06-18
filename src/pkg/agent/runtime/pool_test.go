@@ -3,6 +3,7 @@ package runtime
 import (
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestPoolReusesRuntimeForSameFingerprint(t *testing.T) {
@@ -61,5 +62,49 @@ func TestPoolEvictForcesRebuild(t *testing.T) {
 
 	if builds.Load() != 2 {
 		t.Fatalf("expected two builds after evict, got %d", builds.Load())
+	}
+}
+
+func TestWaitUntilAvailableWhenNoEntry(t *testing.T) {
+	pool := NewPool()
+	if !pool.WaitUntilAvailable("missing", time.Millisecond) {
+		t.Fatal("expected available when entry is absent")
+	}
+}
+
+func TestWaitUntilAvailableReturnsAfterRelease(t *testing.T) {
+	pool := NewPool()
+	_, release, err := pool.Acquire("sess-wait", "fp1", func() (*Runtime, func(), error) {
+		return &Runtime{}, func() {}, nil
+	})
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if !pool.WaitUntilAvailable("sess-wait", time.Second) {
+			t.Error("expected pool to become available after release")
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	release()
+	<-done
+}
+
+func TestWaitUntilAvailableFalseWhileHeld(t *testing.T) {
+	pool := NewPool()
+	_, release, err := pool.Acquire("sess-busy", "fp1", func() (*Runtime, func(), error) {
+		return &Runtime{}, func() {}, nil
+	})
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer release()
+
+	if pool.WaitUntilAvailable("sess-busy", 50*time.Millisecond) {
+		t.Fatal("expected wait to time out while entry is held")
 	}
 }

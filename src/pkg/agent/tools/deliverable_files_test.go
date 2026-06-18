@@ -36,6 +36,22 @@ func TestAttachmentBlocksFromReferencedPaths(t *testing.T) {
 	}
 }
 
+func TestAttachmentBlocksFromReferencedMarkdownPath(t *testing.T) {
+	dir := t.TempDir()
+	readme := filepath.Join(dir, "README.md")
+	if err := os.WriteFile(readme, []byte("# Hello\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	text := "已将 README.md 返回给前端展示预览。"
+	blocks := AttachmentBlocksFromReferencedPaths(text, dir)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if fn, _ := blocks[0]["filename"].(string); fn != "README.md" {
+		t.Fatalf("filename: got %q want README.md", fn)
+	}
+}
+
 func TestAttachmentBlocksFromImagePathsInGlobOutput(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "photos", "cat.jpg")

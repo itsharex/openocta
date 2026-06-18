@@ -18,6 +18,9 @@ func SessionIDFromSessionKey(sessionKey string) string {
 	if key == "" {
 		return "main"
 	}
+	if strings.HasPrefix(key, "custom:") {
+		return session.SanitizeForSessionID(strings.TrimPrefix(key, "custom:"))
+	}
 	parts := strings.SplitN(key, ":", 3)
 	if len(parts) >= 3 {
 		return session.SanitizeForSessionID(parts[2])

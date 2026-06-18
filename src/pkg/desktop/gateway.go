@@ -53,9 +53,9 @@ func StartGateway() (*gatewayhttp.Server, error) {
 
 	// Init global logger: console + rolling file in state dir
 	os.Setenv("OPENOCTA_LOG_DIR", logDir)
-	opts := logging.GlobalOpts{LogDir: logDir, Level: logging.LevelInfo, ConsoleLevel: logging.LevelInfo}
+	opts := logging.GlobalOpts{LogDir: logDir, Level: logging.LevelInfo, ConsoleLevel: logging.LevelTrace}
 	logging.InitGlobal(logDir, opts)
-	logging.RedirectStdLog(logging.LevelInfo)
+	logging.RedirectStdLog(logging.LevelTrace)
 
 	// Load config for run mode
 	cfg, cfgErr := config.Load(env)

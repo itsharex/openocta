@@ -11,8 +11,12 @@ import (
 
 var referencedAttachmentPathPattern = regexp.MustCompile(`(?i)attachments/[A-Za-z0-9._/-]+\.(?:html?|htm)`)
 
+// Matches sandbox-relative previewable files mentioned in assistant text (README.md, docs/guide.md, etc.).
+var referencedPreviewablePathPattern = regexp.MustCompile(`(?i)(?:^|[\s"'(\[])([A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm))`)
+
 const maxDeliverableHTMLBytes = 2 << 20
 const maxDeliverableImageBytes = 5 << 20
+const maxDeliverableTextBytes = 2 << 20
 
 var imageExtensionMIME = map[string]string{
 	".png":  "image/png",
@@ -60,7 +64,10 @@ func AttachmentBlocksFromWriteToolOutput(toolName, output, projectRoot string) [
 	}
 	rawPath := strings.TrimSpace(output[idx+4:])
 	rawPath = strings.Trim(rawPath, `"'`)
-	return attachmentBlocksFromLocalHTMLFile(projectRoot, rawPath)
+	if blocks := attachmentBlocksFromLocalHTMLFile(projectRoot, rawPath); len(blocks) > 0 {
+		return blocks
+	}
+	return attachmentBlocksFromLocalPreviewableFile(projectRoot, rawPath)
 }
 
 func extractLocalPathFromWebFetchOutput(output string) string {
@@ -131,6 +138,66 @@ func attachmentBlocksFromLocalImageFile(projectRoot, rawPath string) []map[strin
 	}
 	return []map[string]interface{}{{
 		"type":      "image",
+		"filename":  filepath.Base(rawPath),
+		"mimeType":  mime,
+		"sizeBytes": len(data),
+		"source": map[string]interface{}{
+			"type":       "base64",
+			"media_type": mime,
+			"data":       base64.StdEncoding.EncodeToString(data),
+		},
+	}}
+}
+
+func previewableMIMEForExt(ext string) (string, bool) {
+	switch strings.ToLower(ext) {
+	case ".html", ".htm":
+		return "text/html; charset=utf-8", true
+	case ".json":
+		return "application/json", true
+	case ".txt", ".md", ".markdown", ".log", ".csv", ".xml", ".yaml", ".yml":
+		return "text/plain; charset=utf-8", true
+	case ".pdf":
+		return "application/pdf", true
+	default:
+		return "", false
+	}
+}
+
+func attachmentBlocksFromLocalPreviewableFile(projectRoot, rawPath string) []map[string]interface{} {
+	rawPath = strings.TrimSpace(rawPath)
+	if rawPath == "" {
+		return nil
+	}
+	ext := strings.ToLower(filepath.Ext(rawPath))
+	mime, ok := previewableMIMEForExt(ext)
+	if !ok {
+		return nil
+	}
+	fullPath, err := resolveSandboxPath(projectRoot, rawPath)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(fullPath)
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+	maxBytes := maxDeliverableTextBytes
+	if ext == ".html" || ext == ".htm" {
+		maxBytes = maxDeliverableHTMLBytes
+	}
+	if ext == ".pdf" {
+		maxBytes = maxDeliverableHTMLBytes
+	}
+	if len(data) > maxBytes {
+		return nil
+	}
+	blockType := "file"
+	if _, isImage := imageExtensionMIME[ext]; isImage {
+		blockType = "image"
+	}
+	return []map[string]interface{}{{
+		"type":      blockType,
 		"filename":  filepath.Base(rawPath),
 		"mimeType":  mime,
 		"sizeBytes": len(data),
@@ -317,6 +384,19 @@ func AttachmentBlocksFromReferencedPaths(text, projectRoot string) []map[string]
 			blocks = append(blocks, chunk...)
 		}
 	}
+	for _, groups := range referencedPreviewablePathPattern.FindAllStringSubmatch(text, -1) {
+		if len(groups) < 2 {
+			continue
+		}
+		path := strings.TrimSpace(strings.Trim(groups[1], `"'`))
+		if path == "" || seen[path] {
+			continue
+		}
+		seen[path] = true
+		if chunk := attachmentBlocksFromLocalPreviewableFile(projectRoot, path); len(chunk) > 0 {
+			blocks = append(blocks, chunk...)
+		}
+	}
 	for _, match := range referencedImagePathPattern.FindAllString(text, -1) {
 		path := strings.TrimSpace(match)
 		if path == "" || seen[path] {
@@ -378,7 +458,10 @@ func AttachmentBlockFromLocalPath(projectRoot, rawPath string) (map[string]inter
 	if blocks := attachmentBlocksFromLocalImageFile(projectRoot, rawPath); len(blocks) > 0 {
 		return blocks[0], nil
 	}
-	return nil, fmt.Errorf("only HTML or image attachments are supported")
+	if blocks := attachmentBlocksFromLocalPreviewableFile(projectRoot, rawPath); len(blocks) > 0 {
+		return blocks[0], nil
+	}
+	return nil, fmt.Errorf("attachment not found or unreadable")
 }
 
 func fileAttachmentFromBytes(filename, mime string, body []byte) openOctaAttachment {

@@ -61,7 +61,7 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	// When sandbox disabled, use NewDisabledSandbox so tools skip path/permission validation.
 	var tools []tool.Tool
 	if !opts.DisableTools {
-		tools = BuiltinTools(projectRoot, !enableSandbox)
+		tools = BuiltinTools(projectRoot, !enableSandbox, resolveBashToolTimeout(opts))
 		if shouldRegisterWebTools(opts) {
 			for _, t := range agenttools.WebToolsFromConfig(opts.Config, projectRoot) {
 				tools = append(tools, t)
@@ -273,7 +273,10 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 
 	if opts.Config != nil && opts.Config.Gateway != nil && opts.Config.Gateway.LlmTrace != nil &&
 		opts.Config.Gateway.LlmTrace.Enabled != nil && *opts.Config.Gateway.LlmTrace.Enabled {
-		mw = append(mw, middleware.NewTraceMiddleware(filepath.Join(projectRoot, ".trace")))
+		mw = append(mw, middleware.NewTraceMiddleware(
+			filepath.Join(projectRoot, ".trace"),
+			llmTraceMiddlewareOptions(opts.Config.Gateway.LlmTrace)...,
+		))
 	}
 
 	// Command validation middleware (BeforeTool): emits early errors for audit/logging.
@@ -395,6 +398,7 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	//}
 	applySessionHistory(&apiOpts, projectRoot, opts)
 	applyChatAgentOptimizations(&apiOpts, opts)
+	applyToolExecutionPolicy(&apiOpts, opts)
 	applyAPITimeouts(&apiOpts, opts)
 	runBudget := resolveAgentRunTimeout(opts)
 	rt, err := api.New(ctx, apiOpts)
@@ -469,6 +473,10 @@ type Options struct {
 	DisallowedTools []string
 	// DisableTools skips all tool registration (pure LLM completion paths such as skill analyze/compose).
 	DisableTools bool
+	// BashToolTimeout overrides config/env bash command hard timeout (default DefaultBashToolTimeout).
+	BashToolTimeout time.Duration
+	// ParallelToolCalls when non-nil overrides tools.exec.parallel (default false: serial tool execution).
+	ParallelToolCalls *bool
 }
 
 func shouldRegisterWebTools(opts Options) bool {

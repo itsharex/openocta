@@ -23,7 +23,7 @@ describe("session-sidebar", () => {
     expect(title).toBe("自定义会话3");
     expect(
       resolveSessionSidebarSubtitle(title, "最后一条消息", "帮我写一份周报"),
-    ).toBe("最后一条消息");
+    ).toBe("帮我写一份周报");
   });
 
   it("falls back to new chat for empty custom sessions", () => {
@@ -49,7 +49,7 @@ describe("session-sidebar", () => {
     expect(resolveSessionSidebarSubtitle("你好", "你好")).toBe("");
     expect(resolveSessionSidebarSubtitle("你好", "世界")).toBe("世界");
     expect(resolveSessionSidebarSubtitle("自定义会话1", null, "帮我写周报")).toBe("帮我写周报");
-    expect(resolveSessionSidebarSubtitle("自定义会话1", "最新回复", "帮我写周报")).toBe("最新回复");
+    expect(resolveSessionSidebarSubtitle("自定义会话1", "最新回复", "帮我写周报")).toBe("帮我写周报");
     expect(isSessionIdDerivedFallback("a1b2c3d4 (2026-06-17)")).toBe(true);
     expect(
       resolveSessionSidebarSubtitle("自定义会话1", "", "a1b2c3d4 (2026-06-17)"),

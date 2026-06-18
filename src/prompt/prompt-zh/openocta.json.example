@@ -41,7 +41,9 @@
       "dangerouslyDisableDeviceAuth": false
     },
     "llmTrace": {
-      "enabled": false
+      "enabled": false,
+      "htmlRender": true,
+      "htmlDebounceMs": 1000
     },
     "http": {
       "endpoints": {
@@ -143,7 +145,8 @@
       "host": "sandbox",
       "security": "allowlist",
       "ask": "on-miss",
-      "timeoutSec": 300
+      "timeoutSec": 10,
+      "parallel": false
     }
   },
   "security": {
@@ -156,7 +159,7 @@
     "commandPolicy": {
       "enabled": true,
       "defaultPolicy": "ask",
-      "deny": ["rm -rf /", "mkfs", "dd if="],
+      "deny": ["rm -rf /", "mkfs", "dd if=", "lsof -i -P", "lsof -i "],
       "ask": [],
       "allow": []
     },

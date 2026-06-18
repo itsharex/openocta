@@ -555,12 +555,12 @@ func VaultSyncHandler(opts HandlerOpts) error {
 	if v, ok := opts.Params["agentId"].(string); ok {
 		agentID = strings.TrimSpace(v)
 	}
+	runtime.EvictAllSessionRuntimes()
 	fileCount, chunkCount, err := runtime.RebuildKnowledgeIndex(context.Background(), cfg, agentID)
 	if err != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{Code: protocol.ErrCodeInternal, Message: err.Error()}, nil)
 		return nil
 	}
-	runtime.EvictAllSessionRuntimes()
 	opts.Respond(true, map[string]interface{}{
 		"ok":         true,
 		"fileCount":  fileCount,

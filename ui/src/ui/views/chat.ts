@@ -814,10 +814,16 @@ function renderAttachmentPreview(props: ChatProps) {
   `;
 }
 
+/** True while a chat run is in flight (abortable or send RPC pending). */
+export function isChatRunActive(props: Pick<ChatProps, "canAbort" | "sending">): boolean {
+  return Boolean(props.canAbort) || props.sending;
+}
+
 export function renderChat(props: ChatProps) {
   const extractingSkill = Boolean(props.extractSkillLoading);
   const canCompose = props.connected && !extractingSkill;
-  const isBusy = props.sending || props.stream !== null || extractingSkill;
+  const runActive = isChatRunActive(props);
+  const isBusy = runActive || extractingSkill;
   const canAbort = Boolean(props.canAbort && props.onAbort);
   const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
   const reasoningLevel = activeSession?.reasoningLevel ?? "off";
@@ -933,6 +939,7 @@ export function renderChat(props: ChatProps) {
               props.client ?? null,
               props.sessionKey,
               props.onA2UIAction,
+              props.onFilePreview,
             );
           }
 
@@ -1290,7 +1297,7 @@ export function renderChat(props: ChatProps) {
   `;
 }
 
-function groupMessages(items: ChatItem[], hasActiveRun = false, hasStream = false): Array<ChatItem | MessageGroup> {
+function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   const result: Array<ChatItem | MessageGroup> = [];
   let currentGroup: MessageGroup | null = null;
 
@@ -1337,28 +1344,6 @@ function groupMessages(items: ChatItem[], hasActiveRun = false, hasStream = fals
     result.push(currentGroup);
   }
 
-  // Mark the last assistant group as streaming when a run is active
-  // and no separate stream/reading-indicator item is present.
-  // When hasStream is true, the current streaming content is rendered
-  // separately via renderStreamingGroup/renderReadingIndicatorGroup,
-  // so historical assistant groups should NOT be marked streaming.
-  // Only the most recent assistant group should be marked streaming;
-  // historical groups remain collapsed so earlier unfinished turns
-  // don't forcibly expand their process details on new user messages.
-  if (hasActiveRun && !hasStream) {
-    let foundLastAssistant = false;
-    for (let i = result.length - 1; i >= 0; i--) {
-      const g = result[i];
-      if (g && typeof g === "object" && "role" in g && g.role === "assistant") {
-        if (!foundLastAssistant) {
-          g.isStreaming = true;
-          foundLastAssistant = true;
-        }
-        break;
-      }
-    }
-  }
-
   return result;
 }
 
@@ -1393,7 +1378,13 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
       message: msg,
     });
   }
-  if (!conversationOnly) {
+  const runActive = Boolean(props.canAbort);
+  const liveA2UI = props.a2uiMessages ?? [];
+  const streamText = props.stream ?? "";
+
+  // Only append toolMessages when no run is active. During a run they would
+  // get merged into the last assistant group and cause it to appear busy.
+  if (!conversationOnly && !runActive) {
     for (let i = 0; i < tools.length; i++) {
       items.push({
         kind: "message",
@@ -1403,10 +1394,10 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
     }
   }
 
-  const runActive = Boolean(props.canAbort);
-  if (runActive || props.stream !== null) {
+  // Only show live stream/A2UI while a run is active. Do not keep a second copy after final
+  // just because chatA2UIMessages was not cleared yet.
+  if (runActive) {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    const streamText = props.stream ?? "";
     if (streamText.trim().length > 0) {
       items.push({
         kind: "stream",
@@ -1414,7 +1405,13 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
         text: streamText,
         startedAt: props.streamStartedAt ?? Date.now(),
       });
-    } else if ((props.a2uiMessages?.length ?? 0) === 0) {
+    } else if (liveA2UI.length > 0) {
+      items.push({
+        kind: "a2ui",
+        key: `${key}:a2ui`,
+        messages: liveA2UI,
+      });
+    } else {
       const phase =
         props.runPhase === "tool"
           ? "tool"
@@ -1430,7 +1427,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
     }
   }
 
-  return groupMessages(items, Boolean(props.canAbort), props.stream !== null);
+  return groupMessages(items);
 }
 
 function messageKey(message: unknown, index: number): string {

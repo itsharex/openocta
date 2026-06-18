@@ -39,16 +39,6 @@ func (s *Server) handleDesktopClearWorkspace(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !uninstallAllowed() {
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(clearWorkspaceResponse{
-			OK:      false,
-			Message: "当前环境不允许通过 API 清理工作区",
-			Detail:  "请在运行本机网关的桌面应用中操作，或设置 OPENOCTA_ALLOW_UNINSTALL=1（仅限本机可信环境）",
-		})
-		return
-	}
-
 	env := func(k string) string { return os.Getenv(k) }
 	stateDir := filepath.Clean(paths.ResolveStateDir(env))
 	workspaceDir := filepath.Join(stateDir, "workspace")

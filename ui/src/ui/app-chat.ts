@@ -1,5 +1,6 @@
 import type { OpenClawApp } from "./app.ts";
 import type { ChatSessionResources } from "./chat/chat-resources.ts";
+import { defaultChatSessionResources, resetChatResourcesPanelUi } from "./chat/chat-resources.ts";
 import type { GatewayHelloOk } from "./gateway.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import {
@@ -12,7 +13,7 @@ import {
 import { scheduleChatScroll } from "./app-scroll.ts";
 import { setLastActiveSessionKey, syncUrlWithSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
-import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
+import { abortChatRun, loadChatHistory, sendChatMessage, switchChatSessionRunState, isSessionChatBusy } from "./controllers/chat.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { normalizeBasePath } from "./navigation.ts";
 import { generateUUID } from "./uuid.ts";
@@ -24,6 +25,8 @@ export type ChatHost = {
   chatAttachmentError?: string | null;
   chatModelRef?: string | null;
   chatResources?: ChatSessionResources;
+  resetToolStream: () => void;
+  resetChatScroll: () => void;
   chatQueue: ChatQueueItem[];
   chatRunId: string | null;
   chatSending: boolean;
@@ -79,7 +82,7 @@ async function reconcileInvalidChatSessionFromList(host: OpenClawApp): Promise<b
     return false;
   }
 
-  host.sessionKey = fallback;
+  switchChatSessionRunState(host as unknown as OpenClawApp, fallback);
   host.applySettings({
     ...host.settings,
     sessionKey: fallback,
@@ -88,10 +91,6 @@ async function reconcileInvalidChatSessionFromList(host: OpenClawApp): Promise<b
   host.chatMessage = "";
   host.chatAttachments = [];
   host.chatAttachmentError = null;
-  host.chatRunId = null;
-  host.chatStream = null;
-  host.chatStreamStartedAt = null;
-  host.chatSending = false;
   host.resetToolStream();
   await host.loadAssistantIdentity();
   syncUrlWithSessionKey(
@@ -103,7 +102,25 @@ async function reconcileInvalidChatSessionFromList(host: OpenClawApp): Promise<b
 }
 
 export function isChatBusy(host: ChatHost) {
-  return host.chatSending || Boolean(host.chatRunId);
+  return isSessionChatBusy(host.sessionKey, host);
+}
+
+/** Persist run state and restore live run indicators for the target session. */
+export function switchChatSession(host: ChatHost, nextSessionKey: string) {
+  switchChatSessionRunState(host as unknown as OpenClawApp, nextSessionKey);
+}
+
+export function prepareChatSessionSwitch(host: ChatHost, nextSessionKey: string) {
+  switchChatSession(host, nextSessionKey);
+  host.chatMessage = "";
+  host.chatAttachments = [];
+  host.chatAttachmentError = null;
+  host.chatModelRef = null;
+  host.chatResources = defaultChatSessionResources();
+  resetChatResourcesPanelUi(host as unknown as Parameters<typeof resetChatResourcesPanelUi>[0]);
+  host.chatQueue = [];
+  host.resetToolStream();
+  host.resetChatScroll();
 }
 
 export function isChatStopCommand(text: string) {

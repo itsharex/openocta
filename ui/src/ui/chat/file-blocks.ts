@@ -1,5 +1,7 @@
 import { html, nothing } from "lit";
 import { icons } from "../icons.ts";
+import { repairA2UIMessages } from "./a2ui-bridge.ts";
+import { componentsArrayFromRaw, normalizeComponentMap, type ComponentRecord } from "./a2ui-repair.ts";
 import { parseOpenOctaFileAttachmentsFromText } from "./openocta-attachments.ts";
 import { extractReferencedImagePaths } from "./attachment-images.ts";
 
@@ -103,6 +105,120 @@ function pushFileBlock(files: FileBlock[], next: FileBlock) {
   files.push(next);
 }
 
+function readComponentString(comp: ComponentRecord, key: string): string | undefined {
+  const direct = comp[key];
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+  const props = comp.properties;
+  if (props != null && typeof props === "object" && !Array.isArray(props)) {
+    const nested = (props as ComponentRecord)[key];
+    if (typeof nested === "string" && nested.trim()) {
+      return nested.trim();
+    }
+  }
+  return undefined;
+}
+
+function filenameFromUrl(url: string, fallback: string): string {
+  if (url.startsWith("data:")) {
+    const mime = url.slice(5, url.indexOf(";")) || "application/octet-stream";
+    if (mime.startsWith("image/")) {
+      const ext = mime.split("/")[1]?.split("+")[0] || "png";
+      return `${fallback}.${ext}`;
+    }
+    return fallback;
+  }
+  try {
+    const parsed = new URL(url, "http://local");
+    const base = parsed.pathname.split("/").pop();
+    if (base?.trim()) {
+      return base.trim();
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
+function mimeTypeFromUrl(url: string, fallback: string): string {
+  if (url.startsWith("data:")) {
+    const semi = url.indexOf(";");
+    const comma = url.indexOf(",");
+    const end = semi >= 0 ? semi : comma >= 0 ? comma : url.length;
+    const mime = url.slice(5, end).trim();
+    if (mime) {
+      return mime;
+    }
+  }
+  const ext = extFromName(filenameFromUrl(url, fallback));
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "pdf") return "application/pdf";
+  if (ext === "html" || ext === "htm") return "text/html";
+  return fallback;
+}
+
+function fileBlockFromA2UIImageComponent(comp: ComponentRecord): FileBlock | null {
+  const url = readComponentString(comp, "url");
+  if (!url) {
+    return null;
+  }
+  const label = readComponentString(comp, "description") || "image";
+  const filename = filenameFromUrl(url, label);
+  const mimeType = mimeTypeFromUrl(url, "image/png");
+  return {
+    filename,
+    mimeType,
+    url,
+    sizeBytes: estimateSizeFromUrl(url),
+    isPreviewable: true,
+  };
+}
+
+/** Extract downloadable file blocks embedded in A2UI server messages (Text markers, Image URLs). */
+export function extractFileBlocksFromA2UIBlocks(blocks: unknown[]): FileBlock[] {
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return [];
+  }
+  const files: FileBlock[] = [];
+  const repaired = repairA2UIMessages(blocks);
+  for (const msg of repaired) {
+    const rawComponents = msg.updateComponents?.components;
+    if (rawComponents == null) {
+      continue;
+    }
+    for (const raw of componentsArrayFromRaw(rawComponents)) {
+      const comp = normalizeComponentMap(raw);
+      const type = typeof comp.component === "string" ? comp.component : "";
+      if (type === "Text") {
+        const text = readComponentString(comp, "text");
+        if (text) {
+          for (const parsed of parseOpenOctaFileAttachmentsFromText(text)) {
+            pushFileBlock(files, {
+              filename: parsed.filename,
+              mimeType: parsed.mimeType,
+              url: parsed.url,
+              sizeBytes: parsed.sizeBytes ?? estimateSizeFromUrl(parsed.url),
+              isPreviewable: isPreviewableMime(parsed.mimeType, parsed.filename),
+            });
+          }
+        }
+        continue;
+      }
+      if (type === "Image") {
+        const imageBlock = fileBlockFromA2UIImageComponent(comp);
+        if (imageBlock) {
+          pushFileBlock(files, imageBlock);
+        }
+      }
+    }
+  }
+  return files;
+}
+
 export function dedupeFileBlocks(files: FileBlock[]): FileBlock[] {
   const out: FileBlock[] = [];
   for (const file of files) {
@@ -152,6 +268,13 @@ export function extractFileBlocks(message: unknown): FileBlock[] {
       continue;
     }
 
+    if (kind === "a2ui" && b.a2ui != null) {
+      for (const parsed of extractFileBlocksFromA2UIBlocks([b.a2ui])) {
+        pushFileBlock(files, parsed);
+      }
+      continue;
+    }
+
     if (kind !== "file" && kind !== "document" && kind !== "attachment") {
       continue;
     }
@@ -187,6 +310,8 @@ export function extractFileBlocks(message: unknown): FileBlock[] {
 }
 
 const referencedAttachmentPathPattern = /attachments\/[\w./-]+\.html?/gi;
+const referencedPreviewablePathPattern =
+  /(?:^|[\s"'([`])([A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm))/gi;
 
 export function extractReferencedAttachmentPaths(text: string): string[] {
   const matches = text.match(referencedAttachmentPathPattern) ?? [];
@@ -194,6 +319,14 @@ export function extractReferencedAttachmentPaths(text: string): string[] {
   const paths: string[] = [];
   for (const raw of matches) {
     const path = raw.trim();
+    if (!path || seen.has(path)) {
+      continue;
+    }
+    seen.add(path);
+    paths.push(path);
+  }
+  for (const match of text.matchAll(referencedPreviewablePathPattern)) {
+    const path = (match[1] ?? "").trim().replace(/^[`'"]+|[`'"]+$/g, "");
     if (!path || seen.has(path)) {
       continue;
     }
@@ -241,14 +374,7 @@ export function renderImageFileBlocks(
               }}
             />
             <div class="chat-message-image-actions">
-              <a
-                class="btn btn--ghost btn--sm"
-                href=${file.url}
-                download=${label}
-                @click=${(e: Event) => e.stopPropagation()}
-              >
-                下载
-              </a>
+              ${renderFileIconButtons(file, onPreview)}
             </div>
           </div>
         `;
@@ -308,6 +434,27 @@ export function extractReferencedPathsFromGroup(messages: Array<{ message: unkno
       const block = part as Record<string, unknown>;
       if (block.type === "text" && typeof block.text === "string") {
         paths.push(...extractReferencedAttachmentPaths(block.text));
+      }
+      if (block.type === "a2ui" && block.a2ui != null) {
+        for (const file of extractFileBlocksFromA2UIBlocks([block.a2ui])) {
+          paths.push(file.filename);
+        }
+        const repaired = repairA2UIMessages([block.a2ui]);
+        for (const msg of repaired) {
+          const rawComponents = msg.updateComponents?.components;
+          if (rawComponents == null) {
+            continue;
+          }
+          for (const raw of componentsArrayFromRaw(rawComponents)) {
+            const comp = normalizeComponentMap(raw);
+            if (comp.component === "Text") {
+              const text = readComponentString(comp, "text");
+              if (text) {
+                paths.push(...extractReferencedAttachmentPaths(text));
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -375,18 +522,179 @@ function fileTypeLabel(filename: string, mimeType: string): string {
   if (ext === "html" || ext === "htm" || mimeType.includes("html")) {
     return "HTML";
   }
-  if (ext) {
-    return ext.toUpperCase();
+  if (ext === "markdown") {
+    return "MD";
   }
-  return "File";
+  if (ext) {
+    return ext.length <= 4 ? ext.toUpperCase() : ext.slice(0, 4).toUpperCase();
+  }
+  return "FILE";
 }
 
-function renderFileIcon(filename: string, mimeType: string) {
+function fileIconTone(filename: string, mimeType: string): string {
+  const ext = extFromName(filename);
+  if (ext === "html" || ext === "htm" || mimeType.includes("html")) {
+    return "html";
+  }
+  if (ext === "md" || ext === "markdown") {
+    return "md";
+  }
+  if (ext === "pdf" || mimeType.includes("pdf")) {
+    return "pdf";
+  }
+  if (ext === "json" || mimeType.includes("json")) {
+    return "json";
+  }
+  if (mimeType.toLowerCase().startsWith("image/")) {
+    return "image";
+  }
+  return "default";
+}
+
+function filePreviewMode(file: FileBlock): "html" | "pdf" | "text" | null {
+  if (!file.isPreviewable) {
+    return null;
+  }
+  const ext = extFromName(file.filename);
+  const mime = file.mimeType.toLowerCase();
+  if (mime.includes("html") || ext === "html" || ext === "htm") {
+    return "html";
+  }
+  if (mime.includes("pdf") || ext === "pdf") {
+    return "pdf";
+  }
+  if (decodeFileText(file.url)) {
+    return "text";
+  }
+  return null;
+}
+
+function toPreviewRequest(file: FileBlock): FilePreviewRequest {
+  return {
+    filename: file.filename,
+    mimeType: file.mimeType,
+    url: file.url,
+  };
+}
+
+function renderFileEmbed(file: FileBlock, mode: "html" | "pdf" | "text") {
+  if (mode === "html" || mode === "pdf") {
+    return html`
+      <iframe
+        class="chat-file-embed"
+        title=${file.filename}
+        sandbox=""
+        src=${file.url}
+        loading="lazy"
+      ></iframe>
+    `;
+  }
+  const text = decodeFileText(file.url);
+  if (!text) {
+    return nothing;
+  }
+  const snippet = text.length > 480 ? `${text.slice(0, 480)}…` : text;
+  return html`<pre class="chat-file-snippet">${snippet}</pre>`;
+}
+
+function renderFileIconCompact(filename: string, mimeType: string) {
   const label = fileTypeLabel(filename, mimeType);
-  const isHtml = label === "HTML";
+  const tone = fileIconTone(filename, mimeType);
   return html`
-    <div class="chat-file-card__icon ${isHtml ? "chat-file-card__icon--html" : ""}">
-      ${isHtml ? html`<span class="chat-file-card__badge">${label}</span>` : icons.fileText}
+    <div class="chat-file-card__icon chat-file-card__icon--compact chat-file-card__icon--${tone}" aria-hidden="true">
+      <span class="chat-file-card__badge">${label}</span>
+    </div>
+  `;
+}
+
+function renderFileIconButtons(file: FileBlock, onPreview?: (req: FilePreviewRequest) => void) {
+  return html`
+    <div class="chat-file-icon-actions">
+      ${
+        file.isPreviewable && onPreview
+          ? html`<button
+              type="button"
+              class="chat-file-icon-btn"
+              title="预览"
+              aria-label="预览 ${file.filename}"
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                onPreview(toPreviewRequest(file));
+              }}
+            >
+              ${icons.eye}
+            </button>`
+          : nothing
+      }
+      <a
+        class="chat-file-icon-btn"
+        title="下载"
+        aria-label="下载 ${file.filename}"
+        href=${file.url}
+        download=${file.filename}
+        target="_blank"
+        rel="noopener"
+        @click=${(e: Event) => e.stopPropagation()}
+      >
+        ${icons.download}
+      </a>
+    </div>
+  `;
+}
+
+function renderPreviewableFileCard(file: FileBlock, onPreview?: (req: FilePreviewRequest) => void) {
+  const mode = filePreviewMode(file);
+  if (!mode) {
+    return null;
+  }
+  const openPreview = () => {
+    if (onPreview) {
+      onPreview(toPreviewRequest(file));
+    }
+  };
+  return html`
+    <div class="chat-file-preview-wrap">
+      <div
+        class="chat-file-preview-surface"
+        role="button"
+        tabindex="0"
+        title="点击预览 ${file.filename}"
+        @click=${openPreview}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openPreview();
+          }
+        }}
+      >
+        ${renderFileEmbed(file, mode)}
+      </div>
+      <div class="chat-file-preview-bar">
+        <div class="chat-file-preview-bar__info">
+          <span class="chat-file-preview-bar__name">${file.filename}</span>
+          ${
+            file.sizeBytes
+              ? html`<span class="chat-file-preview-bar__size muted">${formatFileSize(file.sizeBytes)}</span>`
+              : nothing
+          }
+        </div>
+        ${renderFileIconButtons(file, onPreview)}
+      </div>
+    </div>
+  `;
+}
+
+function renderCompactFileRow(file: FileBlock, onPreview?: (req: FilePreviewRequest) => void) {
+  return html`
+    <div class="chat-file-card chat-file-card--compact">
+      ${renderFileIconCompact(file.filename, file.mimeType)}
+      <div class="chat-file-card__meta">
+        <div class="chat-file-card__name">${file.filename}</div>
+        <div class="chat-file-card__sub muted">
+          ${fileTypeLabel(file.filename, file.mimeType)}${file.sizeBytes ? ` · ${formatFileSize(file.sizeBytes)}` : ""}
+        </div>
+      </div>
+      ${renderFileIconButtons(file, onPreview)}
     </div>
   `;
 }
@@ -399,47 +707,8 @@ export function renderFileAttachments(
     return nothing;
   }
   return html`
-    <div class="chat-file-list">
-      ${files.map(
-        (file) => html`
-          <div class="chat-file-card">
-            ${renderFileIcon(file.filename, file.mimeType)}
-            <div class="chat-file-card__meta">
-              <div class="chat-file-card__name">${file.filename}</div>
-              <div class="chat-file-card__sub muted">
-                File${file.sizeBytes ? ` · ${formatFileSize(file.sizeBytes)}` : ""} · ${file.mimeType}
-              </div>
-            </div>
-            <div class="chat-file-card__actions">
-              ${
-                file.isPreviewable && onPreview
-                  ? html`<button
-                      type="button"
-                      class="btn btn--sm chat-file-card__btn"
-                      @click=${() =>
-                        onPreview({
-                          filename: file.filename,
-                          mimeType: file.mimeType,
-                          url: file.url,
-                        })}
-                    >
-                      预览
-                    </button>`
-                  : nothing
-              }
-              <a
-                class="btn btn--sm chat-file-card__btn"
-                href=${file.url}
-                download=${file.filename}
-                target="_blank"
-                rel="noopener"
-              >
-                下载
-              </a>
-            </div>
-          </div>
-        `,
-      )}
+    <div class="chat-message-files">
+      ${files.map((file) => renderCompactFileRow(file, onPreview))}
     </div>
   `;
 }

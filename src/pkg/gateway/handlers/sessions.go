@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/openocta/openocta/pkg/agent/runtime"
 	"github.com/openocta/openocta/pkg/agent/tools"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
@@ -754,6 +755,10 @@ func SessionsDeleteHandler(opts HandlerOpts) error {
 		}, nil)
 		return nil
 	}
+
+	deleteKey := strings.TrimSpace(strings.ToLower(target.canonicalKey))
+	abortInFlightChatRunsForSession(deleteKey, "")
+	runtime.EvictSessionRuntime(deleteKey)
 
 	result := SessionsDeleteResult{
 		OK:       true,

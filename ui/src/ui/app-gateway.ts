@@ -24,7 +24,8 @@ import {
 import { loadAgents } from "./controllers/agents.ts";
 import { loadAssistantIdentity } from "./controllers/assistant-identity.ts";
 import { loadChatHistory } from "./controllers/chat.ts";
-import { handleChatEvent, type ChatEventPayload } from "./controllers/chat.ts";
+import { handleChatEvent, switchChatSessionRunState, type ChatEventPayload } from "./controllers/chat.ts";
+import { gatewaySessionKeysEqual } from "./sessions/session-key-utils.js";
 import { loadDevices } from "./controllers/devices.ts";
 import {
   addExecApproval,
@@ -129,9 +130,7 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
     nextSettings.sessionKey !== host.settings.sessionKey ||
     nextSettings.lastActiveSessionKey !== host.settings.lastActiveSessionKey;
   if (nextSessionKey !== host.sessionKey) {
-    host.sessionKey = nextSessionKey;
-    // session defaults 可能触发“隐式会话切换”，此时必须清理进行中的流式状态，
-    // 避免切换后仍显示 “...” 或把旧 runId 绑定到新会话上。
+    switchChatSessionRunState(host as unknown as OpenClawApp, nextSessionKey);
     host.chatMessage = "";
     host.chatAttachments = [];
     host.chatAttachmentError = null;
@@ -141,12 +140,6 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
     resetChatResourcesPanelUi(
       host as unknown as Parameters<typeof resetChatResourcesPanelUi>[0],
     );
-    host.chatRunId = null;
-    (host as unknown as { chatTerminalRunIds: string[] }).chatTerminalRunIds = [];
-    (host as unknown as { chatErrorRunId: string | null }).chatErrorRunId = null;
-    (host as unknown as { chatRunPhase: "idle" | "thinking" | "tool" | "streaming" }).chatRunPhase = "idle";
-    (host as unknown as { chatStream: string | null }).chatStream = null;
-    (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
     host.chatQueue = [];
     resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
   }
@@ -251,7 +244,14 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     );
     // 工具开始执行时清掉上一轮残留的流式文本，保持运行中状态以显示加载指示
     if (agentPayload?.stream === "tool" && agentPayload?.data?.phase === "start") {
-      (host as unknown as { chatStream: string | null }).chatStream = "";
+      const eventSessionKey =
+        typeof agentPayload.sessionKey === "string" ? agentPayload.sessionKey : undefined;
+      if (
+        eventSessionKey &&
+        !gatewaySessionKeysEqual(eventSessionKey, host.sessionKey)
+      ) {
+        return;
+      }
       (host as unknown as { chatRunPhase: "idle" | "thinking" | "tool" | "streaming" }).chatRunPhase =
         "tool";
     }
