@@ -54,7 +54,7 @@ archives:
     format: tar.gz
     files:
       - none*
-      - src: src/docs/*
+      - src: docs/*
         dst: docs
       - src: deploy/dist-README.md
         dst: README.md
@@ -66,7 +66,7 @@ archives:
     format: tar.gz
     wrap_in_directory: true
     files:
-      - src: src/docs/*
+      - src: docs/*
         dst: docs
 
 nfpms:
