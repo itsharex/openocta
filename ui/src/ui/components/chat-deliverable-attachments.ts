@@ -23,6 +23,11 @@ export class ChatDeliverableAttachments extends LitElement {
 
   #loadGeneration = 0;
 
+  /** Light DOM so global chat file/image styles apply (preview icon, button sizing, image max dimensions). */
+  createRenderRoot() {
+    return this;
+  }
+
   protected willUpdate(changed: Map<string, unknown>): void {
     if (
       changed.has("paths") ||
