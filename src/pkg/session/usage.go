@@ -336,7 +336,9 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 	dailyLatencyMap := make(map[string][]float64)
 	dailyModelUsageMap := make(map[string]*SessionDailyModelUsage)
 	toolUsageMap := make(map[string]int)
+	callbackToolUsageMap := make(map[string]int)
 	modelUsageMap := make(map[string]*SessionModelUsage)
+	hasTokenUsageLines := false
 	activityDatesSet := make(map[string]bool)
 	var firstAct, lastAct int64
 	var lastUserTimestamp int64
@@ -360,9 +362,10 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 				continue
 			}
 		}
-		// Parse token_usage lines (from TokenCallback); these contain actual token consumption
+		// Parse token_usage lines (from usage callback); these contain actual token consumption
 		var tokenLine tokenUsageLine
 		if json.Unmarshal(line, &tokenLine) == nil && tokenLine.Type == "token_usage" {
+			hasTokenUsageLines = true
 			ts := parseTimestampString(tokenLine.Timestamp)
 			if ts > 0 && (startMs == nil || ts >= *startMs) && (endMs == nil || ts <= *endMs) {
 				if firstAct == 0 || ts < firstAct {
@@ -388,7 +391,62 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 						dailyMap[dayKey] = &SessionDailyUsage{Date: dayKey}
 					}
 					dailyMap[dayKey].Tokens += tokens
+					providerKey := strings.TrimSpace(tokenLine.Provider)
+					if providerKey == "" {
+						providerKey = "unknown"
+					}
+					modelKey := strings.TrimSpace(tokenLine.Model)
+					if modelKey == "" {
+						modelKey = "unknown"
+					}
+					dailyModelKey := dayKey + "::" + providerKey + "::" + modelKey
+					if dailyModelUsageMap[dailyModelKey] == nil {
+						dailyModelUsageMap[dailyModelKey] = &SessionDailyModelUsage{
+							Date:     dayKey,
+							Provider: providerKey,
+							Model:    modelKey,
+						}
+					}
+					dmu := dailyModelUsageMap[dailyModelKey]
+					dmu.Tokens += tokens
+					dmu.Count++
+					globalModelKey := providerKey + "::" + modelKey
+					if modelUsageMap[globalModelKey] == nil {
+						modelUsageMap[globalModelKey] = &SessionModelUsage{
+							Provider: providerKey,
+							Model:    modelKey,
+							Totals:   CostUsageTotals{},
+						}
+					}
+					mum := modelUsageMap[globalModelKey]
+					mum.Count++
+					mum.Totals.Input += u.Input
+					mum.Totals.Output += u.Output
+					mum.Totals.CacheRead += u.CacheRead
+					mum.Totals.CacheWrite += u.CacheWrite
+					mum.Totals.TotalTokens += tokens
+					mum.Totals.MissingCostEntries++
 				}
+			}
+			continue
+		}
+		var toolLine toolCallLine
+		if json.Unmarshal(line, &toolLine) == nil && toolLine.Type == "tool_call" && strings.TrimSpace(toolLine.Name) != "" {
+			ts := parseTimestampString(toolLine.Timestamp)
+			if ts > 0 && (startMs == nil || ts >= *startMs) && (endMs == nil || ts <= *endMs) {
+				if firstAct == 0 || ts < firstAct {
+					firstAct = ts
+				}
+				if ts > lastAct {
+					lastAct = ts
+				}
+				dayKey := FormatDayKey(ts)
+				activityDatesSet[dayKey] = true
+				callbackToolUsageMap[toolLine.Name]++
+				if dailyMessageMap[dayKey] == nil {
+					dailyMessageMap[dayKey] = &SessionDailyMessageCounts{Date: dayKey}
+				}
+				dailyMessageMap[dayKey].ToolCalls++
 			}
 			continue
 		}
@@ -464,7 +522,7 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 			}
 		}
 		toolNames := extractToolCallNames(msg)
-		if len(toolNames) > 0 {
+		if len(toolNames) > 0 && len(callbackToolUsageMap) == 0 {
 			msgCounts.ToolCalls += len(toolNames)
 			for _, name := range toolNames {
 				toolUsageMap[name]++
@@ -493,7 +551,9 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 		} else if msg.Role == "assistant" {
 			dmc.Assistant++
 		}
-		dmc.ToolCalls += len(toolNames)
+		if len(toolNames) > 0 && len(callbackToolUsageMap) == 0 {
+			dmc.ToolCalls += len(toolNames)
+		}
 		dmc.ToolResults += toolTotal
 		dmc.Errors += toolErrors
 		if msg.StopReason != "" {
@@ -503,6 +563,9 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 			}
 		}
 		if msg.Usage == nil {
+			continue
+		}
+		if hasTokenUsageLines {
 			continue
 		}
 		u := msg.Usage
@@ -658,6 +721,13 @@ func LoadSessionCostSummary(sessionFile string, startMs, endMs *int64) (*Session
 		})
 		totals.DailyModelUsage = entries
 	}
+	if len(callbackToolUsageMap) > 0 {
+		toolUsageMap = callbackToolUsageMap
+		msgCounts.ToolCalls = 0
+		for _, count := range callbackToolUsageMap {
+			msgCounts.ToolCalls += count
+		}
+	}
 	if len(toolUsageMap) > 0 {
 		var tools []SessionToolCount
 		totalCalls := 0
@@ -747,12 +817,23 @@ type tokenUsageLine struct {
 	Timestamp   string `json:"timestamp"`
 	SessionID   string `json:"sessionId,omitempty"`
 	RequestID   string `json:"requestId,omitempty"`
+	Model       string `json:"model,omitempty"`
+	Provider    string `json:"provider,omitempty"`
 	Input       int    `json:"input"`
 	Output      int    `json:"output"`
 	CacheRead   int    `json:"cacheRead"`
 	CacheWrite  int    `json:"cacheWrite"`
 	CacheCreate int    `json:"cacheCreation"` // alias from logging.TokenUsageSessionLine
 	TotalTokens int    `json:"totalTokens"`
+}
+
+// toolCallLine is a lightweight tool invocation record from the Eino usage callback.
+type toolCallLine struct {
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	SessionID string `json:"sessionId,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
+	Name      string `json:"name"`
 }
 
 // applyUsageTotals adds usage to bucket (aligns with TS applyUsageTotals).

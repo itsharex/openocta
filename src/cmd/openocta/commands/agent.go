@@ -5,8 +5,8 @@ import (
 
 	"github.com/openocta/openocta/pkg/agent/runtime"
 	"github.com/openocta/openocta/pkg/agent/tools"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/spf13/cobra"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func runAgent(cmd *cobra.Command, _ []string) error {
 	}
 	defer rt.Close()
 
-	req := api.Request{
+	req := types.Request{
 		Prompt: msg,
 	}
 	resp, err := rt.Run(ctx, req)

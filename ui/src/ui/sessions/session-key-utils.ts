@@ -93,6 +93,25 @@ export function isStableEmployeeWebchatSessionKey(sessionKey: string | undefined
 }
 
 /**
+ * 运行历史跳转用的 cron 会话 key：保留完整 run key（agent:…:cron:jobId:run:sessionId），
+ * 不再折叠为持久 key，以便 chat.history 能定位到对应 transcript。
+ */
+export function cronRunHistorySessionKey(sessionKey: string | undefined | null): string | null {
+  const raw = (sessionKey ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+  const legacy = /^cron:([^:]+):run:(.+)$/i.exec(raw);
+  if (legacy) {
+    return `agent:main:cron:${legacy[1]}:run:${legacy[2]}`;
+  }
+  if (/^agent:[^:]+:cron:[^:]+(:run:.+)?$/i.test(raw)) {
+    return raw;
+  }
+  return null;
+}
+
+/**
  * Cron 单次运行会话 key。网关 sessions.list 有意不包含此类会话（见 handlers/sessions.go isCronRunSessionKey），
  * 与「会话不存在」无关；用于 UI 协调逻辑时勿误判为已删除。
  *

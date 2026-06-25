@@ -108,9 +108,7 @@
         "hide": { "label": "hide", "detailKeys": ["node", "nodeId"] },
         "navigate": { "label": "navigate", "detailKeys": ["url", "node", "nodeId"] },
         "eval": { "label": "eval", "detailKeys": ["javaScript", "node", "nodeId"] },
-        "snapshot": { "label": "snapshot", "detailKeys": ["format", "node", "nodeId"] },
-        "a2ui_push": { "label": "A2UI push", "detailKeys": ["messages", "jsonl"] },
-        "a2ui_reset": { "label": "A2UI reset", "detailKeys": ["surfaceId"] }
+        "snapshot": { "label": "snapshot", "detailKeys": ["format", "node", "nodeId"] }
       }
     },
     "nodes": {

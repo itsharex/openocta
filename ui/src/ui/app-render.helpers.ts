@@ -114,4 +114,3 @@ export function renderChatControls(state: AppViewState) {
     </div>
   `;
 }
-

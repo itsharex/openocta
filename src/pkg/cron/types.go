@@ -26,6 +26,14 @@ type CronPayload struct {
 	Message string `json:"message,omitempty"`
 }
 
+// CronRunConfig holds per-run agent resources for isolated cron jobs.
+type CronRunConfig struct {
+	ModelRef    string                 `json:"modelRef,omitempty"`
+	SkillKeys   []string               `json:"skillKeys,omitempty"`
+	McpServers  []string               `json:"mcpServers,omitempty"`
+	ExtraParams map[string]interface{} `json:"extraParams,omitempty"`
+}
+
 // CronJobState holds runtime state.
 type CronJobState struct {
 	NextRunAtMs       *int64 `json:"nextRunAtMs,omitempty"`
@@ -54,11 +62,12 @@ type CronJob struct {
 	SessionTarget     string       `json:"sessionTarget"`
 	// SessionKey 可选，用于定时调度时复用同一会话。格式：agent:main:cron:<jobId>。
 	// 手动触发时始终生成新 sessionKey（agent:main:cron:<jobId>:run:<sessionId>），忽略此字段。
-	SessionKey string        `json:"sessionKey,omitempty"`
-	WakeMode   string        `json:"wakeMode"`
-	Payload    CronPayload   `json:"payload"`
-	Delivery   *CronDelivery `json:"delivery,omitempty"`
-	State      CronJobState  `json:"state"`
+	SessionKey string         `json:"sessionKey,omitempty"`
+	WakeMode   string         `json:"wakeMode"`
+	Payload    CronPayload    `json:"payload"`
+	Delivery   *CronDelivery  `json:"delivery,omitempty"`
+	RunConfig  *CronRunConfig `json:"runConfig,omitempty"`
+	State      CronJobState   `json:"state"`
 }
 
 // StoreFile is the persistent store format.

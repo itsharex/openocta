@@ -10,9 +10,9 @@ import (
 
 	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/agent/runtime"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
 	"github.com/openocta/openocta/pkg/session"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
 const chatExtractSkillPromptTemplate = `你是一名 Agent Skill 作者。请根据下面的对话记录，提炼出一个可复用的 SKILL.md 技能文档。
@@ -96,7 +96,7 @@ func ChatExtractSkillHandler(opts HandlerOpts) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if cfg != nil {
 		factory, factoryErr := agent.CreateModelFactoryFromConfig(cfg, agentID)
 		if factoryErr != nil {
@@ -126,6 +126,7 @@ func ChatExtractSkillHandler(opts HandlerOpts) error {
 		EnableWebTools:     &webToolsOff,
 		AgentID:            agentID,
 		Env:                env,
+		TokenTracking:      true,
 	}
 	rt, err := runtime.New(ctx, rtOpts)
 	if err != nil {
@@ -138,7 +139,7 @@ func ChatExtractSkillHandler(opts HandlerOpts) error {
 	defer rt.Close()
 
 	prompt := fmt.Sprintf(chatExtractSkillPromptTemplate, conversation)
-	resp, runErr := rt.Run(ctx, api.Request{Prompt: prompt, SessionID: sessionID + ":extract-skill"})
+	resp, runErr := rt.Run(ctx, types.Request{Prompt: prompt, SessionID: sessionID + ":extract-skill"})
 	if runErr != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{
 			Code:    protocol.ErrCodeInternal,

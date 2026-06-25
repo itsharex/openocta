@@ -95,7 +95,7 @@ export function renderApprovals(props: ApprovalsProps) {
                 </div>
                 ${queueEntries.map((e) => {
                   const sessionKey = e.sessionKey ?? e.sessionId;
-                  const sessionPath = sessionKey ? `${props.pathForTab("sessions")}?key=${encodeURIComponent(sessionKey)}` : "";
+                  const sessionPath = sessionKey ? `${props.pathForTab("message")}?session=${encodeURIComponent(sessionKey)}` : "";
                   const canAct = e.status === "pending" && !e.expired;
                   const expiresAt = e.expiresAt ?? e.timeoutAt;
                   return html`

@@ -12,14 +12,20 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/openocta/openocta/pkg/paths"
 
 	"github.com/google/uuid"
+	"github.com/openocta/openocta/pkg/a2ui"
 	mcpManager "github.com/openocta/openocta/pkg/acp/mcp"
 	"github.com/openocta/openocta/pkg/agent"
+	"github.com/openocta/openocta/pkg/agent/eino"
+	"github.com/openocta/openocta/pkg/agent/model"
 	"github.com/openocta/openocta/pkg/agent/runtime"
+	"github.com/openocta/openocta/pkg/agent/stream"
+	octool "github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/agent/tools"
 	"github.com/openocta/openocta/pkg/browser"
 	"github.com/openocta/openocta/pkg/channels"
@@ -28,15 +34,12 @@ import (
 	"github.com/openocta/openocta/pkg/gateway/protocol"
 	"github.com/openocta/openocta/pkg/logging"
 	"github.com/openocta/openocta/pkg/session"
-	"github.com/stellarlinkco/agentsdk-go/pkg/a2ui"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
-	"github.com/stellarlinkco/agentsdk-go/pkg/model"
-	sdkTool "github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
 
 var chatLog = logging.Sub("chat")
 
-const chatAttachmentMaxBytes = 1 << 20 // 1 MiB
+const chatAttachmentMaxBytes = 5 << 20       // 5 MiB for images and documents
+const chatAttachmentVideoMaxBytes = 50 << 20 // 50 MiB for video
 const chatRuntimePoolWait = 30 * time.Second
 
 var (
@@ -52,6 +55,7 @@ var (
 		".pdf": {}, ".txt": {}, ".md": {}, ".markdown": {}, ".csv": {}, ".json": {},
 		".xml": {}, ".html": {}, ".htm": {},
 		".doc": {}, ".docx": {}, ".xls": {}, ".xlsx": {}, ".ppt": {}, ".pptx": {}, ".rtf": {},
+		".mp4": {}, ".mov": {}, ".avi": {},
 	}
 )
 
@@ -79,12 +83,52 @@ func isBlockedChatAttachmentMime(mimeType string) bool {
 		strings.Contains(lower, "x-bzip")
 }
 
+func isChatAttachmentVideo(filename, mimeType string) bool {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(mimeType)), "video/") {
+		return true
+	}
+	switch chatAttachmentExtension(filename) {
+	case ".mp4", ".mov", ".avi":
+		return true
+	default:
+		return false
+	}
+}
+
+func chatAttachmentMaxSizeBytes(filename, mimeType string) int {
+	if isChatAttachmentVideo(filename, mimeType) {
+		return chatAttachmentVideoMaxBytes
+	}
+	return chatAttachmentMaxBytes
+}
+
+func inferChatAttachmentContentBlockType(filename, mimeType string) model.ContentBlockType {
+	if strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		return model.ContentBlockImage
+	}
+	if isChatAttachmentVideo(filename, mimeType) {
+		return model.ContentBlockVideo
+	}
+	return model.ContentBlockDocument
+}
+
+func inferTranscriptAttachmentBlockType(filename, mimeType string) string {
+	if strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		return "image"
+	}
+	if isChatAttachmentVideo(filename, mimeType) {
+		return "video"
+	}
+	return "document"
+}
+
 func validateChatAttachmentMeta(filename, mimeType string, sizeBytes int) error {
 	if sizeBytes <= 0 {
 		return fmt.Errorf("attachment is empty")
 	}
-	if sizeBytes > chatAttachmentMaxBytes {
-		return fmt.Errorf("attachment exceeds max size (%d bytes)", chatAttachmentMaxBytes)
+	maxBytes := chatAttachmentMaxSizeBytes(filename, mimeType)
+	if sizeBytes > maxBytes {
+		return fmt.Errorf("attachment exceeds max size (%d bytes)", maxBytes)
 	}
 	if isBlockedChatAttachmentMime(mimeType) {
 		return fmt.Errorf("compressed attachment type is not allowed")
@@ -161,6 +205,10 @@ func inferAttachmentSaveExtension(filename, mimeType string) string {
 		return ".xlsx"
 	case strings.Contains(mimeType, "presentationml"):
 		return ".pptx"
+	case strings.HasPrefix(mimeType, "video/mp4"), mimeType == "video/x-msvideo":
+		return ".mp4"
+	case mimeType == "video/quicktime":
+		return ".mov"
 	default:
 		return ""
 	}
@@ -191,6 +239,7 @@ var agentRunSeqMu sync.Mutex
 // ChatAbortController tracks an active chat run for cancellation.
 type ChatAbortController struct {
 	Controller  context.CancelFunc
+	TurnAbort   func()
 	SessionID   string
 	SessionKey  string
 	StartedAtMs int64
@@ -306,17 +355,116 @@ func broadcastChatA2UI(ctx *Context, runId string, sessionKey string, a2uiMessag
 		"seq":        seq,
 		"state":      "a2ui",
 		"a2ui":       parsed,
-		"message": map[string]interface{}{
-			"role": "assistant",
-			"content": []map[string]interface{}{
-				{"type": "a2ui", "a2ui": parsed},
-			},
-		},
 	}
 	ctx.Broadcast("chat", payload, nil)
 	if ctx.NodeSendToSession != nil {
 		ctx.NodeSendToSession(sessionKey, "chat", payload)
 	}
+}
+
+// broadcastChatReasoningDelta streams incremental reasoning/thinking text to the frontend.
+func broadcastChatReasoningDelta(ctx *Context, runId string, sessionKey string, delta string) {
+	if ctx == nil || ctx.Broadcast == nil || delta == "" {
+		return
+	}
+	seq := int64(0)
+	if ctx.AgentRunSeq != nil {
+		seq = nextChatSeq(ctx.AgentRunSeq, runId)
+	}
+	payload := map[string]interface{}{
+		"runId":      runId,
+		"sessionKey": sessionKey,
+		"seq":        seq,
+		"state":      "delta",
+		"reasoning":  delta,
+	}
+	ctx.Broadcast("chat", payload, nil)
+	if ctx.NodeSendToSession != nil {
+		ctx.NodeSendToSession(sessionKey, "chat", payload)
+	}
+}
+
+func clearSessionAgentState(projectRoot, sessionID string) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return
+	}
+	runtime.ClearSessionHistory(projectRoot, sessionID)
+	eino.ClearPersistedSessionCheckpoints(sessionID)
+}
+
+func mergeStreamingThinkingText(existing, incoming string) string {
+	if incoming == "" {
+		return existing
+	}
+	if existing == "" {
+		return incoming
+	}
+	if strings.HasPrefix(incoming, existing) {
+		return incoming
+	}
+	if strings.HasPrefix(existing, incoming) {
+		return existing
+	}
+	return existing + incoming
+}
+
+func upsertAssistantThinkingBlock(content []map[string]interface{}, thinking string) []map[string]interface{} {
+	thinking = strings.TrimSpace(thinking)
+	if thinking == "" {
+		return content
+	}
+	for i := len(content) - 1; i >= 0; i-- {
+		typ, _ := content[i]["type"].(string)
+		if typ == "thinking" {
+			content[i]["thinking"] = thinking
+			return content
+		}
+	}
+	return append(content, map[string]interface{}{
+		"type":     "thinking",
+		"thinking": thinking,
+	})
+}
+
+func appendAssistantToolCallBlock(content []map[string]interface{}, evt stream.StreamEvent) []map[string]interface{} {
+	toolID := strings.TrimSpace(evt.ToolUseID)
+	toolName := strings.TrimSpace(evt.Name)
+	if toolID == "" && evt.ContentBlock != nil {
+		toolID = strings.TrimSpace(evt.ContentBlock.ID)
+	}
+	if toolName == "" && evt.ContentBlock != nil {
+		toolName = strings.TrimSpace(evt.ContentBlock.Name)
+	}
+	if toolID == "" || toolName == "" {
+		return content
+	}
+	for _, block := range content {
+		typ, _ := block["type"].(string)
+		if typ != "toolCall" && typ != "tool_call" && typ != "toolUse" && typ != "tool_use" {
+			continue
+		}
+		id, _ := block["id"].(string)
+		if id == toolID {
+			return content
+		}
+	}
+	tc := map[string]interface{}{
+		"type": "toolCall",
+		"id":   toolID,
+		"name": toolName,
+	}
+	if evt.ContentBlock != nil && len(evt.ContentBlock.Input) > 0 {
+		var args map[string]interface{}
+		if json.Unmarshal(evt.ContentBlock.Input, &args) == nil {
+			tc["arguments"] = args
+		} else {
+			tc["arguments"] = json.RawMessage(evt.ContentBlock.Input)
+		}
+	} else {
+		tc["arguments"] = map[string]interface{}{}
+	}
+	return append(content, tc)
 }
 
 func contentBlockToClientFormat(b session.ContentBlock) map[string]interface{} {
@@ -339,6 +487,26 @@ func contentBlockToClientFormat(b session.ContentBlock) map[string]interface{} {
 		}
 		if b.Filename != "" {
 			out["filename"] = b.Filename
+		}
+		if b.URL != "" {
+			out["url"] = b.URL
+		}
+		return out
+	case "video":
+		out := map[string]interface{}{
+			"type":     "video",
+			"mimeType": b.MimeType,
+			"filename": b.Filename,
+		}
+		if b.Name != "" && b.Filename == "" {
+			out["filename"] = b.Name
+		}
+		if b.Data != "" {
+			out["source"] = map[string]interface{}{
+				"type":       "base64",
+				"media_type": b.MimeType,
+				"data":       b.Data,
+			}
 		}
 		if b.URL != "" {
 			out["url"] = b.URL
@@ -714,15 +882,6 @@ func assistantContentHasA2UI(blocks []map[string]interface{}) bool {
 	return false
 }
 
-func isA2UIProtocolTool(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "a2ui_push", "a2ui_reset":
-		return true
-	default:
-		return false
-	}
-}
-
 func shouldSuppressAssistantTextForA2UI(text string, blocks []map[string]interface{}, turnHasA2UI bool) bool {
 	if shouldSkipAssistantTextBlock(text, blocks) {
 		return true
@@ -749,62 +908,28 @@ func combinedAssistantText(blocks []map[string]interface{}) string {
 		if !strings.EqualFold(strings.TrimSpace(typ), "text") {
 			continue
 		}
-		if t, ok := b["text"].(string); ok && strings.TrimSpace(t) != "" {
+		if t, ok := b["text"].(string); ok && strings.TrimSpace(t) != "" && !stream.IsLeakedAssistantText(t) {
 			parts = append(parts, t)
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n\n"))
 }
 
-func appendA2UIContentBlocks(blocks []map[string]interface{}, msgs []*a2ui.ServerMessage) []map[string]interface{} {
-	for _, msg := range a2ui.RepairMessages(msgs) {
-		raw, err := msg.RawJSON()
-		if err != nil || len(raw) == 0 {
-			continue
-		}
-		var parsed map[string]interface{}
-		if json.Unmarshal(raw, &parsed) == nil {
-			blocks = append(blocks, map[string]interface{}{
-				"type": "a2ui",
-				"a2ui": parsed,
-			})
-		}
-	}
-	return blocks
-}
-
-// normalizeAssistantContentForA2UI keeps a single user-visible channel: A2UI.
-// When A2UI blocks exist, strip duplicate markdown text. When only text exists on a final turn, convert to A2UI.
+// normalizeAssistantContentForA2UI strips duplicate text when A2UI blocks are already present.
+// Plain markdown/text replies are kept as text blocks so line breaks survive to the chat UI.
 func normalizeAssistantContentForA2UI(
 	blocks []map[string]interface{},
-	finalTurn bool,
-	emitA2UI func(json.RawMessage),
+	_ bool,
+	_ func(json.RawMessage),
 ) []map[string]interface{} {
 	if len(blocks) == 0 {
 		return blocks
 	}
 	if assistantContentHasA2UI(blocks) {
-		return stripAssistantTextBlocks(blocks)
+		blocks = stripAssistantTextBlocks(blocks)
+		return a2ui.CoalesceAssistantA2UIBlocks(blocks)
 	}
-	if !finalTurn {
-		return blocks
-	}
-	text := combinedAssistantText(blocks)
-	if text == "" {
-		return blocks
-	}
-	msgs := a2ui.MessagesFromPlainText(text)
-	for _, msg := range a2ui.RepairMessages(msgs) {
-		raw, err := msg.RawJSON()
-		if err != nil || len(raw) == 0 {
-			continue
-		}
-		if emitA2UI != nil {
-			emitA2UI(raw)
-		}
-	}
-	withoutText := stripAssistantTextBlocks(blocks)
-	return appendA2UIContentBlocks(withoutText, msgs)
+	return blocks
 }
 
 type assistantSnapshotParams struct {
@@ -819,7 +944,7 @@ type assistantSnapshotParams struct {
 	runStart          time.Time
 	firstTokenTime    time.Time
 	totalToolDuration int64
-	usage             *api.Usage
+	usage             *stream.Usage
 	parentMessageID   string
 }
 
@@ -935,6 +1060,22 @@ func extractAssistantTextForIMDelivery(message map[string]interface{}) string {
 		parts = append(parts, t)
 	}
 	return strings.Join(parts, "")
+}
+
+// imPlainFromTurn 提取本轮应对 IM 投递的纯文本。
+// Web/UI 在 A2UI 模式下会剥离 text block，但 textBuf 仍保留原始回复，需单独回传给 IM 通道。
+func imPlainFromTurn(message map[string]interface{}, turnText string, stopReason string) string {
+	if t := extractAssistantTextForIMDelivery(message); t != "" {
+		return t
+	}
+	if stopReason == "tool_use" || stopReason == "interrupt" {
+		return ""
+	}
+	raw := strings.TrimSpace(turnText)
+	if raw == "" || isAssistantPlaceholderText(raw) {
+		return ""
+	}
+	return raw
 }
 
 // resolveAgentDisplayName 从配置解析助手显示名称，默认 "助手"。
@@ -1533,7 +1674,7 @@ func runSessionResetForChat(sessionKey string, ctx *Context) (sessionID, session
 		if projectRoot == "" {
 			projectRoot = "."
 		}
-		runtime.ClearSessionHistory(projectRoot, oldSessionID)
+		clearSessionAgentState(projectRoot, oldSessionID)
 	}
 	abortInFlightChatRunsForSession(sessionKey, "")
 	runtime.EvictSessionRuntime(sessionKey)
@@ -1738,14 +1879,26 @@ func ChatSendHandler(opts HandlerOpts) error {
 		}
 	}
 
-	// Avoid pooled-runtime deadlocks when a prior run is still winding down.
-	abortedRuns := abortInFlightChatRunsForSession(sessionKey, runId)
-	if err := waitForSessionRuntimePool(sessionKey, runId, abortedRuns); err != nil {
-		opts.Respond(false, nil, &protocol.ErrorShape{
-			Code:    protocol.ErrCodeServiceUnavailable,
-			Message: "chat.send: " + err.Error(),
-		}, nil)
-		return nil
+	// Preempt in-flight runs via Eino TurnLoop when another message arrives; otherwise abort legacy runs.
+	preempt := sessionHasInFlightRuns(sessionKey, runId)
+	var abortedRuns []string
+	if preempt {
+		if err := waitForSessionRuntimePool(sessionKey, runId, nil); err != nil {
+			opts.Respond(false, nil, &protocol.ErrorShape{
+				Code:    protocol.ErrCodeServiceUnavailable,
+				Message: "chat.send: " + err.Error(),
+			}, nil)
+			return nil
+		}
+	} else {
+		abortedRuns = abortInFlightChatRunsForSession(sessionKey, runId)
+		if err := waitForSessionRuntimePool(sessionKey, runId, abortedRuns); err != nil {
+			opts.Respond(false, nil, &protocol.ErrorShape{
+				Code:    protocol.ErrCodeServiceUnavailable,
+				Message: "chat.send: " + err.Error(),
+			}, nil)
+			return nil
+		}
 	}
 
 	if err := session.EnsureTranscriptFile(transcriptPath, sessionID); err != nil {
@@ -1769,6 +1922,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 			content, _ := obj["content"].(string)
 			dataUrl, _ := obj["dataUrl"].(string)
 			mimeType, _ := obj["mimeType"].(string)
+			filename, _ := obj["filename"].(string)
 			if content == "" && dataUrl == "" {
 				continue
 			}
@@ -1782,14 +1936,11 @@ func ChatSendHandler(opts HandlerOpts) error {
 				}
 			}
 			if base64Data != "" {
-				blockType := "document"
-				if strings.HasPrefix(strings.ToLower(mimeType), "image/") {
-					blockType = "image"
-				}
 				transcriptImageBlocks = append(transcriptImageBlocks, session.ContentBlock{
-					Type:     blockType,
+					Type:     inferTranscriptAttachmentBlockType(filename, mimeType),
 					MimeType: mimeType,
 					Data:     base64Data,
+					Filename: filename,
 				})
 			}
 		}
@@ -1874,6 +2025,13 @@ func ChatSendHandler(opts HandlerOpts) error {
 		deliverHeader, _ := opts.Params["header"].(string)
 		deliverOriginalMessage := message
 		deliverAgentName := resolveAgentDisplayName(opts.Context, agent.ResolveSessionAgentID(sessionKey))
+		var deliverMeta map[string]interface{}
+		if rawMeta, ok := opts.Params["deliverMetadata"].(map[string]interface{}); ok && len(rawMeta) > 0 {
+			deliverMeta = make(map[string]interface{}, len(rawMeta))
+			for k, v := range rawMeta {
+				deliverMeta[k] = v
+			}
+		}
 		var deliverCtx *DeliverContext
 		if deliverChannel != "" && deliverTo != "" {
 			deliverCtx = &DeliverContext{
@@ -1884,13 +2042,18 @@ func ChatSendHandler(opts HandlerOpts) error {
 				Header:        strings.TrimSpace(deliverHeader),
 				UserQuery:     deliverOriginalMessage,
 				AgentName:     deliverAgentName,
+				Metadata:      deliverMeta,
 			}
 		}
 
 		go func() {
 			ctxForBroadcast := opts.Context // Capture context for broadcast
 			deliverForGoroutine := deliverCtx
+			var openAPICompleted int32
 			defer func() {
+				if atomic.LoadInt32(&openAPICompleted) == 0 {
+					failOpenAPIRun(runId, errOpenAPIRunNoReply)
+				}
 				cfg := loadConfigFromContext(ctxForBroadcast)
 				browser.StopForRun(context.Background(), cfg, os.Getenv, runId)
 				chatAbortControllers.Delete(runId)
@@ -1931,7 +2094,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 			}
 
 			// Create runtime with model factory from config
-			var modelFactory api.ModelFactory
+			var modelFactory agent.ModelFactory
 			var isXunfeiProvider bool
 			if cfg := loadConfigFromContext(ctxForBroadcast); cfg != nil {
 				agentID := agent.ResolveSessionAgentID(sessionKey)
@@ -1954,7 +2117,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 						}
 					}
 				}
-				var factory api.ModelFactory
+				var factory agent.ModelFactory
 				var factoryErr error
 				if modelRefOverride != "" {
 					factory, factoryErr = agent.CreateModelFactoryForModelRef(cfg, modelRefOverride)
@@ -2014,6 +2177,13 @@ func ChatSendHandler(opts HandlerOpts) error {
 					systemPromptOverrides = strings.TrimSpace(m.Prompt)
 				}
 			}
+			if hint := BuildLocalAgentSystemHint(message, runtimeConfig); hint != "" {
+				if systemPromptOverrides != "" {
+					systemPromptOverrides = strings.TrimSpace(systemPromptOverrides) + "\n\n" + hint
+				} else {
+					systemPromptOverrides = hint
+				}
+			}
 			skillKeysForFP := append([]string(nil), runResources.SkillKeys...)
 			xunfeiImageMode := false
 			if isXunfeiProvider {
@@ -2045,10 +2215,11 @@ func ChatSendHandler(opts HandlerOpts) error {
 					invoker = &gatewayInvokerAdapter{invoke: ctxForBroadcast.InvokeMethod}
 				}
 				agentTools := tools.DefaultToolsWithInvoker(invoker)
+				agentTools = AppendLocalAgentToolsForSession(agentTools, runtimeConfig, agentID, os.Getenv)
 
 				toolOrder := make([]string, 0, len(agentTools))
-				toolByName := make(map[string]sdkTool.Tool, len(agentTools))
-				addTool := func(t sdkTool.Tool) {
+				toolByName := make(map[string]octool.Tool, len(agentTools))
+				addTool := func(t octool.Tool) {
 					if t == nil {
 						return
 					}
@@ -2096,7 +2267,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 					}
 				}
 
-				agentTools = make([]sdkTool.Tool, 0, len(toolOrder))
+				agentTools = make([]octool.Tool, 0, len(toolOrder))
 				for _, name := range toolOrder {
 					if t, ok := toolByName[name]; ok && t != nil {
 						agentTools = append(agentTools, t)
@@ -2129,7 +2300,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 					EmployeeID:            employeeID,
 					EnableSubagents:       true,
 					EnableSandbox:         true,
-					EnableApprovalQueue:   true,
+					EnableApprovalQueue:   runtime.ApprovalQueueEnabled(runtimeConfig),
 					EnableSystemPrompt:    true,
 					SystemPromptOverrides: systemPromptOverrides,
 					TokenTracking:         true,
@@ -2160,6 +2331,11 @@ func ChatSendHandler(opts HandlerOpts) error {
 				chatLog.Info("chat runtime pool acquired sessionKey=%s runId=%s waitedMs=%d poolSize=%d",
 					sessionKey, runId, waited.Milliseconds(), runtime.PooledSessionCount())
 			}
+			if existing, ok := chatAbortControllers.Load(runId); ok {
+				if ctrl, ok := existing.(*ChatAbortController); ok {
+					ctrl.TurnAbort = func() { rt.AbortSessionTurn() }
+				}
+			}
 			defer releasePooledRT()
 
 			// Execute agent run with streaming
@@ -2176,6 +2352,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 				content, _ := obj["content"].(string)
 				dataUrl, _ := obj["dataUrl"].(string)
 				mimeType, _ := obj["mimeType"].(string)
+				filename, _ := obj["filename"].(string)
 				if content == "" && dataUrl == "" {
 					continue
 				}
@@ -2193,26 +2370,29 @@ func ChatSendHandler(opts HandlerOpts) error {
 					base64Data = parts[1]
 				}
 
-				var blockType model.ContentBlockType = model.ContentBlockDocument
-				if strings.HasPrefix(strings.ToLower(mimeType), "image/") {
-					blockType = model.ContentBlockImage
-				}
-
-				// Xunfei's OpenAI-compatible chat endpoint (like Spark 4.0 Ultra) supports image/image_url
-				// in messages. We do not skip image blocks.
 				contentBlocks = append(contentBlocks, model.ContentBlock{
-					Type:      blockType,
+					Type:      inferChatAttachmentContentBlockType(filename, mimeType),
 					MediaType: mimeType,
 					Data:      base64Data,
 				})
 			}
 
-			req := api.Request{
+			req := runtime.Request{
 				Prompt:        prompt,
 				ContentBlocks: contentBlocks,
 				SessionID:     sessionID,
+				RequestID:     runId,
 			}
-			eventChan, streamErr := rt.RunStream(ctx, req)
+			if !preempt {
+				rt.ClearSessionCheckpoints(sessionID)
+			}
+			var eventChan <-chan stream.StreamEvent
+			var streamErr error
+			if preempt {
+				eventChan, streamErr = rt.RunStreamTurn(ctx, req, runId, true)
+			} else {
+				eventChan, streamErr = rt.RunStream(ctx, req)
+			}
 			if streamErr != nil {
 				// Fallback to non-streaming run if RunStream is not supported
 				resp, runErr := rt.Run(ctx, req)
@@ -2296,7 +2476,9 @@ func ChatSendHandler(opts HandlerOpts) error {
 					if cronSummary == "" {
 						cronSummary = output
 					}
-					deliverAssistantToIM(ctxForBroadcast, deliverForGoroutine, cronSummary)
+					if deliverAssistantReplies(ctxForBroadcast, runId, deliverForGoroutine, cronSummary, nil, opts.Usage) {
+						atomic.StoreInt32(&openAPICompleted, 1)
+					}
 					if cronSession {
 						runAtMs := runStart.UnixMilli()
 						durationMs := time.Since(runStart).Milliseconds()
@@ -2313,13 +2495,14 @@ func ChatSendHandler(opts HandlerOpts) error {
 
 			// Stream events: broadcast agent events and append to sessionFile (transcript)
 			var textBuf strings.Builder
+			var thinkingBuf strings.Builder
 			var assistantContent []map[string]interface{}
 			var lastMessageID string
-			var usageSnapshot *api.Usage
+			var usageSnapshot *stream.Usage
 			stopReason := ""
 			// 每轮 EventMessageStop 可能对应「工具前说明 / 工具 / 最终回答」之一；只对飞书等 IM 保留「最后一次非空」的可见摘录，流结束再发一条。
 			lastAssistantContent := ""
-			streamIMPlain := ""
+			//streamIMPlain := ""
 
 			var firstTokenTime time.Time
 			var totalToolDurationMs int64
@@ -2332,11 +2515,18 @@ func ChatSendHandler(opts HandlerOpts) error {
 					break streamLoop
 				}
 				switch evt.Type {
-				case api.EventContentBlockDelta:
+				case stream.EventContentBlockDelta:
 					if firstTokenTime.IsZero() {
 						firstTokenTime = time.Now()
 					}
-					if evt.Delta != nil && evt.Delta.Text != "" {
+					if evt.Delta != nil && evt.Delta.Thinking != "" {
+						merged := mergeStreamingThinkingText(thinkingBuf.String(), evt.Delta.Thinking)
+						thinkingBuf.Reset()
+						thinkingBuf.WriteString(merged)
+						assistantContent = upsertAssistantThinkingBlock(assistantContent, merged)
+						broadcastChatReasoningDelta(ctxForBroadcast, runId, sessionKey, evt.Delta.Thinking)
+					}
+					if evt.Delta != nil && evt.Delta.Text != "" && !stream.IsLeakedAssistantText(evt.Delta.Text) {
 						delta := evt.Delta.Text
 						textBuf.WriteString(delta)
 						visible := textBuf.String()
@@ -2351,22 +2541,19 @@ func ChatSendHandler(opts HandlerOpts) error {
 					if evt.Delta != nil && evt.Delta.StopReason != "" {
 						stopReason = evt.Delta.StopReason
 					}
-				case api.EventA2UI:
+				case stream.EventA2UI:
 					if len(evt.A2UI) > 0 {
 						turnHasA2UI = true
 						broadcastChatA2UI(ctxForBroadcast, runId, sessionKey, evt.A2UI)
 						var parsed map[string]interface{}
 						if json.Unmarshal(evt.A2UI, &parsed) == nil {
-							assistantContent = append(assistantContent, map[string]interface{}{
-								"type": "a2ui",
-								"a2ui": parsed,
-							})
+							assistantContent = a2ui.AppendAssistantA2UIBlock(assistantContent, parsed)
 						}
 						broadcastAgentEvent(ctxForBroadcast, runId, sessionKey, "a2ui", map[string]interface{}{
 							"a2ui": json.RawMessage(evt.A2UI),
 						})
 					}
-				case api.EventContentBlockStart:
+				case stream.EventContentBlockStart:
 					if firstTokenTime.IsZero() {
 						firstTokenTime = time.Now()
 					}
@@ -2392,18 +2579,40 @@ func ChatSendHandler(opts HandlerOpts) error {
 								"name":       evt.ContentBlock.Name,
 								"arguments":  evt.ContentBlock.Input,
 							})
+						} else if evt.ContentBlock.Type == "thinking" && evt.ContentBlock.Thinking != "" {
+							merged := mergeStreamingThinkingText(thinkingBuf.String(), evt.ContentBlock.Thinking)
+							thinkingBuf.Reset()
+							thinkingBuf.WriteString(merged)
+							assistantContent = upsertAssistantThinkingBlock(assistantContent, merged)
+							if len(merged) > 0 {
+								broadcastChatReasoningDelta(ctxForBroadcast, runId, sessionKey, evt.ContentBlock.Thinking)
+							}
 						} else if evt.ContentBlock.Type == "text" && evt.ContentBlock.Text != "" && !shouldSuppressAssistantTextForA2UI(evt.ContentBlock.Text, assistantContent, turnHasA2UI) {
 							assistantContent = append(assistantContent, map[string]interface{}{"type": "text", "text": evt.ContentBlock.Text})
 						}
 					}
-				case api.EventToolExecutionStart:
+				case stream.EventToolExecutionStart:
 					if evt.ToolUseID != "" {
 						toolStartTimes[evt.ToolUseID] = time.Now()
 					}
 					if tools.IsBrowserToolName(evt.Name) {
 						browser.MarkRunUsingBrowser(runId)
 					}
-				case api.EventToolExecutionResult:
+					// Eino emits tool_execution_start (not content_block_start) for tool calls.
+					assistantContent = appendAssistantToolCallBlock(assistantContent, evt)
+					if evt.ContentBlock != nil {
+						broadcastAgentEvent(ctxForBroadcast, runId, sessionKey, "tool_call", map[string]interface{}{
+							"toolCallId": evt.ContentBlock.ID,
+							"name":       evt.ContentBlock.Name,
+							"arguments":  evt.ContentBlock.Input,
+						})
+					} else if evt.ToolUseID != "" {
+						broadcastAgentEvent(ctxForBroadcast, runId, sessionKey, "tool_call", map[string]interface{}{
+							"toolCallId": evt.ToolUseID,
+							"name":       evt.Name,
+						})
+					}
+				case stream.EventToolExecutionResult:
 					if ctx.Err() != nil {
 						break streamLoop
 					}
@@ -2419,9 +2628,6 @@ func ChatSendHandler(opts HandlerOpts) error {
 						"isError":    isErr,
 					})
 					if !isErr {
-						for _, block := range tools.ParseOpenOctaAttachments(outputStr) {
-							assistantContent = append(assistantContent, block)
-						}
 						for _, block := range tools.AttachmentBlocksFromDeliverableToolOutput(evt.Name, outputStr, projectRoot) {
 							assistantContent = append(assistantContent, block)
 						}
@@ -2435,9 +2641,6 @@ func ChatSendHandler(opts HandlerOpts) error {
 						{"type": "text", "text": tools.StripOpenOctaAttachmentsMarker(outputStr)},
 					}
 					if !isErr {
-						for _, block := range tools.ParseOpenOctaAttachments(outputStr) {
-							toolResultContent = append(toolResultContent, block)
-						}
 						for _, block := range tools.AttachmentBlocksFromDeliverableToolOutput(evt.Name, outputStr, projectRoot) {
 							toolResultContent = append(toolResultContent, block)
 						}
@@ -2459,18 +2662,26 @@ func ChatSendHandler(opts HandlerOpts) error {
 					if err := session.AppendTranscriptLine(transcriptPath, line); err != nil {
 						chatLog.Warn("append toolResult to transcript failed path=%s err=%v", transcriptPath, err)
 					}
-				case api.EventMessageDelta:
+				case stream.EventMessageDelta:
 					if evt.Usage != nil {
 						usageSnapshot = evt.Usage
 					}
-				case api.EventMessageStop:
+				case stream.EventRunInterrupted:
+					if evt.Interrupt != nil {
+						broadcastChatInterrupt(ctxForBroadcast, runId, sessionKey, evt.Interrupt)
+					}
+					if evt.Interrupt != nil {
+						stopReason = "interrupt"
+					}
+				case stream.EventMessageStop:
 					if ctx.Err() != nil {
 						break streamLoop
 					}
 					if evt.Usage != nil {
 						usageSnapshot = evt.Usage
 					}
-					if stopReason == "" && evt.Delta != nil {
+					// 每轮 MessageStop 都应用当前事件的 stopReason（勿仅在空时赋值，否则上一轮 tool_use 会粘住）。
+					if evt.Delta != nil && evt.Delta.StopReason != "" {
 						stopReason = evt.Delta.StopReason
 					}
 					// Flush assistant message: thinking + toolCalls + text (snapshot for this turn only)
@@ -2480,7 +2691,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 							assistantContent = append(assistantContent, map[string]interface{}{"type": "text", "text": text})
 						}
 					}
-					isFinalTurn := stopReason != "tool_use"
+					isFinalTurn := stopReason != "tool_use" && stopReason != "interrupt"
 					assistantContent = normalizeAssistantContentForA2UI(
 						assistantContent,
 						isFinalTurn,
@@ -2570,23 +2781,26 @@ func ChatSendHandler(opts HandlerOpts) error {
 						// tool_use 轮次广播 turn（保留 run 状态）；最终轮次广播 final。
 						if stopReason == "tool_use" {
 							broadcastChatTurn(ctxForBroadcast, runId, sessionKey, messageBody)
+						} else if stopReason == "interrupt" {
+							broadcastChatTurn(ctxForBroadcast, runId, sessionKey, messageBody)
 						} else {
 							broadcastChatFinal(ctxForBroadcast, runId, sessionKey, messageBody)
 						}
-						if t := extractAssistantTextForIMDelivery(messageBody); t != "" {
-							streamIMPlain = t
+						if t := imPlainFromTurn(messageBody, textBuf.String(), stopReason); t != "" {
+							//streamIMPlain = t
 							lastAssistantContent = t
 						}
 						// Reset accumulators so next EventMessageStop (if any) does not include this turn's content
 						assistantContent = nil
 						textBuf.Reset()
+						thinkingBuf.Reset()
 						turnHasA2UI = false
 					} else if usageSnapshot != nil && stopReason != "tool_use" {
 						broadcastChatFinal(ctxForBroadcast, runId, sessionKey, map[string]interface{}{
 							"role": "assistant", "content": []map[string]interface{}{}, "timestamp": time.Now().UnixMilli(),
 						})
 					}
-				case api.EventError:
+				case stream.EventError:
 					outMsg := ""
 					if evt.Output != nil {
 						if s, ok := evt.Output.(string); ok {
@@ -2605,15 +2819,18 @@ func ChatSendHandler(opts HandlerOpts) error {
 			// 流式正常结束：只向 IM 发送一条，内容为多次 MessageStop 中最后一次非空的「最终可见」摘录（与钉钉/企微/飞书同一逻辑）。
 			if ctx.Err() == nil {
 				// 兜底逻辑：如果 streamIMPlain 为空（如只有工具调用无文本回复），使用 lastAssistantContent
-				textToSend := streamIMPlain
+				//textToSend := streamIMPlain
+				textToSend := textBuf.String()
 				if strings.TrimSpace(textToSend) == "" && lastAssistantContent != "" {
 					textToSend = lastAssistantContent
 					chatLog.Debug("streamIMPlain empty, fallback to lastAssistantContent sessionKey=%s", sessionKey)
 				}
 				if strings.TrimSpace(textToSend) != "" {
-					deliverAssistantToIM(ctxForBroadcast, deliverForGoroutine, textToSend)
+					if deliverAssistantReplies(ctxForBroadcast, runId, deliverForGoroutine, textToSend, usageSnapshot, nil) {
+						atomic.StoreInt32(&openAPICompleted, 1)
+					}
 				} else {
-					chatLog.Warn("IM delivery skipped: no content to deliver sessionKey=%s", sessionKey)
+					chatLog.Warn("reply delivery skipped: no content to deliver sessionKey=%s", sessionKey)
 				}
 			}
 			if cronSession {
@@ -2623,8 +2840,38 @@ func ChatSendHandler(opts HandlerOpts) error {
 				DeliverCronResultIfNeeded(ctxForBroadcast, sessionKey, lastAssistantContent, "ok")
 			}
 
-			// Context cancelled or stream closed
+			// Context cancelled or stream closed — flush partial assistant content before reporting cancel.
 			if ctx.Err() != nil {
+				if len(assistantContent) > 0 || textBuf.Len() > 0 {
+					if textBuf.Len() > 0 {
+						text := textBuf.String()
+						if !shouldSuppressAssistantTextForA2UI(text, assistantContent, turnHasA2UI) {
+							assistantContent = append(assistantContent, map[string]interface{}{"type": "text", "text": text})
+						}
+					}
+					if stopReason == "" {
+						stopReason = "cancelled"
+					}
+					if snap, ok := publishAssistantSnapshot(assistantSnapshotParams{
+						ctx:               ctxForBroadcast,
+						runId:             runId,
+						sessionKey:        sessionKey,
+						transcriptPath:    transcriptPath,
+						projectRoot:       projectRoot,
+						content:           assistantContent,
+						stopReason:        stopReason,
+						modelRef:          modelRefForRun,
+						runStart:          runStart,
+						firstTokenTime:    firstTokenTime,
+						totalToolDuration: totalToolDurationMs,
+						usage:             usageSnapshot,
+						parentMessageID:   lastMessageID,
+					}); ok {
+						lastMessageID = snap.lastMessageID
+					}
+					assistantContent = nil
+					textBuf.Reset()
+				}
 				reason := "已取消"
 				if ctx.Err() == context.DeadlineExceeded {
 					reason = "已超时"
@@ -2672,8 +2919,11 @@ func ChatSendHandler(opts HandlerOpts) error {
 					parentMessageID:   lastMessageID,
 				}); ok {
 					lastMessageID = snap.lastMessageID
-					if snap.imPlain != "" {
-						streamIMPlain = snap.imPlain
+					if t := imPlainFromTurn(snap.messageBody, textBuf.String(), stopReason); t != "" {
+						//streamIMPlain = t
+						lastAssistantContent = t
+					} else if snap.imPlain != "" {
+						//streamIMPlain = snap.imPlain
 						lastAssistantContent = snap.imPlain
 					}
 				}
@@ -2736,7 +2986,9 @@ func ChatSendHandler(opts HandlerOpts) error {
 					if cronSummary == "" {
 						cronSummary = output
 					}
-					deliverAssistantToIM(ctxForBroadcast, deliverForGoroutine, cronSummary)
+					if deliverAssistantReplies(ctxForBroadcast, runId, deliverForGoroutine, cronSummary, nil, opts.Usage) {
+						atomic.StoreInt32(&openAPICompleted, 1)
+					}
 					if cronSession {
 						runAtMs := runStart.UnixMilli()
 						writeCronSessionResult(sessionKey, sessionID, cronSummary, "ok", runAtMs, durationMs)
@@ -2793,6 +3045,51 @@ func waitForSessionRuntimePool(sessionKey, runId string, abortedRuns []string) e
 	return fmt.Errorf("session runtime is still busy; please retry")
 }
 
+// sessionHasInFlightRuns reports whether sessionKey has active runs other than exceptRunId.
+func sessionHasInFlightRuns(sessionKey, exceptRunId string) bool {
+	sessionKey = strings.TrimSpace(strings.ToLower(sessionKey))
+	exceptRunId = strings.TrimSpace(exceptRunId)
+	found := false
+	chatAbortControllers.Range(func(key, value interface{}) bool {
+		runID := key.(string)
+		if exceptRunId != "" && runID == exceptRunId {
+			return true
+		}
+		ctrl := value.(*ChatAbortController)
+		if ctrl.SessionKey == sessionKey {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// broadcastChatInterrupt notifies clients that agent execution paused for approval.
+func broadcastChatInterrupt(ctx *Context, runID, sessionKey string, payload *stream.InterruptPayload) {
+	if ctx == nil || payload == nil || ctx.Broadcast == nil {
+		return
+	}
+	seq := int64(0)
+	if ctx.AgentRunSeq != nil {
+		seq = nextChatSeq(ctx.AgentRunSeq, runID)
+	}
+	body := map[string]interface{}{
+		"runId":      runID,
+		"sessionKey": sessionKey,
+		"seq":        seq,
+		"state":      "interrupted",
+		"toolName":   payload.ToolName,
+		"arguments":  payload.Arguments,
+		"stopReason": payload.StopReason,
+		"contexts":   payload.Contexts,
+	}
+	ctx.Broadcast("chat", body, nil)
+	if ctx.NodeSendToSession != nil {
+		ctx.NodeSendToSession(sessionKey, "chat", body)
+	}
+}
+
 // abortInFlightChatRunsForSession cancels active chat runs for sessionKey.
 // exceptRunId is kept when non-empty (idempotent chat.send retry for the same runId).
 func abortInFlightChatRunsForSession(sessionKey, exceptRunId string) []string {
@@ -2806,6 +3103,9 @@ func abortInFlightChatRunsForSession(sessionKey, exceptRunId string) []string {
 		}
 		ctrl := value.(*ChatAbortController)
 		if ctrl.SessionKey == sessionKey {
+			if ctrl.TurnAbort != nil {
+				ctrl.TurnAbort()
+			}
 			ctrl.Controller()
 			chatAbortControllers.Delete(runId)
 			aborted = append(aborted, runId)
@@ -2895,7 +3195,7 @@ func handleChatNewCommand(opts HandlerOpts) error {
 		if projectRoot == "" {
 			projectRoot = "."
 		}
-		runtime.ClearSessionHistory(projectRoot, oldSessionID)
+		clearSessionAgentState(projectRoot, oldSessionID)
 	}
 	abortInFlightChatRunsForSession(sessionKey, "")
 	runtime.EvictSessionRuntime(sessionKey)
@@ -3037,6 +3337,9 @@ func ChatAbortHandler(opts HandlerOpts) error {
 			runId, ctrl.SessionKey, sessionKey)
 	}
 
+	if ctrl.TurnAbort != nil {
+		ctrl.TurnAbort()
+	}
 	ctrl.Controller()
 	chatAbortControllers.Delete(runId)
 
@@ -3206,4 +3509,169 @@ func ChatA2UIActionHandler(opts HandlerOpts) error {
 		Params:  sendParams,
 		Respond: opts.Respond,
 	})
+}
+
+// ChatResumeHandler resumes an Eino-interrupted agent run after user approval (chat.resume).
+func ChatResumeHandler(opts HandlerOpts) error {
+	sessionKey, _ := opts.Params["sessionKey"].(string)
+	sessionKey = strings.TrimSpace(strings.ToLower(sessionKey))
+	runID, _ := opts.Params["runId"].(string)
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		runID, _ = opts.Params["idempotencyKey"].(string)
+		runID = strings.TrimSpace(runID)
+	}
+	approved := true
+	if v, ok := opts.Params["approved"].(bool); ok {
+		approved = v
+	}
+	reason, _ := opts.Params["reason"].(string)
+
+	sessionID, _, _, err := ResolveChatSessionID(opts.Params, opts.Context)
+	if err != nil {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "chat.resume: invalid session: " + err.Error(),
+		}, nil)
+		return nil
+	}
+	if runID == "" {
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeInvalidRequest,
+			Message: "chat.resume: runId required",
+		}, nil)
+		return nil
+	}
+
+	var targets map[string]any
+	if raw, ok := opts.Params["targets"].(map[string]interface{}); ok && len(raw) > 0 {
+		targets = make(map[string]any, len(raw))
+		for k, v := range raw {
+			targets[k] = v
+		}
+	}
+	var contexts []stream.InterruptContext
+	if raw, ok := opts.Params["contexts"].([]interface{}); ok {
+		for _, item := range raw {
+			b, mErr := json.Marshal(item)
+			if mErr != nil {
+				continue
+			}
+			var ic stream.InterruptContext
+			if json.Unmarshal(b, &ic) == nil {
+				contexts = append(contexts, ic)
+			}
+		}
+	}
+
+	cfg := loadConfigFromContext(opts.Context)
+	projectRoot := "."
+	agentID := "main"
+	if cfg != nil {
+		agentID = agent.ResolveSessionAgentID(sessionKey)
+		projectRoot = agent.ResolveAgentWorkspaceDir(cfg, agentID, os.Getenv)
+	}
+	if projectRoot == "" {
+		projectRoot = "."
+	}
+	runtimeFP := chatRuntimeFingerprint(projectRoot, agentID, "", "", false, nil, nil, false, "")
+
+	timeoutMs := 600000
+	if cfg != nil && cfg.Env != nil && cfg.Env.Vars != nil {
+		if d := runtime.DefaultAgentRunDuration(os.Getenv, cfg); d > 0 {
+			timeoutMs = int(d / time.Millisecond)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	now := time.Now().UnixMilli()
+	ctrl := &ChatAbortController{
+		Controller:  cancel,
+		SessionID:   sessionID,
+		SessionKey:  sessionKey,
+		StartedAtMs: now,
+		ExpiresAtMs: now + int64(timeoutMs),
+	}
+	chatAbortControllers.Store(runID, ctrl)
+
+	rt, releasePooledRT, acqErr := runtime.DefaultPool().Acquire(sessionKey, runtimeFP, func() (*runtime.Runtime, func(), error) {
+		var factory agent.ModelFactory = runtime.DefaultModelFactory()
+		if cfg != nil {
+			if f, fErr := agent.CreateModelFactoryFromConfig(cfg, agentID); fErr == nil {
+				factory = f
+			}
+		}
+		newRT, nErr := runtime.New(context.Background(), runtime.Options{
+			ModelFactory:        factory,
+			ProjectRoot:         projectRoot,
+			Config:              cfg,
+			EnableSkills:        true,
+			EnableApprovalQueue: runtime.ApprovalQueueEnabled(cfg),
+			EnableSystemPrompt:  true,
+			AgentID:             agentID,
+			Env:                 os.Getenv,
+			TokenTracking:       true,
+		})
+		if nErr != nil {
+			return nil, nil, nErr
+		}
+		return newRT, nil, nil
+	})
+	if acqErr != nil {
+		chatAbortControllers.Delete(runID)
+		cancel()
+		opts.Respond(false, nil, &protocol.ErrorShape{
+			Code:    protocol.ErrCodeServiceUnavailable,
+			Message: "chat.resume: " + acqErr.Error(),
+		}, nil)
+		return nil
+	}
+	if existing, ok := chatAbortControllers.Load(runID); ok {
+		if c, ok := existing.(*ChatAbortController); ok {
+			c.TurnAbort = func() { rt.AbortSessionTurn() }
+		}
+	}
+
+	opts.Respond(true, map[string]interface{}{
+		"runId":  runID,
+		"status": "resuming",
+	}, nil, map[string]interface{}{
+		"runId": runID,
+	})
+
+	go func() {
+		ctxForBroadcast := opts.Context
+		defer func() {
+			chatAbortControllers.Delete(runID)
+			cancel()
+			releasePooledRT()
+			broadcastChatComplete(ctxForBroadcast, runID, sessionKey)
+		}()
+		approval := eino.TurnApproval{
+			Approved: approved,
+			Reason:   strings.TrimSpace(reason),
+			Targets:  targets,
+			Contexts: contexts,
+		}
+		eventChan, streamErr := rt.ResumeStream(ctx, sessionID, runID, approval)
+		if streamErr != nil {
+			broadcastChatError(ctxForBroadcast, runID, sessionKey, streamErr.Error())
+			return
+		}
+		for evt := range eventChan {
+			if ctx.Err() != nil {
+				return
+			}
+			switch evt.Type {
+			case stream.EventRunInterrupted:
+				if evt.Interrupt != nil {
+					broadcastChatInterrupt(ctxForBroadcast, runID, sessionKey, evt.Interrupt)
+				}
+			case stream.EventError:
+				broadcastChatError(ctxForBroadcast, runID, sessionKey, evt.Name)
+				return
+			}
+		}
+	}()
+
+	return nil
 }

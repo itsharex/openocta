@@ -463,18 +463,3 @@ func AttachmentBlockFromLocalPath(projectRoot, rawPath string) (map[string]inter
 	}
 	return nil, fmt.Errorf("attachment not found or unreadable")
 }
-
-func fileAttachmentFromBytes(filename, mime string, body []byte) openOctaAttachment {
-	if strings.TrimSpace(filename) == "" {
-		filename = "download.bin"
-	}
-	if strings.TrimSpace(mime) == "" {
-		mime = "application/octet-stream"
-	}
-	return openOctaAttachment{
-		Type:     "file",
-		Filename: filename,
-		MimeType: mime,
-		Data:     base64.StdEncoding.EncodeToString(body),
-	}
-}

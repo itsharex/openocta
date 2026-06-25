@@ -1,11 +1,14 @@
 import type { ChatState } from "../controllers/chat.ts";
 import type { ChatEventPayload } from "../controllers/chat.ts";
+import { dedupeA2UIMessages } from "./a2ui-bridge.ts";
+import { extractThinking } from "./message-extract.ts";
 import { canonicalGatewaySessionKey, gatewaySessionKeysEqual } from "../sessions/session-key-utils.js";
 
 export type SessionChatRunState = {
   runId: string | null;
   runPhase: "idle" | "thinking" | "tool" | "streaming";
   stream: string | null;
+  reasoningStream: string | null;
   streamStartedAt: number | null;
   a2uiMessages: unknown[];
   terminalRunIds: string[];
@@ -20,6 +23,7 @@ function defaultRunState(): SessionChatRunState {
     runId: null,
     runPhase: "idle",
     stream: null,
+    reasoningStream: null,
     streamStartedAt: null,
     a2uiMessages: [],
     terminalRunIds: [],
@@ -60,6 +64,7 @@ export function captureChatRunFields(state: ChatState): SessionChatRunState {
     runId: state.chatRunId,
     runPhase: state.chatRunPhase,
     stream: state.chatStream,
+    reasoningStream: state.chatReasoningStream,
     streamStartedAt: state.chatStreamStartedAt,
     a2uiMessages: [...state.chatA2UIMessages],
     terminalRunIds: [...(state.chatTerminalRunIds ?? [])],
@@ -73,10 +78,11 @@ function normalizeRunSnapshot(snap: SessionChatRunState): SessionChatRunState {
   if (next.runId && next.terminalRunIds.includes(next.runId)) {
     next = {
       ...next,
-      runId: null,
-      runPhase: "idle",
-      stream: null,
-      streamStartedAt: null,
+    runId: null,
+    runPhase: "idle",
+    stream: null,
+    reasoningStream: null,
+    streamStartedAt: null,
       a2uiMessages: [],
       sending: false,
     };
@@ -92,6 +98,7 @@ export function applyChatRunFields(state: ChatState, snap: SessionChatRunState) 
   state.chatRunId = normalized.runId;
   state.chatRunPhase = normalized.runPhase;
   state.chatStream = normalized.stream;
+  state.chatReasoningStream = normalized.reasoningStream;
   state.chatStreamStartedAt = normalized.streamStartedAt;
   state.chatA2UIMessages = [...normalized.a2uiMessages];
   state.chatTerminalRunIds = [...normalized.terminalRunIds];
@@ -124,6 +131,7 @@ export function resolveSessionChatRunState(
     | "chatRunId"
     | "chatRunPhase"
     | "chatStream"
+    | "chatReasoningStream"
     | "chatStreamStartedAt"
     | "chatA2UIMessages"
     | "chatTerminalRunIds"
@@ -158,6 +166,7 @@ export function isSessionChatBusy(
         ...live,
         chatRunPhase: "idle" as const,
         chatStream: null,
+        chatReasoningStream: null,
         chatStreamStartedAt: null,
         chatA2UIMessages: [],
         chatErrorRunId: null,
@@ -192,6 +201,7 @@ function clearActiveRun(snap: SessionChatRunState, runId?: string): SessionChatR
     runId: null,
     runPhase: "idle",
     stream: null,
+    reasoningStream: null,
     streamStartedAt: null,
     a2uiMessages: [],
     sending: false,
@@ -220,7 +230,7 @@ export function applyBackgroundChatEvent(sessionKey: string, payload: ChatEventP
       putSessionChatRunState(sessionKey, {
         ...snap,
         runId: snap.runId ?? (runId || null),
-        a2uiMessages: [...snap.a2uiMessages, payload.a2ui],
+        a2uiMessages: dedupeA2UIMessages([...snap.a2uiMessages, payload.a2ui]),
         runPhase: "streaming",
       });
     }
@@ -239,6 +249,17 @@ export function applyBackgroundChatEvent(sessionKey: string, payload: ChatEventP
   }
 
   if (payload.state === "delta") {
+    const reasoningChunk = typeof payload.reasoning === "string" ? payload.reasoning : "";
+    if (reasoningChunk) {
+      const current = snap.reasoningStream ?? "";
+      putSessionChatRunState(sessionKey, {
+        ...snap,
+        runId: snap.runId ?? (runId || null),
+        reasoningStream: current + reasoningChunk,
+        runPhase: "thinking",
+      });
+      return;
+    }
     const chunk = typeof payload.text === "string" ? payload.text : "";
     if (!chunk) {
       return;
@@ -258,9 +279,11 @@ export function applyBackgroundChatEvent(sessionKey: string, payload: ChatEventP
   }
 
   if (payload.state === "turn") {
+    const turnThinking = extractThinking(payload.message)?.trim() ?? "";
     putSessionChatRunState(sessionKey, {
       ...snap,
       runId: snap.runId ?? (runId || null),
+      reasoningStream: turnThinking ? null : snap.reasoningStream,
       runPhase: "tool",
     });
     return;

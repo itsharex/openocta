@@ -56,19 +56,14 @@ func TestNormalizeAssistantContentForA2UI(t *testing.T) {
 	}
 
 	textOnly := []map[string]interface{}{
-		{"type": "text", "text": "你好"},
+		{"type": "text", "text": "# Title\n\nLine one\nLine two"},
 	}
 	out = normalizeAssistantContentForA2UI(textOnly, true, nil)
-	if combinedAssistantText(out) != "" {
-		t.Fatalf("expected text converted away on final turn, got %q", combinedAssistantText(out))
+	if got := combinedAssistantText(out); got != "# Title\n\nLine one\nLine two" {
+		t.Fatalf("expected markdown text preserved on final turn, got %q", got)
 	}
-	if !assistantContentHasA2UI(out) {
-		t.Fatal("expected a2ui block from plain text conversion")
-	}
-
-	intermediate := normalizeAssistantContentForA2UI(textOnly, false, nil)
-	if combinedAssistantText(intermediate) != "你好" {
-		t.Fatalf("expected text kept on non-final turn, got %q", combinedAssistantText(intermediate))
+	if assistantContentHasA2UI(out) {
+		t.Fatal("expected no auto a2ui conversion for plain text")
 	}
 }
 
@@ -84,5 +79,25 @@ func TestExtractAssistantTextForIMDeliverySkipsPlaceholder(t *testing.T) {
 	}
 	if got := extractAssistantTextForIMDelivery(msg); got != "" {
 		t.Fatalf("extractAssistantTextForIMDelivery() = %q, want empty", got)
+	}
+}
+
+func TestImPlainFromTurnUsesTextBufWhenA2UIStripsText(t *testing.T) {
+	t.Parallel()
+
+	a2uiOnly := map[string]interface{}{
+		"role": "assistant",
+		"content": []map[string]interface{}{
+			{"type": "a2ui", "a2ui": map[string]interface{}{"updateDataModel": map[string]interface{}{"path": "/content", "value": "hello"}}},
+		},
+	}
+	if got := imPlainFromTurn(a2uiOnly, "hello from model", "end_turn"); got != "hello from model" {
+		t.Fatalf("imPlainFromTurn() = %q, want hello from model", got)
+	}
+	if got := imPlainFromTurn(a2uiOnly, "pre-tool", "tool_use"); got != "" {
+		t.Fatalf("imPlainFromTurn() on tool_use = %q, want empty", got)
+	}
+	if got := imPlainFromTurn(a2uiOnly, "final answer", "end_turn"); got != "final answer" {
+		t.Fatalf("imPlainFromTurn() on end_turn = %q, want final answer", got)
 	}
 }

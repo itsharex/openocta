@@ -1,17 +1,22 @@
 package handlers
 
-import "testing"
+import (
+	"testing"
 
-func TestChatRunDisallowedToolsWebSearchOffByDefault(t *testing.T) {
-	disallowed := chatRunDisallowedTools(ChatRunResources{})
-	if len(disallowed) != 3 {
-		t.Fatalf("expected 3 disallowed tools, got %v", disallowed)
+	"github.com/openocta/openocta/pkg/agent/tools"
+)
+
+func TestChatRunDisallowedToolsAlwaysBlocksWebTools(t *testing.T) {
+	cases := []ChatRunResources{
+		{},
+		{Configured: true, WebSearch: false},
+		{Configured: true, WebSearch: true},
+		{WebSearch: true},
 	}
-}
-
-func TestChatRunDisallowedToolsWebSearchEnabled(t *testing.T) {
-	disallowed := chatRunDisallowedTools(ChatRunResources{WebSearch: true})
-	if len(disallowed) != 0 {
-		t.Fatalf("expected no disallowed tools, got %v", disallowed)
+	for _, res := range cases {
+		disallowed := chatRunDisallowedTools(res)
+		if len(disallowed) != len(tools.WebToolNames) {
+			t.Fatalf("expected %d disallowed tools for %#v, got %v", len(tools.WebToolNames), res, disallowed)
+		}
 	}
 }

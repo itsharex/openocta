@@ -2,6 +2,7 @@ import type { GatewayBrowserClient } from "../gateway.ts";
 import type { CronJob, CronRunLogEntry, CronStatus } from "../types.ts";
 import type { CronFormState } from "../ui-types.ts";
 import { toNumber } from "../format.ts";
+import { applyScheduleToForm, buildAtCronExpr } from "../cron/cron-schedule.ts";
 
 export type CronState = {
   client: GatewayBrowserClient | null;
@@ -19,13 +20,21 @@ export type CronState = {
 function normalizeEmployeeIdForCron(raw: string): string {
   let s = (raw ?? "").trim();
   if (!s) return "";
-  // 兼容市场/目录层的 local:<id> 表示：存储与会话 key 只使用去前缀后的稳定 id。
   if (s.toLowerCase().startsWith("local:")) {
     s = s.slice("local:".length);
   }
-  // cron 的 employee 会话 key 以 ":" 分隔，id 内不能包含冒号。
   s = s.replaceAll(":", "-");
   return s.trim().toLowerCase();
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toLocalDateTimeInputValue(ms: number): string {
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 export async function loadCronStatus(state: CronState) {
@@ -62,13 +71,6 @@ export async function loadCronJobs(state: CronState) {
 }
 
 export function buildCronSchedule(form: CronFormState) {
-  if (form.scheduleKind === "at") {
-    const ms = Date.parse(form.scheduleAt);
-    if (!Number.isFinite(ms)) {
-      throw new Error("Invalid run time.");
-    }
-    return { kind: "at" as const, at: new Date(ms).toISOString() };
-  }
   if (form.scheduleKind === "every") {
     const amount = toNumber(form.everyAmount, 0);
     if (amount <= 0) {
@@ -78,6 +80,10 @@ export function buildCronSchedule(form: CronFormState) {
     const mult = unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000;
     return { kind: "every" as const, everyMs: amount * mult };
   }
+  if (form.scheduleKind === "at") {
+    const expr = buildAtCronExpr(form);
+    return { kind: "cron" as const, expr, tz: form.cronTz.trim() || undefined };
+  }
   const expr = form.cronExpr.trim();
   if (!expr) {
     throw new Error("Cron expression required.");
@@ -85,94 +91,109 @@ export function buildCronSchedule(form: CronFormState) {
   return { kind: "cron" as const, expr, tz: form.cronTz.trim() || undefined };
 }
 
-export function buildCronPayload(form: CronFormState) {
-  if (form.payloadKind === "systemEvent") {
-    const text = form.payloadText.trim();
-    if (!text) {
-      throw new Error("System event text required.");
+export function buildCronRunConfig(form: CronFormState) {
+  const modelRef = form.modelRef.trim();
+  const skillKeys = form.skillKeys.filter(Boolean);
+  const mcpServers = form.mcpServers.filter(Boolean);
+  let extraParams: Record<string, unknown> | undefined;
+  const rawExtra = form.extraParamsJson.trim();
+  if (rawExtra && rawExtra !== "{}") {
+    try {
+      const parsed = JSON.parse(rawExtra) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        extraParams = parsed as Record<string, unknown>;
+      }
+    } catch {
+      throw new Error("附加参数 JSON 格式无效。");
     }
-    return { kind: "systemEvent" as const, text };
   }
+  if (!modelRef && skillKeys.length === 0 && mcpServers.length === 0 && !extraParams) {
+    return {};
+  }
+  return {
+    modelRef: modelRef || undefined,
+    skillKeys: skillKeys.length ? skillKeys : undefined,
+    mcpServers: mcpServers.length ? mcpServers : undefined,
+    extraParams,
+  };
+}
+
+function buildCronDelivery(form: CronFormState) {
+  const channel = form.channel.trim();
+  if (!channel) {
+    return undefined;
+  }
+  const to = form.deliveryTo.trim();
+  if (!to) {
+    throw new Error("选择 IM 通道后，请填写群聊/用户 ID（如飞书 oc_xxx、ou_xxx）。");
+  }
+  return {
+    mode: "announce" as const,
+    channel,
+    to,
+  };
+}
+
+function buildCronPayload(form: CronFormState) {
   const message = form.payloadText.trim();
   if (!message) {
     throw new Error("Agent message required.");
   }
-  const payload: {
-    kind: "agentTurn";
-    message: string;
-    timeoutSeconds?: number;
-  } = { kind: "agentTurn", message };
-  const timeoutSeconds = toNumber(form.timeoutSeconds, 0);
-  if (timeoutSeconds > 0) {
-    payload.timeoutSeconds = timeoutSeconds;
-  }
-  return payload;
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function toLocalDateTimeInputValue(ms: number): string {
-  const d = new Date(ms);
-  if (Number.isNaN(d.getTime())) return "";
-  // datetime-local expects local time "YYYY-MM-DDTHH:mm"
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return { kind: "agentTurn" as const, message };
 }
 
 export function cronFormFromJob(job: CronJob, prev: CronFormState): CronFormState {
-  const scheduleKind = (job.schedule?.kind ?? prev.scheduleKind) as CronFormState["scheduleKind"];
   const next: CronFormState = { ...prev };
   next.name = job.name ?? "";
   next.description = job.description ?? "";
-  next.agentId = job.agentId ?? "";
   next.digitalEmployeeId = normalizeEmployeeIdForCron(job.digitalEmployeeId ?? "");
   next.enabled = !!job.enabled;
-  next.sessionTarget = (job.sessionTarget ?? prev.sessionTarget) as CronFormState["sessionTarget"];
-  next.wakeMode = (job.wakeMode ?? prev.wakeMode) as CronFormState["wakeMode"];
-
-  // Schedule
-  next.scheduleKind = scheduleKind;
-  const schedule = job.schedule;
-  if (scheduleKind === "at" && schedule?.kind === "at") {
-    const atMs = Date.parse(schedule.at ?? "");
-    next.scheduleAt = Number.isFinite(atMs) ? toLocalDateTimeInputValue(atMs) : "";
-  } else if (scheduleKind === "every" && schedule?.kind === "every") {
-    const everyMs = Number(schedule.everyMs ?? 0);
-    const minute = 60_000;
-    const hour = 3_600_000;
-    const day = 86_400_000;
-    if (everyMs > 0 && everyMs % day === 0) {
-      next.everyUnit = "days";
-      next.everyAmount = String(Math.max(1, Math.round(everyMs / day)));
-    } else if (everyMs > 0 && everyMs % hour === 0) {
-      next.everyUnit = "hours";
-      next.everyAmount = String(Math.max(1, Math.round(everyMs / hour)));
-    } else {
-      next.everyUnit = "minutes";
-      next.everyAmount = String(Math.max(1, Math.round((everyMs || minute) / minute)));
-    }
-  } else if (schedule?.kind === "cron") {
-    next.cronExpr = String(schedule.expr ?? "").trim() || prev.cronExpr;
-    next.cronTz = String(schedule.tz ?? "").trim();
-  }
-
-  // Payload
-  const pk = (job.payload?.kind ?? prev.payloadKind) as CronFormState["payloadKind"];
-  next.payloadKind = pk;
-  if (pk === "systemEvent") {
-    next.payloadText = String((job.payload as any)?.text ?? "");
-  } else {
-    next.payloadText = String((job.payload as any)?.message ?? "");
-  }
-
-  // Delivery (only relevant for agentTurn in UI, but keep mapping)
-  const mode = (job.delivery?.mode ?? "none") as CronFormState["deliveryMode"];
-  next.deliveryMode = mode === "announce" ? "announce" : "none";
-  next.deliveryChannel = job.delivery?.channel ?? "last";
+  next.payloadText =
+    job.payload?.kind === "agentTurn"
+      ? String(job.payload.message ?? "")
+      : String((job.payload as { text?: string })?.text ?? "");
+  next.channel = job.delivery?.channel && job.delivery.channel !== "last" ? job.delivery.channel : "";
   next.deliveryTo = job.delivery?.to ?? "";
+  next.modelRef = job.runConfig?.modelRef ?? "";
+  next.skillKeys = [...(job.runConfig?.skillKeys ?? [])];
+  next.mcpServers = [...(job.runConfig?.mcpServers ?? [])];
+  next.extraParamsJson =
+    job.runConfig?.extraParams && Object.keys(job.runConfig.extraParams).length > 0
+      ? JSON.stringify(job.runConfig.extraParams, null, 2)
+      : "{}";
+  return applyScheduleToForm(job.schedule, next);
+}
 
-  return next;
+function runConfigForSave(form: CronFormState) {
+  const rc = buildCronRunConfig(form);
+  if (!rc.modelRef && !(rc.skillKeys?.length ?? 0) && !(rc.mcpServers?.length ?? 0) && !rc.extraParams) {
+    return undefined;
+  }
+  return rc;
+}
+
+function buildCronJobBody(form: CronFormState) {
+  const schedule = buildCronSchedule(form);
+  const payload = buildCronPayload(form);
+  const delivery = buildCronDelivery(form);
+  const runConfig = runConfigForSave(form);
+  const digitalEmployeeId = normalizeEmployeeIdForCron(form.digitalEmployeeId.trim());
+  const job = {
+    name: form.name.trim(),
+    description: form.description.trim() || undefined,
+    digitalEmployeeId: digitalEmployeeId || undefined,
+    enabled: form.enabled,
+    schedule,
+    sessionTarget: "isolated" as const,
+    wakeMode: "now" as const,
+    payload,
+    delivery,
+    runConfig,
+  };
+  if (!job.name) {
+    throw new Error("Name required.");
+  }
+  return job;
 }
 
 export async function addCronJob(state: CronState) {
@@ -182,35 +203,7 @@ export async function addCronJob(state: CronState) {
   state.cronBusy = true;
   state.cronError = null;
   try {
-    const schedule = buildCronSchedule(state.cronForm);
-    const payload = buildCronPayload(state.cronForm);
-    const delivery =
-      state.cronForm.sessionTarget === "isolated" &&
-      state.cronForm.payloadKind === "agentTurn" &&
-      state.cronForm.deliveryMode
-        ? {
-            mode: state.cronForm.deliveryMode === "announce" ? "announce" : "none",
-            channel: state.cronForm.deliveryChannel.trim() || "last",
-            to: state.cronForm.deliveryTo.trim() || undefined,
-          }
-        : undefined;
-    const agentId = state.cronForm.agentId.trim();
-    const digitalEmployeeId = normalizeEmployeeIdForCron(state.cronForm.digitalEmployeeId.trim());
-    const job = {
-      name: state.cronForm.name.trim(),
-      description: state.cronForm.description.trim() || undefined,
-      agentId: agentId || undefined,
-      digitalEmployeeId: digitalEmployeeId || undefined,
-      enabled: state.cronForm.enabled,
-      schedule,
-      sessionTarget: state.cronForm.sessionTarget,
-      wakeMode: state.cronForm.wakeMode,
-      payload,
-      delivery,
-    };
-    if (!job.name) {
-      throw new Error("Name required.");
-    }
+    const job = buildCronJobBody(state.cronForm);
     await state.client.request("cron.add", job);
     state.cronForm = {
       ...state.cronForm,
@@ -234,33 +227,19 @@ export async function updateCronJob(state: CronState, jobId: string) {
   state.cronBusy = true;
   state.cronError = null;
   try {
-    const schedule = buildCronSchedule(state.cronForm);
-    const payload = buildCronPayload(state.cronForm);
-    const delivery =
-      state.cronForm.sessionTarget === "isolated" &&
-      state.cronForm.payloadKind === "agentTurn" &&
-      state.cronForm.deliveryMode
-        ? {
-            mode: state.cronForm.deliveryMode === "announce" ? "announce" : "none",
-            channel: state.cronForm.deliveryChannel.trim() || "last",
-            to: state.cronForm.deliveryTo.trim() || undefined,
-          }
-        : undefined;
+    const body = buildCronJobBody(state.cronForm);
     const patch = {
-      enabled: state.cronForm.enabled,
-      name: state.cronForm.name.trim(),
-      description: state.cronForm.description.trim(),
-      agentId: state.cronForm.agentId.trim() || undefined,
-      digitalEmployeeId: normalizeEmployeeIdForCron(state.cronForm.digitalEmployeeId.trim()) || "",
-      schedule,
-      sessionTarget: state.cronForm.sessionTarget,
-      wakeMode: state.cronForm.wakeMode,
-      payload,
-      delivery,
+      enabled: body.enabled,
+      name: body.name,
+      description: body.description ?? "",
+      digitalEmployeeId: body.digitalEmployeeId ?? "",
+      schedule: body.schedule,
+      sessionTarget: body.sessionTarget,
+      wakeMode: body.wakeMode,
+      payload: body.payload,
+      delivery: body.delivery,
+      runConfig: buildCronRunConfig(state.cronForm),
     };
-    if (!patch.name) {
-      throw new Error("Name required.");
-    }
     await state.client.request("cron.update", { id: jobId, patch });
     await loadCronJobs(state);
     await loadCronStatus(state);
@@ -340,3 +319,5 @@ export async function loadCronRuns(state: CronState, jobId: string) {
     state.cronError = String(err);
   }
 }
+
+export { toLocalDateTimeInputValue };

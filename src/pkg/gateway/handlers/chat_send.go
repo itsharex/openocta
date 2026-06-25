@@ -16,9 +16,12 @@ type ChatSendParams struct {
 	ChatType       string
 	MessageID      string
 	Header         string
+	Metadata       map[string]interface{}
 	Thinking       string
 	TimeoutMs      int
 	Attachments    []interface{}
+	ModelRef       string
+	Resources      map[string]interface{}
 }
 
 // InvokeChatSend 通过 ctx.InvokeMethod 调用 chat.send，返回 runId 与是否成功。
@@ -50,6 +53,9 @@ func InvokeChatSend(ctx *Context, p ChatSendParams) (runID string, ok bool) {
 	if p.Header != "" {
 		params["header"] = p.Header
 	}
+	if len(p.Metadata) > 0 {
+		params["deliverMetadata"] = p.Metadata
+	}
 	if p.Thinking != "" {
 		params["thinking"] = p.Thinking
 	}
@@ -58,6 +64,12 @@ func InvokeChatSend(ctx *Context, p ChatSendParams) (runID string, ok bool) {
 	}
 	if len(p.Attachments) > 0 {
 		params["attachments"] = p.Attachments
+	}
+	if p.ModelRef != "" {
+		params["modelRef"] = p.ModelRef
+	}
+	if len(p.Resources) > 0 {
+		params["resources"] = p.Resources
 	}
 	ok, payload, _ := ctx.InvokeMethod("chat.send", params)
 	if !ok || payload == nil {
@@ -99,6 +111,9 @@ func InvokeChatSendWithError(ctx *Context, p ChatSendParams) (runID string, ok b
 	if p.Header != "" {
 		params["header"] = p.Header
 	}
+	if len(p.Metadata) > 0 {
+		params["deliverMetadata"] = p.Metadata
+	}
 	if p.Thinking != "" {
 		params["thinking"] = p.Thinking
 	}
@@ -107,6 +122,12 @@ func InvokeChatSendWithError(ctx *Context, p ChatSendParams) (runID string, ok b
 	}
 	if len(p.Attachments) > 0 {
 		params["attachments"] = p.Attachments
+	}
+	if p.ModelRef != "" {
+		params["modelRef"] = p.ModelRef
+	}
+	if len(p.Resources) > 0 {
+		params["resources"] = p.Resources
 	}
 	ok, payload, errShape := ctx.InvokeMethod("chat.send", params)
 	if !ok {

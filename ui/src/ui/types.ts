@@ -694,6 +694,13 @@ export type CronDelivery = {
   bestEffort?: boolean;
 };
 
+export type CronRunConfig = {
+  modelRef?: string;
+  skillKeys?: string[];
+  mcpServers?: string[];
+  extraParams?: Record<string, unknown>;
+};
+
 export type CronJobState = {
   nextRunAtMs?: number;
   runningAtMs?: number;
@@ -715,9 +722,11 @@ export type CronJob = {
   updatedAtMs: number;
   schedule: CronSchedule;
   sessionTarget: CronSessionTarget;
+  sessionKey?: string;
   wakeMode: CronWakeMode;
   payload: CronPayload;
   delivery?: CronDelivery;
+  runConfig?: CronRunConfig;
   state?: CronJobState;
 };
 

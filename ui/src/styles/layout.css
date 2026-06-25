@@ -535,13 +535,13 @@
   border-radius: 999px;
   font-size: 12px;
   line-height: 1;
-  color: #ffffff;
+  color: var(--accent-foreground);
   border: none;
-  background: #000000;
+  background: var(--text-primary);
 }
 
 .security-help:hover {
-  background: #222222;
+  background: color-mix(in srgb, var(--text-primary) 85%, var(--accent));
 }
 
 /* ===========================================
@@ -635,9 +635,9 @@
 }
 
 .nav-badge--beta {
-  color: #4a3a00;
-  background: #ffd24a;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: color-mix(in srgb, var(--warn) 80%, var(--text-primary));
+  background: color-mix(in srgb, var(--warn) 25%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
 }
 
 .top-tab .nav-badge {
@@ -863,6 +863,12 @@ button.nav-item {
 
 .content--chat > * + * {
   margin-top: 0;
+}
+
+.content--chat > .chat:not(.chat-empty) {
+  flex: 1 1 0;
+  min-height: 0;
+  align-self: stretch;
 }
 
 /* Content header */
@@ -1627,7 +1633,6 @@ button.nav-item {
   --shell-nav-width: 240px;
 }
 
-.shell--tutorials,
 .shell--knowledge-vault {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
@@ -1647,8 +1652,11 @@ button.nav-item {
   padding: 0;
   height: auto;
   min-height: var(--shell-topbar-height);
-  background: var(--bg);
-  box-shadow: 0px 0px 10px 0px rgba(119, 122, 126, 0.08);
+  background: var(--bg-glass, var(--bg));
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .topbar__main {
@@ -1863,6 +1871,12 @@ button.nav-item {
 .topbar-link__img,
 .topbar-link__icon {
   opacity: 0.9;
+}
+
+.nav--config .nav-group__items--flat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 @media (max-width: 1200px) {

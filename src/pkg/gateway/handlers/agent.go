@@ -12,9 +12,9 @@ import (
 	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/agent/runtime"
 	"github.com/openocta/openocta/pkg/agent/tools"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
 // AgentHandler handles "agent" (simplified: local run, no streaming/delivery).
@@ -38,7 +38,7 @@ func AgentHandler(opts HandlerOpts) error {
 	defer cancel()
 
 	// Create runtime with model factory from config
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if opts.Context != nil && opts.Context.Config != nil {
 		// Use default agent ID for agent handler
 		factory, factoryErr := agent.CreateModelFactoryFromConfig(opts.Context.Config, "main")
@@ -58,6 +58,7 @@ func AgentHandler(opts HandlerOpts) error {
 		invoker = &gatewayInvokerAdapter{invoke: opts.Context.InvokeMethod}
 	}
 	agentTools := tools.DefaultToolsWithInvoker(invoker)
+	agentTools = AppendLocalAgentToolsForSession(agentTools, opts.Context.Config, "main", os.Getenv)
 	if IsAgentToAgentEnabled(opts.Context.Config) {
 		agentTools = append(agentTools, SwarmTools(true)...)
 	}
@@ -84,6 +85,7 @@ func AgentHandler(opts HandlerOpts) error {
 		EnableSubagents:    true,
 		EnableSystemPrompt: true,
 		Env:                os.Getenv,
+		TokenTracking:      true,
 	})
 	if err != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{
@@ -106,7 +108,7 @@ func AgentHandler(opts HandlerOpts) error {
 			}
 		}
 	}
-	req := api.Request{Prompt: prompt}
+	req := types.Request{Prompt: prompt}
 	resp, err := rt.Run(ctx, req)
 	if err != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{
@@ -139,7 +141,7 @@ func RunIsolatedAgentTurn(ctx *Context, agentID string, sessionKey string, messa
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), runDeadline)
 	defer cancel()
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if ctx.Config != nil {
 		factory, err := agent.CreateModelFactoryFromConfig(ctx.Config, agentID)
 		if err != nil {
@@ -155,6 +157,7 @@ func RunIsolatedAgentTurn(ctx *Context, agentID string, sessionKey string, messa
 		invoker = &gatewayInvokerAdapter{invoke: ctx.InvokeMethod}
 	}
 	agentTools := tools.DefaultToolsWithInvoker(invoker)
+	agentTools = AppendLocalAgentToolsForSession(agentTools, ctx.Config, agentID, os.Getenv)
 	if IsAgentToAgentEnabled(ctx.Config) {
 		agentTools = append(agentTools, SwarmTools(true)...)
 	}
@@ -179,9 +182,10 @@ func RunIsolatedAgentTurn(ctx *Context, agentID string, sessionKey string, messa
 		EmployeeID:          parseEmployeeIDFromSessionKey(sessionKey),
 		EnableSubagents:     true,
 		EnableSandbox:       true,
-		EnableApprovalQueue: true,
+		EnableApprovalQueue: runtime.ApprovalQueueEnabled(ctx.Config),
 		EnableSystemPrompt:  true,
 		Env:                 os.Getenv,
+		TokenTracking:       true,
 	})
 	if err != nil {
 		return
@@ -201,7 +205,7 @@ func RunIsolatedAgentTurn(ctx *Context, agentID string, sessionKey string, messa
 			}
 		}
 	}
-	_, _ = rt.Run(runCtx, api.Request{Prompt: prompt, SessionID: sessionKey})
+	_, _ = rt.Run(runCtx, types.Request{Prompt: prompt, SessionID: sessionKey})
 }
 
 // RunCronAgentOnce runs one non-streaming agent turn for a cron job and returns the output text.
@@ -217,7 +221,7 @@ func RunCronAgentOnce(ctx *Context, agentID string, sessionKey string, message s
 	runCtx, cancel := context.WithTimeout(context.Background(), runDeadline)
 	defer cancel()
 
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if ctx.Config != nil {
 		factory, err := agent.CreateModelFactoryFromConfig(ctx.Config, agentID)
 		if err != nil {
@@ -234,6 +238,7 @@ func RunCronAgentOnce(ctx *Context, agentID string, sessionKey string, message s
 		invoker = &gatewayInvokerAdapter{invoke: ctx.InvokeMethod}
 	}
 	agentTools := tools.DefaultToolsWithInvoker(invoker)
+	agentTools = AppendLocalAgentToolsForSession(agentTools, ctx.Config, agentID, os.Getenv)
 	if IsAgentToAgentEnabled(ctx.Config) {
 		agentTools = append(agentTools, SwarmTools(true)...)
 	}
@@ -260,9 +265,10 @@ func RunCronAgentOnce(ctx *Context, agentID string, sessionKey string, message s
 		EmployeeID:          parseEmployeeIDFromSessionKey(sessionKey),
 		EnableSubagents:     true,
 		EnableSandbox:       true,
-		EnableApprovalQueue: true,
+		EnableApprovalQueue: runtime.ApprovalQueueEnabled(ctx.Config),
 		EnableSystemPrompt:  true,
 		Env:                 os.Getenv,
+		TokenTracking:       true,
 	})
 	if err != nil {
 		return "", err
@@ -284,7 +290,7 @@ func RunCronAgentOnce(ctx *Context, agentID string, sessionKey string, message s
 		}
 	}
 
-	resp, err := rt.Run(runCtx, api.Request{Prompt: prompt, SessionID: sessionKey})
+	resp, err := rt.Run(runCtx, types.Request{Prompt: prompt, SessionID: sessionKey})
 	if err != nil {
 		return "", err
 	}

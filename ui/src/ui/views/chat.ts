@@ -1,22 +1,12 @@
 import { html, nothing } from "lit";
 import { ref } from "lit/directives/ref.js";
-import { repeat } from "lit/directives/repeat.js";
 import type { SessionsListResult } from "../types.ts";
-import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
 import type { ChatSessionResources } from "../chat/chat-resources.ts";
 import { chatResourcesSelectionCount } from "../chat/chat-resources.ts";
 import type { SkillStatusEntry } from "../types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { FilePreviewRequest } from "../chat/file-blocks.ts";
-import {
-  renderMessageGroup,
-  renderReadingIndicatorGroup,
-  renderStreamingGroup,
-  renderA2UIGroup,
-} from "../chat/grouped-render.ts";
-import { CHAT_HISTORY_LIMIT } from "../controllers/chat.ts";
-import { normalizeMessage, normalizeRoleForGrouping, isToolResultMessage } from "../chat/message-normalizer.ts";
 import { icons } from "../icons.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
 import { t } from "../strings.js";
@@ -25,6 +15,10 @@ import "../components/resizable-divider.ts";
 import "../components/chat-file-preview.ts";
 import "../components/chat-browser-preview.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
+import "../components/openocta-chat-thread.ts";
+import "../components/openocta-chat-input.ts";
+import "../components/openocta-local-agent-picker.ts";
+import type { LocalAgentProbeResult } from "../local-agents.ts";
 
 export type CompactionIndicatorStatus = {
   active: boolean;
@@ -70,6 +64,7 @@ export type ChatProps = {
   messages: unknown[];
   toolMessages: unknown[];
   stream: string | null;
+  reasoningStream?: string | null;
   streamStartedAt: number | null;
   runPhase?: "idle" | "thinking" | "tool" | "streaming";
   a2uiMessages?: unknown[];
@@ -77,6 +72,9 @@ export type ChatProps = {
   onA2UIAction?: (action: import("@a2ui/web_core/v0_9").A2uiClientAction) => Promise<void> | void;
   assistantAvatarUrl?: string | null;
   draft: string;
+  /** True when the isolated compose input has non-whitespace text. */
+  composeHasText?: boolean;
+  composeClearToken?: number;
   queue: ChatQueueItem[];
   connected: boolean;
   canSend: boolean;
@@ -105,11 +103,16 @@ export type ChatProps = {
   onConversationOnlyChange?: (next: boolean) => void;
   /** 空会话快捷输入；未传时使用内置默认文案 */
   quickPrompts?: string[];
+  localAgents?: LocalAgentProbeResult[];
+  composeInsertToken?: number;
+  composeInsertSnippet?: string;
+  onComposeInsert?: (snippet: string) => void;
   // Event handlers
   onRefresh: () => void;
   onToggleFocusMode: () => void;
   onDraftChange: (next: string) => void;
-  onSend: () => void;
+  onComposeDraftChange?: (hasText: boolean) => void;
+  onSend: (message?: string) => void;
   onAbort?: () => void;
   onQueueRemove: (id: string) => void;
   confirmQueueRemove?: boolean;
@@ -131,8 +134,10 @@ export type ChatProps = {
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
-/** 图片与文件统一上限（约 1MB） */
-export const CHAT_ATTACHMENT_MAX_BYTES = 1024 * 1024;
+/** 图片与文档上限 5MB */
+export const CHAT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+/** 视频上限 50MB */
+export const CHAT_ATTACHMENT_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 const CHAT_ATTACHMENT_MAX_COUNT = 1;
 
 const CHAT_ATTACHMENT_BLOCKED_EXTENSIONS = new Set([
@@ -191,6 +196,9 @@ const CHAT_ATTACHMENT_ALLOWED_EXTENSIONS = new Set([
   ".ppt",
   ".pptx",
   ".rtf",
+  ".mp4",
+  ".mov",
+  ".avi",
 ]);
 
 const CHAT_ATTACHMENT_ACCEPT = [
@@ -215,7 +223,10 @@ const CHAT_ATTACHMENT_ACCEPT = [
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/rtf",
-  ".png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.pdf,.txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.rtf",
+  "video/mp4",
+  "video/quicktime",
+  "video/x-msvideo",
+  ".png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.pdf,.txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.rtf,.mp4,.mov,.avi",
 ].join(",");
 
 type AttachmentValidationResult = { ok: true } | { ok: false; message: string };
@@ -256,11 +267,29 @@ function isBlockedAttachmentMime(mimeType: string): boolean {
   );
 }
 
+function isVideoAttachmentFilename(filename: string): boolean {
+  const ext = getFileExtension(filename);
+  return ext === ".mp4" || ext === ".mov" || ext === ".avi";
+}
+
+function isVideoAttachmentMime(mimeType: string): boolean {
+  return mimeType.trim().toLowerCase().startsWith("video/");
+}
+
+function isVideoAttachmentFile(file: Pick<File, "name" | "type">): boolean {
+  return isVideoAttachmentMime(file.type) || isVideoAttachmentFilename(file.name);
+}
+
+function getChatAttachmentMaxBytes(file: Pick<File, "name" | "type">): number {
+  return isVideoAttachmentFile(file) ? CHAT_ATTACHMENT_VIDEO_MAX_BYTES : CHAT_ATTACHMENT_MAX_BYTES;
+}
+
 export function validateChatAttachmentFile(file: File): AttachmentValidationResult {
-  if (file.size > CHAT_ATTACHMENT_MAX_BYTES) {
+  const maxBytes = getChatAttachmentMaxBytes(file);
+  if (file.size > maxBytes) {
     return {
       ok: false,
-      message: `文件大小不能超过 ${formatBytes(CHAT_ATTACHMENT_MAX_BYTES)}（当前 ${formatBytes(file.size)}）`,
+      message: `文件大小不能超过 ${formatBytes(maxBytes)}（当前 ${formatBytes(file.size)}）`,
     };
   }
   if (isBlockedAttachmentFilename(file.name) || isBlockedAttachmentMime(file.type)) {
@@ -268,7 +297,10 @@ export function validateChatAttachmentFile(file: File): AttachmentValidationResu
   }
   const ext = getFileExtension(file.name);
   if (!ext || !CHAT_ATTACHMENT_ALLOWED_EXTENSIONS.has(ext)) {
-    return { ok: false, message: "仅支持常见图片与文档格式（如 PNG、PDF、TXT、DOCX 等）" };
+    return {
+      ok: false,
+      message: "仅支持常见图片、文档与视频格式（如 PNG、PDF、MP4、MOV 等）",
+    };
   }
   return { ok: true };
 }
@@ -297,11 +329,6 @@ function formatBytes(bytes?: number) {
     unitIndex += 1;
   }
   return `${size.toFixed(size < 10 ? 1 : 0)} ${units[unitIndex]}`;
-}
-
-function adjustTextareaHeight(el: HTMLTextAreaElement) {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
 }
 
 function renderCompactionIndicator(status: CompactionIndicatorStatus | null | undefined) {
@@ -337,13 +364,19 @@ function generateAttachmentId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function inferAttachmentKind(mimeType: string, filename?: string): "image" | "file" {
+function inferAttachmentKind(mimeType: string, filename?: string): "image" | "video" | "file" {
   if (mimeType.startsWith("image/")) {
     return "image";
+  }
+  if (mimeType.startsWith("video/")) {
+    return "video";
   }
   const ext = filename ? getFileExtension(filename) : "";
   if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"].includes(ext)) {
     return "image";
+  }
+  if ([".mp4", ".mov", ".avi"].includes(ext)) {
+    return "video";
   }
   return "file";
 }
@@ -710,16 +743,6 @@ function renderChatResourcesPopover(props: ChatProps, opts?: { fixed?: boolean }
                 }</div>`
         }
       </div>
-      <label class="chat-resources-popover__footer">
-        <input
-          type="checkbox"
-          .checked=${resources.webSearch}
-          @change=${(e: Event) => {
-            patch({ webSearch: (e.target as HTMLInputElement).checked });
-          }}
-        />
-        <span>连网搜索（web_search / 图片下载）</span>
-      </label>
       ${
         resources.configured
           ? html`<button
@@ -730,7 +753,7 @@ function renderChatResourcesPopover(props: ChatProps, opts?: { fixed?: boolean }
                   configured: false,
                   skillKeys: [],
                   mcpServers: [],
-                  webSearch: false,
+                  webSearch: true,
                 })}
             >
               恢复默认（全部可用）
@@ -779,22 +802,37 @@ function renderAttachmentPreview(props: ChatProps) {
         (att) => html`
           <div class="chat-attachment">
             ${
-              (att.kind ?? inferAttachmentKind(att.mimeType, att.filename)) === "image"
-                ? html`
+              (() => {
+                const kind = att.kind ?? inferAttachmentKind(att.mimeType, att.filename);
+                if (kind === "image") {
+                  return html`
                     <img
                       src=${att.dataUrl}
                       alt=${att.filename || "Attachment preview"}
                       class="chat-attachment__img"
                     />
-                  `
-                : html`
-                    <div class="chat-attachment__file">
-                      <div class="mono">${att.filename || "file"}</div>
-                      <div class="muted" style="font-size: 12px;">
-                        ${att.mimeType}${att.sizeBytes ? ` · ${formatBytes(att.sizeBytes)}` : ""}
-                      </div>
+                  `;
+                }
+                if (kind === "video") {
+                  return html`
+                    <video
+                      src=${att.dataUrl}
+                      class="chat-attachment__video"
+                      controls
+                      preload="metadata"
+                      aria-label=${att.filename || "Video preview"}
+                    ></video>
+                  `;
+                }
+                return html`
+                  <div class="chat-attachment__file">
+                    <div class="mono">${att.filename || "file"}</div>
+                    <div class="muted" style="font-size: 12px;">
+                      ${att.mimeType}${att.sizeBytes ? ` · ${formatBytes(att.sizeBytes)}` : ""}
                     </div>
-                  `
+                  </div>
+                `;
+              })()
             }
             <button
               class="chat-attachment__remove"
@@ -836,7 +874,7 @@ export function renderChat(props: ChatProps) {
   };
 
   const hasAttachments = (props.attachments?.length ?? 0) > 0;
-  const hasDraftContent = props.draft.trim().length > 0;
+  const hasDraftContent = Boolean(props.composeHasText) || props.draft.trim().length > 0;
   const canSubmit = canCompose && (hasDraftContent || hasAttachments);
   const composePlaceholder = !props.connected
     ? "Connect to the gateway to start chatting…"
@@ -844,7 +882,7 @@ export function renderChat(props: ChatProps) {
       ? "正在提炼 Skill，请稍候…"
       : hasAttachments
         ? "添加消息（也可替换附件）…"
-        : "输入消息（回车发送，Shift+回车换行，可粘贴图片或添加文件，≤1MB）";
+        : "输入消息（回车发送，Shift+回车换行，可粘贴图片或添加文件，文档≤5MB，视频≤50MB）";
 
   const browserPreviewOpen = Boolean(props.browserPreviewEnabled && props.browserPreviewOpen);
   const markdownSidebarOpen = Boolean(
@@ -877,8 +915,7 @@ export function renderChat(props: ChatProps) {
                   type="button"
                   ?disabled=${!props.connected}
                   @click=${() => {
-                    props.onDraftChange(p);
-                    props.onSend();
+                    props.onSend(p);
                   }}
                 >
                   ${icons.chatPrompt} ${p}
@@ -886,83 +923,49 @@ export function renderChat(props: ChatProps) {
               `,
             )}
           </div>
+          ${
+            (props.localAgents?.length ?? 0) > 0
+              ? html`
+                  <div class="chat-local-agents-empty">
+                    <div class="chat-local-agents-empty__hint muted">${t("chatLocalAgentsHint")}</div>
+                    <openocta-local-agent-picker
+                      .agents=${props.localAgents ?? []}
+                      ?disabled=${!props.connected}
+                      @agent-insert=${(e: CustomEvent<{ mention: string }>) =>
+                        props.onComposeInsert?.(e.detail.mention)}
+                    ></openocta-local-agent-picker>
+                  </div>
+                `
+              : nothing
+          }
         </div>
       `
     : nothing;
   const thread = html`
-    <div
-      class="chat-thread"
-      role="log"
-      aria-live="polite"
-      @scroll=${props.onChatScroll}
-      @click=${(e: Event) => {
-        const target = e.target as HTMLElement | null;
-        const anchor = target?.closest?.("a[data-chat-attachment]") as HTMLAnchorElement | null;
-        if (!anchor) {
-          return;
-        }
-        e.preventDefault();
-        const path = anchor.getAttribute("data-chat-attachment");
-        if (path) {
-          props.onOpenAttachment?.(path);
-        }
-      }}
-    >
-      ${
-        props.loading
-          ? html`
-              <div class="muted">Loading chat…</div>
-            `
-          : nothing
-      }
-      ${repeat(
-        buildChatItems(props),
-        (item) => item.key,
-        (item) => {
-          if (item.kind === "reading-indicator") {
-            return renderReadingIndicatorGroup(assistantIdentity, item.startedAt, item.phase);
-          }
-
-          if (item.kind === "stream") {
-            return renderStreamingGroup(
-              item.text,
-              item.startedAt,
-              props.onOpenSidebar,
-              assistantIdentity,
-            );
-          }
-
-          if (item.kind === "a2ui") {
-            return renderA2UIGroup(
-              item.messages,
-              assistantIdentity,
-              props.client ?? null,
-              props.sessionKey,
-              props.onA2UIAction,
-              props.onFilePreview,
-            );
-          }
-
-          if (item.kind === "group") {
-            const opts = {
-              onOpenSidebar: props.onOpenSidebar,
-              onFilePreview: props.onFilePreview,
-              showReasoning,
-              assistantName: props.assistantName,
-              assistantAvatar: assistantIdentity.avatar,
-              client: props.client ?? null,
-              sessionKey: props.sessionKey,
-              onA2UIAction: props.onA2UIAction,
-            } as unknown as { showToolTrace: boolean };
-            opts.showToolTrace = showToolTrace;
-            return renderMessageGroup(item, opts as never);
-          }
-
-          return nothing;
-        },
-      )}
-      ${emptyIntro}
-    </div>
+    <openocta-chat-thread
+      .sessionKey=${props.sessionKey}
+      .loading=${props.loading}
+      .canAbort=${Boolean(props.canAbort)}
+      .conversationOnly=${conversationOnly}
+      .showReasoning=${showReasoning}
+      .assistantName=${assistantIdentity.name}
+      .assistantAvatar=${assistantIdentity.avatar}
+      .messages=${props.messages}
+      .toolMessages=${props.toolMessages}
+      .stream=${props.stream}
+      .reasoningStream=${props.reasoningStream ?? null}
+      .streamStartedAt=${props.streamStartedAt}
+      .runPhase=${props.runPhase ?? "idle"}
+      .a2uiMessages=${props.a2uiMessages ?? []}
+      .client=${props.client ?? null}
+      .emptyIntro=${emptyIntro}
+      @chat-scroll=${(e: CustomEvent<{ event: Event }>) => props.onChatScroll?.(e.detail.event)}
+      @open-attachment=${(e: CustomEvent<{ path: string }>) => props.onOpenAttachment?.(e.detail.path)}
+      @open-sidebar=${(e: CustomEvent<{ content: string }>) => props.onOpenSidebar?.(e.detail.content)}
+      @file-preview=${(e: CustomEvent<{ req: FilePreviewRequest }>) => props.onFilePreview?.(e.detail.req)}
+      @a2ui-action=${(e: CustomEvent<{ action: import("@a2ui/web_core/v0_9").A2uiClientAction }>) =>
+        props.onA2UIAction?.(e.detail.action)}
+    ></openocta-chat-thread>
   `;
   const visibleQueue = props.queue.filter((item) => item.sessionKey === props.sessionKey);
 
@@ -1121,44 +1124,27 @@ export function renderChat(props: ChatProps) {
         <div class="chat-compose__inner">
           <label class="field chat-compose__field">
             <span>Message</span>
-            <span class="textarea"><textarea
-            ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
-            .value=${props.draft}
-            ?disabled=${!canCompose}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key !== "Enter") {
-                return;
-              }
-              if (e.isComposing || e.keyCode === 229) {
-                return;
-              }
-              if (e.shiftKey) {
-                return;
-              } // Allow Shift+Enter for line breaks
-              if (!canCompose) {
-                return;
-              }
-              e.preventDefault();
-              if (canCompose && canSubmit) {
-                props.onSend();
-              }
-            }}
-            @input=${(e: Event) => {
-              const target = e.target as HTMLTextAreaElement;
-              adjustTextareaHeight(target);
-              props.onDraftChange(target.value);
-            }}
-            @paste=${(e: ClipboardEvent) => handlePaste(e, props)}
-            placeholder=${composePlaceholder}
-          ></textarea></span>
+            <openocta-chat-input
+              .disabled=${!canCompose}
+              .placeholder=${composePlaceholder}
+              .clearToken=${props.composeClearToken ?? 0}
+              .insertToken=${props.composeInsertToken ?? 0}
+              .insertSnippet=${props.composeInsertSnippet ?? ""}
+              .mentionOptions=${(props.localAgents ?? []).filter((a) => a.installed)}
+              @compose-send=${(e: CustomEvent<{ message: string }>) => props.onSend(e.detail.message)}
+              @compose-draft-change=${(e: CustomEvent<{ hasText: boolean }>) =>
+                props.onComposeDraftChange?.(e.detail.hasText)}
+              @compose-paste=${(e: CustomEvent<{ event: ClipboardEvent }>) =>
+                handlePaste(e.detail.event, props)}
+            ></openocta-chat-input>
         </label>
           <div class="chat-compose__row">
           <div class="chat-compose__meta">
             <button
               class="btn btn--icon chat-compose__add-file"
               type="button"
-              aria-label="添加文件（图片或常见文档，≤1MB）"
-              title="添加文件（图片或常见文档，≤1MB，不支持压缩包）"
+              aria-label="添加文件（图片、文档≤5MB，视频≤50MB）"
+              title="添加文件（图片、文档≤5MB，视频 MP4/MOV/AVI≤50MB，不支持压缩包）"
               ?disabled=${!canCompose || !props.onAttachmentsChange}
               @click=${() => {
                 const input = document.getElementById("chat-file-input") as HTMLInputElement | null;
@@ -1180,10 +1166,10 @@ export function renderChat(props: ChatProps) {
                     <div class="chat-resources-anchor">
                       <button
                         type="button"
-                        class="chat-compose__chip ${props.resourcesPanelOpen ? "chat-compose__chip--active" : ""} ${chatResourcesSelectionCount(props.resources ?? { configured: false, skillKeys: [], mcpServers: [], webSearch: false }) > 0 ? "chat-compose__chip--active" : ""}"
+                        class="chat-compose__chip ${props.resourcesPanelOpen ? "chat-compose__chip--active" : ""} ${chatResourcesSelectionCount(props.resources ?? { configured: false, skillKeys: [], mcpServers: [], webSearch: true }) > 0 ? "chat-compose__chip--active" : ""}"
                         aria-label="全部资源"
                         aria-expanded=${props.resourcesPanelOpen ? "true" : "false"}
-                        title="选择 Skill / MCP / 连网搜索"
+                        title="选择 Skill / MCP"
                         ?disabled=${!props.connected}
                         ${ref(resourcesAnchorRef(props))}
                         @click=${(e: Event) => {
@@ -1199,7 +1185,7 @@ export function renderChat(props: ChatProps) {
                               configured: false,
                               skillKeys: [],
                               mcpServers: [],
-                              webSearch: false,
+                              webSearch: true,
                             },
                           ) > 0
                             ? html`<span class="chat-compose__chip-badge">${chatResourcesSelectionCount(props.resources!)}</span>`
@@ -1224,6 +1210,18 @@ export function renderChat(props: ChatProps) {
                       <span class="chat-compose__chip-icon" aria-hidden="true">${icons.globe}</span>
                       <span class="chat-compose__chip-label">${t("chatBrowserPreviewToggle")}</span>
                     </button>
+                  `
+                : nothing
+            }
+            ${
+              (props.localAgents?.length ?? 0) > 0
+                ? html`
+                    <openocta-local-agent-picker
+                      .agents=${props.localAgents ?? []}
+                      ?disabled=${!canCompose}
+                      @agent-insert=${(e: CustomEvent<{ mention: string }>) =>
+                        props.onComposeInsert?.(e.detail.mention)}
+                    ></openocta-local-agent-picker>
                   `
                 : nothing
             }
@@ -1283,7 +1281,13 @@ export function renderChat(props: ChatProps) {
               aria-label="发送"
               title="发送 (Enter)"
               ?disabled=${!canSubmit}
-              @click=${props.onSend}
+              @click=${(e: Event) => {
+                const compose = (e.currentTarget as HTMLElement).closest(".chat-compose");
+                const input = compose?.querySelector("openocta-chat-input") as
+                  | { requestSend?: () => void }
+                  | null;
+                input?.requestSend?.();
+              }}
             >
               ${isBusy ? icons.loader2 : icons.send}
             </button>
@@ -1295,159 +1299,4 @@ export function renderChat(props: ChatProps) {
       ${emptyPrompts}
     </section>
   `;
-}
-
-function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
-  const result: Array<ChatItem | MessageGroup> = [];
-  let currentGroup: MessageGroup | null = null;
-
-  for (const item of items) {
-    if (item.kind !== "message") {
-      if (currentGroup) {
-        result.push(currentGroup);
-        currentGroup = null;
-      }
-      result.push(item);
-      continue;
-    }
-
-    if (isToolResultMessage(item.message)) {
-      if (currentGroup && currentGroup.role === "assistant") {
-        currentGroup.messages.push({ message: item.message, key: item.key });
-        continue;
-      }
-    }
-
-    const normalized = normalizeMessage(item.message);
-    const normalizedRole = normalizeRoleForGrouping(normalized.role);
-    const role = normalizedRole === "tool" ? "assistant" : normalizedRole;
-    const timestamp = normalized.timestamp || Date.now();
-
-    if (!currentGroup || currentGroup.role !== role) {
-      if (currentGroup) {
-        result.push(currentGroup);
-      }
-      currentGroup = {
-        kind: "group",
-        key: `group:${role}:${item.key}`,
-        role,
-        messages: [{ message: item.message, key: item.key }],
-        timestamp,
-        isStreaming: false,
-      };
-    } else {
-      currentGroup.messages.push({ message: item.message, key: item.key });
-    }
-  }
-
-  if (currentGroup) {
-    result.push(currentGroup);
-  }
-
-  return result;
-}
-
-function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
-  const items: ChatItem[] = [];
-  const history = Array.isArray(props.messages) ? props.messages : [];
-  const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
-  const conversationOnly = props.conversationOnly ?? false;
-  const historyStart = Math.max(0, history.length - CHAT_HISTORY_LIMIT);
-  if (historyStart > 0) {
-    items.push({
-      kind: "message",
-      key: "chat:history:notice",
-      message: {
-        role: "system",
-        content: `Showing last ${CHAT_HISTORY_LIMIT} messages (${historyStart} hidden).`,
-        timestamp: Date.now(),
-      },
-    });
-  }
-  for (let i = historyStart; i < history.length; i++) {
-    const msg = history[i];
-    const normalized = normalizeMessage(msg);
-
-    if (conversationOnly && normalized.role === "toolResult") {
-      continue;
-    }
-
-    items.push({
-      kind: "message",
-      key: messageKey(msg, i),
-      message: msg,
-    });
-  }
-  const runActive = Boolean(props.canAbort);
-  const liveA2UI = props.a2uiMessages ?? [];
-  const streamText = props.stream ?? "";
-
-  // Only append toolMessages when no run is active. During a run they would
-  // get merged into the last assistant group and cause it to appear busy.
-  if (!conversationOnly && !runActive) {
-    for (let i = 0; i < tools.length; i++) {
-      items.push({
-        kind: "message",
-        key: messageKey(tools[i], i + history.length),
-        message: tools[i],
-      });
-    }
-  }
-
-  // Only show live stream/A2UI while a run is active. Do not keep a second copy after final
-  // just because chatA2UIMessages was not cleared yet.
-  if (runActive) {
-    const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    if (streamText.trim().length > 0) {
-      items.push({
-        kind: "stream",
-        key,
-        text: streamText,
-        startedAt: props.streamStartedAt ?? Date.now(),
-      });
-    } else if (liveA2UI.length > 0) {
-      items.push({
-        kind: "a2ui",
-        key: `${key}:a2ui`,
-        messages: liveA2UI,
-      });
-    } else {
-      const phase =
-        props.runPhase === "tool"
-          ? "tool"
-          : props.runPhase === "streaming"
-            ? "streaming"
-            : "thinking";
-      items.push({
-        kind: "reading-indicator",
-        key,
-        startedAt: props.streamStartedAt ?? Date.now(),
-        phase,
-      });
-    }
-  }
-
-  return groupMessages(items);
-}
-
-function messageKey(message: unknown, index: number): string {
-  const m = message as Record<string, unknown>;
-  const toolCallId = typeof m.toolCallId === "string" ? m.toolCallId : "";
-  if (toolCallId) {
-    return `tool:${toolCallId}`;
-  }
-  const id = typeof m.id === "string" ? m.id : "";
-  if (id) {
-    return `msg:${id}`;
-  }
-  const messageId = typeof m.messageId === "string" ? m.messageId : "";
-  if (messageId) {
-    return `msg:${messageId}`;
-  }
-  const timestamp = typeof m.timestamp === "number" ? m.timestamp : null;
-  const role = typeof m.role === "string" ? m.role : "unknown";
-  if (timestamp != null) {
-    return `msg:${role}:${timestamp}:${index}`;
-  }
-  return `msg:${role}:${index}`;
 }

@@ -98,11 +98,14 @@ function installHooks() {
 }
 
 export function toSanitizedMarkdownHtml(markdown: string): string {
-  const input = markdown.trim();
-  if (!input) {
+  if (!markdown) {
+    return "";
+  }
+  if (!markdown.trim()) {
     return "";
   }
   installHooks();
+  const input = markdown;
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
     const cached = getCachedMarkdown(input);
     if (cached !== null) {

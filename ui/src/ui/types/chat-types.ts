@@ -5,12 +5,13 @@
 /** Union type for items in the chat thread */
 export type ChatItem =
   | { kind: "message"; key: string; message: unknown }
-  | { kind: "stream"; key: string; text: string; startedAt: number }
+  | { kind: "stream"; key: string; text: string; startedAt: number; reasoningText?: string }
   | {
       kind: "reading-indicator";
       key: string;
       startedAt?: number;
       phase?: "thinking" | "tool" | "streaming";
+      reasoningText?: string;
     }
   | { kind: "a2ui"; key: string; messages: unknown[] };
 

@@ -17,6 +17,8 @@ import {
   type CostDailyEntry,
   type UsageSessionEntry,
 } from "./overview-usage-widgets.ts";
+import { renderOverviewLocalAgents } from "./overview-local-agents.ts";
+import type { LocalAgentProbeResult } from "../local-agents.ts";
 
 export type OverviewProps = {
   connected: boolean;
@@ -40,6 +42,9 @@ export type OverviewProps = {
   usageChartMode: "tokens" | "cost";
   usageDailyChartMode: "total" | "by-type";
   usageTimeZone: "local" | "utc";
+  localAgentsLoading: boolean;
+  localAgentsError: string | null;
+  localAgents: LocalAgentProbeResult[];
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   onRefresh: () => void;
@@ -205,6 +210,12 @@ export function renderOverview(props: OverviewProps) {
             `
       }
     </section>
+
+    ${renderOverviewLocalAgents({
+      loading: props.localAgentsLoading,
+      error: props.localAgentsError,
+      agents: props.localAgents,
+    })}
 
     <section class="card" style="margin-top: 16px;">
       <div class="row" style="justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">

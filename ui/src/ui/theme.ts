@@ -14,3 +14,10 @@ export function resolveTheme(mode: ThemeMode): ResolvedTheme {
   }
   return mode;
 }
+
+const THEME_CYCLE: ThemeMode[] = ["light", "dark", "system"];
+
+export function cycleTheme(mode: ThemeMode): ThemeMode {
+  const index = THEME_CYCLE.indexOf(mode);
+  return THEME_CYCLE[(index + 1) % THEME_CYCLE.length] ?? "light";
+}

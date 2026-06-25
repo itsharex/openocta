@@ -1,7 +1,11 @@
 import { html, nothing } from "lit";
 import { icons } from "../icons.ts";
-import { repairA2UIMessages } from "./a2ui-bridge.ts";
-import { componentsArrayFromRaw, normalizeComponentMap, type ComponentRecord } from "./a2ui-repair.ts";
+import { normalizeA2UIMessages } from "./a2ui-bridge.ts";
+import {
+  componentsArrayFromRaw,
+  normalizeComponentMap,
+  type ComponentRecord,
+} from "./a2ui-components.ts";
 import { parseOpenOctaFileAttachmentsFromText } from "./openocta-attachments.ts";
 import { extractReferencedImagePaths } from "./attachment-images.ts";
 
@@ -184,7 +188,7 @@ export function extractFileBlocksFromA2UIBlocks(blocks: unknown[]): FileBlock[] 
     return [];
   }
   const files: FileBlock[] = [];
-  const repaired = repairA2UIMessages(blocks);
+  const repaired = normalizeA2UIMessages(blocks);
   for (const msg of repaired) {
     const rawComponents = msg.updateComponents?.components;
     if (rawComponents == null) {
@@ -439,7 +443,7 @@ export function extractReferencedPathsFromGroup(messages: Array<{ message: unkno
         for (const file of extractFileBlocksFromA2UIBlocks([block.a2ui])) {
           paths.push(file.filename);
         }
-        const repaired = repairA2UIMessages([block.a2ui]);
+        const repaired = normalizeA2UIMessages([block.a2ui]);
         for (const msg of repaired) {
           const rawComponents = msg.updateComponents?.components;
           if (rawComponents == null) {

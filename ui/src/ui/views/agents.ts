@@ -95,14 +95,6 @@ function getToolSections() {
             ],
         },
         {
-            id: "web",
-            label: t("agentsWeb"),
-            tools: [
-                {id: "web_search", label: "web_search", description: t("agentsWebSearch")},
-                {id: "web_fetch", label: "web_fetch", description: t("agentsWebFetch")},
-            ],
-        },
-        {
             id: "memory",
             label: t("agentsMemory"),
             tools: [

@@ -110,7 +110,6 @@ flowchart LR
 | `approvals` | 审批授权 | 高危工具 / Prompt 人工确认 |
 | `audit` | 审计日志 | 等保 / 内控追溯 |
 | `enterprise-reports` / `reports` | 企业报表 | Token 成本、用量、运营分析 |
-| `llm-trace` | LLM 调用链 | 排障、质量分析 |
 
 ### 3.2 个人工作台（`/workspace`，需 `console-workspace`）
 

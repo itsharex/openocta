@@ -15,6 +15,7 @@ import { loadAgents } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
 import { loadCronJobs, loadCronStatus } from "./controllers/cron.ts";
+import { loadApiKeys } from "./controllers/api-keys.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
@@ -24,11 +25,10 @@ import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadUsage } from "./controllers/usage.ts";
 import { loadDigitalEmployees } from "./controllers/digital-employees.ts";
-import { loadTraceList } from "./controllers/llm-trace.ts";
-import { syncLlmTraceFromConfig } from "./app-llm-trace.ts";
 import { syncSecurityFromConfig } from "./app-security.ts";
 import { loadApprovalsList } from "./controllers/approvals.ts";
 import { loadSkills } from "./controllers/skills.ts";
+import { loadLocalAgents } from "./controllers/local-agents.ts";
 import {
   inferBasePathFromPathname,
   normalizeBasePath,
@@ -56,7 +56,6 @@ type SettingsHost = {
   eventLogBuffer: unknown[];
   securityForm?: unknown;
   basePath: string;
-  tutorialsActiveTab?: import("./views/tutorials.ts").TutorialTab;
   agentsList?: AgentsListResult | null;
   agentsSelectedId?: string | null;
   agentsPanel?: "overview" | "files" | "tools" | "skills" | "channels" | "cron";
@@ -206,21 +205,23 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "instances") {
     await loadPresence(host as unknown as OpenClawApp);
   }
-  if (host.tab === "sessions") {
-    await loadSessions(host as unknown as OpenClawApp, { includeLastMessage: true });
-  }
   if (host.tab === "cron") {
     await loadCron(host);
-    // Cron 配置需要数字员工列表用于下拉选择/校验。这里 await，避免编辑时误判“已删除”。
     await loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
+    await loadSkills(host as unknown as OpenClawApp);
+    await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
   }
   if (host.tab === "scheduledTasks") {
     await loadCron(host);
     await loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
+    await loadSkills(host as unknown as OpenClawApp);
+    await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
   }
   if (host.tab === "cronHistory") {
     await loadCron(host);
     await loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
+    await loadSkills(host as unknown as OpenClawApp);
+    await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
   }
   if (host.tab === "skills") {
     await loadSkills(host as unknown as OpenClawApp);
@@ -233,17 +234,17 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "mcp") {
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
-  }
-  if (host.tab === "llmTrace") {
-    await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
-    await loadTraceList(host as unknown as Parameters<typeof loadTraceList>[0]);
   }
   if (host.tab === "sandbox") {
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
     host.securityForm = syncSecurityFromConfig(host as unknown as Parameters<typeof syncSecurityFromConfig>[0]);
     await loadApprovalsList(host as unknown as Parameters<typeof loadApprovalsList>[0]);
+  }
+  if (host.tab === "apiKeys") {
+    await loadApiKeys(host as unknown as Parameters<typeof loadApiKeys>[0]);
+    await loadSkills(host as unknown as OpenClawApp);
+    await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
+    await loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
   }
   if (host.tab === "digitalEmployee") {
     await loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
@@ -255,7 +256,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "agents") {
     await loadAgents(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
     const agentIds = host.agentsList?.agents?.map((entry) => entry.id) ?? [];
     if (agentIds.length > 0) {
       void loadAgentIdentities(host as unknown as OpenClawApp, agentIds);
@@ -279,12 +279,12 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadNodes(host as unknown as OpenClawApp);
     await loadDevices(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
     await loadExecApprovals(host as unknown as OpenClawApp);
   }
   if (host.tab === "chat" || host.tab === "message") {
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
     await loadSkills(host as unknown as OpenClawApp);
+    void loadLocalAgents(host as unknown as OpenClawApp);
     await refreshChat(host as unknown as Parameters<typeof refreshChat>[0]);
     void loadDigitalEmployees(host as unknown as Parameters<typeof loadDigitalEmployees>[0]);
     scheduleChatScroll(
@@ -295,11 +295,9 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "config") {
     await loadConfigSchema(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
   }
   if (host.tab === "envVars" || host.tab === "models" || host.tab === "modelLibrary") {
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
-    syncLlmTraceFromConfig(host as unknown as Parameters<typeof syncLlmTraceFromConfig>[0]);
   }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as OpenClawApp);
@@ -391,10 +389,6 @@ function normalizeLegacyChatSessionPath(host: SettingsHost): void {
 }
 
 function resolveRouteTab(host: SettingsHost, tab: Tab): Tab {
-  if (tab === "documentation") {
-    host.tutorialsActiveTab = "documentation";
-    return "tutorials";
-  }
   if (tab === "config") {
     return "overview";
   }
@@ -508,6 +502,7 @@ export async function loadOverview(host: SettingsHost) {
     loadUsage(host as unknown as Parameters<typeof loadUsage>[0]),
     loadSkills(host as unknown as OpenClawApp),
     loadConfig(host as unknown as OpenClawApp),
+    loadLocalAgents(host as unknown as OpenClawApp, { force: true }),
   ]);
 }
 

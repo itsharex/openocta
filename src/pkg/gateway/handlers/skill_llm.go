@@ -9,8 +9,8 @@ import (
 
 	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/agent/runtime"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
 func resolveSkillLLMTimeoutMs(params map[string]interface{}, defaultMs int) int {
@@ -31,7 +31,7 @@ func newSkillLLMRuntime(ctx context.Context, opts HandlerOpts, agentID string) (
 		}
 	}
 
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if cfg != nil {
 		factory, factoryErr := agent.CreateModelFactoryFromConfig(cfg, agentID)
 		if factoryErr != nil {
@@ -61,6 +61,7 @@ func newSkillLLMRuntime(ctx context.Context, opts HandlerOpts, agentID string) (
 		EnableWebTools:     &webToolsOff,
 		AgentID:            agentID,
 		Env:                env,
+		TokenTracking:      true,
 	}
 	rt, err := runtime.New(ctx, rtOpts)
 	if err != nil {
@@ -86,7 +87,7 @@ func runSkillLLMPrompt(ctx context.Context, opts HandlerOpts, agentID, sessionSu
 	defer cleanup()
 
 	sessionID := fmt.Sprintf("skill-llm:%s:%d", sessionSuffix, time.Now().UnixNano())
-	resp, runErr := rt.Run(runCtx, api.Request{Prompt: prompt, SessionID: sessionID})
+	resp, runErr := rt.Run(runCtx, types.Request{Prompt: prompt, SessionID: sessionID})
 	if runErr != nil {
 		return "", &protocol.ErrorShape{
 			Code:    protocol.ErrCodeInternal,

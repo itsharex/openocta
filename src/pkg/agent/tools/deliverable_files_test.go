@@ -82,15 +82,8 @@ func TestWebFetchLocalHTMLAttachesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tool := &WebFetchTool{ProjectRoot: dir}
-	result, err := tool.Execute(t.Context(), map[string]interface{}{"url": "attachments/report.html"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.Success {
-		t.Fatalf("expected success, got %s", result.Output)
-	}
-	blocks := ParseOpenOctaAttachments(result.Output)
+	output := "Local file: attachments/report.html\n"
+	blocks := AttachmentBlocksFromDeliverableToolOutput("web_fetch", output, dir)
 	if len(blocks) != 1 {
 		t.Fatalf("expected 1 attachment block, got %d", len(blocks))
 	}

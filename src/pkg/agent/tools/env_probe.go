@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
+	"github.com/openocta/openocta/pkg/agent/tool"
 )
 
 // EnvProbeTool reports whether common CLI programs exist and captures a short version string.

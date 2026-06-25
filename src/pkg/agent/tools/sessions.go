@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/session"
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
 
 // SessionIDFromSessionKey derives a session ID from a session key when no store is available.

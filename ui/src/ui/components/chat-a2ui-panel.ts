@@ -8,10 +8,14 @@ import { A2uiSurface, Context } from "@a2ui/lit/v0_9";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import {
   createFreshChatA2UIProcessor,
+  dedupeA2UIMessages,
   dispatchChatA2UIAction,
+  extractA2UIDisplayTextFromBlocks,
   processA2UIMessages,
 } from "../chat/a2ui-bridge.ts";
 import { createA2UIMarkdownRenderer } from "../chat/a2ui-markdown.ts";
+import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 @customElement("chat-a2ui-panel")
 export class ChatA2UIPanel extends SignalWatcher(LitElement) {
@@ -37,11 +41,15 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
   });
 
   #lastMessagesKey = "";
+  #processedCount = 0;
+  #lastFirstMessageKey = "";
 
   #resetProcessor(): void {
     this.#processor = createFreshChatA2UIProcessor(async (action) => {
       await this.#dispatchAction(action);
     });
+    this.#processedCount = 0;
+    this.#lastFirstMessageKey = "";
   }
 
   static styles = css`
@@ -151,24 +159,45 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
 
   #processError: string | null = null;
 
-  protected updated(changed: PropertyValues<this>): void {
+  protected willUpdate(changed: PropertyValues<this>): void {
     if (!changed.has("messages")) {
       return;
     }
+    this.#syncMessages();
+  }
+
+  #syncMessages(): void {
     this.#processError = null;
-    const messagesKey = JSON.stringify(this.messages);
-    if (messagesKey === this.#lastMessagesKey) {
-      return;
-    }
-    this.#lastMessagesKey = messagesKey;
 
     if (this.messages.length === 0) {
       this.#resetProcessor();
+      this.#lastMessagesKey = "";
       return;
     }
+
+    const normalizedMessages = dedupeA2UIMessages(this.messages);
+    const messagesKey = JSON.stringify(normalizedMessages);
+    if (messagesKey === this.#lastMessagesKey) {
+      return;
+    }
+
+    const firstMessageKey = JSON.stringify(normalizedMessages[0]);
+    const needsFullReplay =
+      this.#processedCount === 0 ||
+      normalizedMessages.length < this.#processedCount ||
+      (this.#lastFirstMessageKey !== "" && firstMessageKey !== this.#lastFirstMessageKey);
+
     try {
-      this.#resetProcessor();
-      processA2UIMessages(this.#processor, this.messages);
+      if (needsFullReplay) {
+        this.#resetProcessor();
+        processA2UIMessages(this.#processor, normalizedMessages);
+        this.#processedCount = normalizedMessages.length;
+        this.#lastFirstMessageKey = firstMessageKey;
+      } else if (normalizedMessages.length > this.#processedCount) {
+        processA2UIMessages(this.#processor, normalizedMessages.slice(this.#processedCount));
+        this.#processedCount = normalizedMessages.length;
+      }
+      this.#lastMessagesKey = messagesKey;
     } catch (err) {
       this.#processError = err instanceof Error ? err.message : String(err);
       console.error("[chat-a2ui-panel] failed to process A2UI messages", err);
@@ -176,6 +205,7 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
   }
 
   render() {
+    const normalizedMessages = dedupeA2UIMessages(this.messages);
     const surfaces = Array.from(this.#processor.model.surfacesMap.entries());
     const panelClass = this.inline
       ? "chat-a2ui-panel chat-a2ui-panel--inline"
@@ -192,7 +222,17 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
     }
 
     if (surfaces.length === 0) {
-      return nothing;
+      const fallbackText = extractA2UIDisplayTextFromBlocks(normalizedMessages);
+      if (!fallbackText) {
+        return nothing;
+      }
+      return html`
+        <div class="${panelClass}">
+          <div class="chat-text chat-text--preserve-breaks">
+            ${unsafeHTML(toSanitizedMarkdownHtml(fallbackText))}
+          </div>
+        </div>
+      `;
     }
 
     return html`

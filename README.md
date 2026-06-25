@@ -139,7 +139,7 @@ OpenOcta/
 │   └── README.md           # 后端详细说明
 ├── ui/                     # Control UI 前端（Lit + Vite，WebSocket 控制面）
 │   └── README.md           # 前端详细说明
-├── deploy/                 # 部署相关（Dockerfile、systemd 服务）
+├── deploy/                 # 部署相关（Dockerfile、systemd 服务、场景模板等）
 └── docs/                   # 文档与迁移计划
 ```
 

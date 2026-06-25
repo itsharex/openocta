@@ -3,9 +3,11 @@ import type * as v0_9 from "@a2ui/web_core/v0_9";
 import type { ChatSessionResources } from "../chat/chat-resources.ts";
 import { chatResourcesPayload } from "../chat/chat-resources.ts";
 import type { ChatAttachment } from "../ui-types.ts";
-import { extractText } from "../chat/message-extract.ts";
+import { extractText, extractThinking } from "../chat/message-extract.ts";
 import {
+  dedupeA2UIMessages,
   filterA2UIMessagesForSurface,
+  mergeA2UIIntoMessageContent,
   removeA2UISurfaceFromMessages,
   resetChatA2UISurfaces,
 } from "../chat/a2ui-bridge.ts";
@@ -32,6 +34,7 @@ export type ChatState = {
   chatRunId: string | null;
   chatRunPhase: "idle" | "thinking" | "tool" | "streaming";
   chatStream: string | null;
+  chatReasoningStream: string | null;
   chatStreamStartedAt: number | null;
   chatA2UIMessages: unknown[];
   /** Runs that ended (error/aborted/final); late delta/turn events are ignored. */
@@ -45,6 +48,7 @@ const CHAT_TERMINAL_RUN_LIMIT = 24;
 
 function clearActiveChatRunState(state: ChatState, runId?: string) {
   state.chatStream = null;
+  state.chatReasoningStream = null;
   if (runId?.trim()) {
     markChatRunTerminal(state, runId);
   }
@@ -114,10 +118,14 @@ function persistA2UIBlocksToChatMessages(state: ChatState, blocks: unknown[]) {
     } else if (typeof last.content === "string" && last.content.trim()) {
       existing.push({ type: "text", text: last.content });
     }
-    for (const block of blocks) {
-      existing.push(a2uiContentBlock(block));
-    }
-    state.chatMessages = [...messages.slice(0, -1), { ...last, content: existing, timestamp }];
+    state.chatMessages = [
+      ...messages.slice(0, -1),
+      {
+        ...last,
+        content: mergeA2UIIntoMessageContent(existing, blocks),
+        timestamp,
+      },
+    ];
     return;
   }
 
@@ -135,7 +143,7 @@ function applyA2UIChatEvent(state: ChatState, payload: ChatEventPayload) {
   if (payload.a2ui == null) {
     return;
   }
-  state.chatA2UIMessages = [...state.chatA2UIMessages, payload.a2ui];
+  state.chatA2UIMessages = dedupeA2UIMessages([...state.chatA2UIMessages, payload.a2ui]);
   state.chatRunPhase = "streaming";
   const runId = typeof payload.runId === "string" ? payload.runId.trim() : "";
   // Late A2UI after final: merge into the last assistant bubble instead of appending a duplicate row.
@@ -150,19 +158,10 @@ function mergeLiveA2UIIntoFinalMessage(state: ChatState, finalMessage: Record<st
     return finalMessage;
   }
   const content = Array.isArray(finalMessage.content) ? [...finalMessage.content] : [];
-  const existingA2UI = content.filter(
-    (part) =>
-      part != null &&
-      typeof part === "object" &&
-      (part as Record<string, unknown>).type === "a2ui",
-  ).length;
-  if (existingA2UI >= pending.length) {
-    return finalMessage;
-  }
-  for (let i = existingA2UI; i < pending.length; i++) {
-    content.push(a2uiContentBlock(pending[i]));
-  }
-  return { ...finalMessage, content };
+  return {
+    ...finalMessage,
+    content: mergeA2UIIntoMessageContent(content, pending),
+  };
 }
 
 function trimTrailingA2UIOnlyMessages(messages: unknown[]): unknown[] {
@@ -213,9 +212,10 @@ export async function dispatchA2UIActionFromChat(
       typeof res?.runId === "string" && res.runId.trim() !== "" ? res.runId.trim() : idempotencyKey;
     state.chatRunId = runId;
     state.chatErrorRunId = null;
-    state.chatRunPhase = "thinking";
-    state.chatStream = null;
-    state.chatStreamStartedAt = Date.now();
+  state.chatRunPhase = "thinking";
+  state.chatStream = null;
+  state.chatReasoningStream = null;
+  state.chatStreamStartedAt = Date.now();
     state.chatA2UIMessages = [];
     resetChatA2UISurfaces();
     return true;
@@ -235,6 +235,8 @@ export type ChatEventPayload = {
   state: "delta" | "turn" | "final" | "complete" | "aborted" | "error" | "a2ui";
   /** Incremental streaming chunk (preferred over full snapshot in message.content). */
   text?: string;
+  /** Incremental reasoning / thinking chunk from the model. */
+  reasoning?: string;
   message?: unknown;
   a2ui?: unknown;
   errorMessage?: string;
@@ -329,14 +331,25 @@ export async function sendChatMessage(
   if (msg) {
     contentBlocks.push({ type: "text", text: msg });
   }
-  // Add image previews to the message for display
+  // Add image/video previews to the message for display
   if (hasAttachments) {
     for (const att of attachments) {
-      const kind = att.kind ?? (att.mimeType?.startsWith("image/") ? "image" : "file");
+      const kind =
+        att.kind ??
+        (att.mimeType?.startsWith("image/")
+          ? "image"
+          : att.mimeType?.startsWith("video/")
+            ? "video"
+            : "file");
       if (kind === "image") {
         contentBlocks.push({
           type: "image",
           source: { type: "base64", media_type: att.mimeType, data: att.dataUrl },
+        });
+      } else if (kind === "video") {
+        contentBlocks.push({
+          type: "text",
+          text: `[视频] ${att.filename || "video"} (${att.mimeType || "video/mp4"})`,
         });
       } else {
         contentBlocks.push({
@@ -372,6 +385,7 @@ export async function sendChatMessage(
     runId,
     runPhase: "thinking",
     stream: null,
+    reasoningStream: null,
     streamStartedAt: now,
     a2uiMessages: [],
     terminalRunIds: priorSnap.terminalRunIds,
@@ -387,7 +401,13 @@ export async function sendChatMessage(
           if (!parsed) {
             return null;
           }
-          const kind = att.kind ?? (att.mimeType?.startsWith("image/") ? "image" : "file");
+          const kind =
+            att.kind ??
+            (att.mimeType?.startsWith("image/")
+              ? "image"
+              : att.mimeType?.startsWith("video/")
+                ? "video"
+                : "file");
           return {
             type: kind,
             mimeType: parsed.mimeType,
@@ -410,7 +430,7 @@ export async function sendChatMessage(
       attachments: apiAttachments,
       modelRef: trimmedModel || undefined,
       resources: chatResourcesPayload(
-        resources ?? { configured: false, skillKeys: [], mcpServers: [], webSearch: false },
+        resources ?? { configured: false, skillKeys: [], mcpServers: [], webSearch: true },
       ),
     });
     markSessionSendAcknowledged(sendSessionKey, state);
@@ -423,6 +443,7 @@ export async function sendChatMessage(
       runId: null,
       runPhase: "idle",
       stream: null,
+      reasoningStream: null,
       streamStartedAt: null,
       sending: false,
     });
@@ -430,6 +451,7 @@ export async function sendChatMessage(
       state.chatRunId = null;
       state.chatRunPhase = "idle";
       state.chatStream = null;
+      state.chatReasoningStream = null;
       state.chatStreamStartedAt = null;
       state.lastError = error;
       state.chatMessages = [
@@ -460,6 +482,7 @@ export async function abortChatRun(state: ChatState): Promise<boolean> {
       state.chatRunId = null;
       state.chatRunPhase = "idle";
       state.chatStream = null;
+      state.chatReasoningStream = null;
       state.chatStreamStartedAt = null;
     }
     return true;
@@ -487,6 +510,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     if (stored.runId === runId) {
       state.chatRunId = runId;
       state.chatStream = stored.stream;
+      state.chatReasoningStream = stored.reasoningStream;
       state.chatRunPhase = stored.runPhase;
       state.chatStreamStartedAt = stored.streamStartedAt ?? state.chatStreamStartedAt;
       state.chatA2UIMessages = [...stored.a2uiMessages];
@@ -531,6 +555,16 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   }
 
   if (payload.state === "delta") {
+    if (state.chatA2UIMessages.length > 0) {
+      state.chatRunPhase = "streaming";
+      return "delta";
+    }
+    const reasoningChunk = typeof payload.reasoning === "string" ? payload.reasoning : "";
+    if (reasoningChunk.length > 0) {
+      const currentReasoning = state.chatReasoningStream ?? "";
+      state.chatReasoningStream = currentReasoning + reasoningChunk;
+      state.chatRunPhase = "thinking";
+    }
     const chunk =
       typeof payload.text === "string" ? payload.text : extractText(payload.message);
     if (typeof chunk === "string" && chunk.length > 0) {
@@ -548,6 +582,10 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       state.chatMessages = [...state.chatMessages, payload.message];
     }
     state.chatStream = null;
+    const turnThinking = extractThinking(payload.message)?.trim() ?? "";
+    if (turnThinking) {
+      state.chatReasoningStream = null;
+    }
     state.chatRunPhase = "tool";
   } else if (payload.state === "final") {
     if (payload.message && typeof payload.message === "object") {

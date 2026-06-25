@@ -8,6 +8,7 @@ import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
 import { t } from "../strings.js";
 import { renderSkillCreateModals, type SkillCreateModalsProps } from "./skill-create-modals.ts";
+import { renderSkillCategoryAside } from "./catalog-category-aside.ts";
 
 /** Skills default icon (layers) - same as skills.ts */
 const SKILL_ICON_SVG = html`
@@ -42,6 +43,8 @@ export type SkillLibraryProps = {
   installSuccess: string | null;
   /** 与 fetch 一致，用于解析相对 logo 路径（Vite 开发等场景） */
   gatewayHost?: string;
+  token?: string;
+  categoryReloadVersion?: number;
   query: string;
   items: SkillListItem[];
   selectedFolder: string | null;
@@ -55,6 +58,7 @@ export type SkillLibraryProps = {
   installingFolder?: string | null;
   onQueryChange: (next: string) => void;
   onCategoryChange: (next: string) => void;
+  onCategoryTreeSelect?: (name: string, descendantNames: string[]) => void;
   onStatusChange: (next: string) => void;
   onRefresh: () => void;
   onSelect: (folder: string) => void;
@@ -429,6 +433,22 @@ export function renderSkillLibrary(props: SkillLibraryProps) {
     <main class="emp-page">
       <section class="emp-list-wrap">
         <div class="emp-content">
+          ${renderSkillCategoryAside({
+            items: props.items,
+            selectedCategory: activeCategory,
+            keyword: props.query,
+            gatewayHost: props.gatewayHost,
+            token: props.token,
+            reloadVersion: props.categoryReloadVersion ?? 0,
+            disabled: props.loading,
+            onSelect: (name, descendantNames) => {
+              if (props.onCategoryTreeSelect) {
+                props.onCategoryTreeSelect(name, descendantNames);
+                return;
+              }
+              props.onCategoryChange(name);
+            },
+          })}
           <div class="emp-main">
             ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
             ${props.installSuccess ? html`<div class="callout success">${props.installSuccess}</div>` : nothing}

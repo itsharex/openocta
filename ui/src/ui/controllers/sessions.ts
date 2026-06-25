@@ -1,7 +1,6 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
 import type { SessionsListResult } from "../types.ts";
-import { toNumber } from "../format.ts";
 
 export type SessionsState = {
   client: GatewayBrowserClient | null;
@@ -9,10 +8,6 @@ export type SessionsState = {
   sessionsLoading: boolean;
   sessionsResult: SessionsListResult | null;
   sessionsError: string | null;
-  sessionsFilterActive: string;
-  sessionsFilterLimit: string;
-  sessionsIncludeGlobal: boolean;
-  sessionsIncludeUnknown: boolean;
 };
 
 export type SessionsCreateResult = {
@@ -106,10 +101,10 @@ export async function loadSessions(
   state.sessionsLoading = true;
   state.sessionsError = null;
   try {
-    const includeGlobal = overrides?.includeGlobal ?? state.sessionsIncludeGlobal;
-    const includeUnknown = overrides?.includeUnknown ?? state.sessionsIncludeUnknown;
-    const activeMinutes = overrides?.activeMinutes ?? toNumber(state.sessionsFilterActive, 0);
-    const limit = overrides?.limit ?? toNumber(state.sessionsFilterLimit, 0);
+    const includeGlobal = overrides?.includeGlobal ?? true;
+    const includeUnknown = overrides?.includeUnknown ?? false;
+    const activeMinutes = overrides?.activeMinutes ?? 0;
+    const limit = overrides?.limit ?? 0;
     const params: Record<string, unknown> = {
       includeGlobal,
       includeUnknown,
@@ -192,44 +187,6 @@ export async function deleteSession(state: SessionsState, key: string) {
   state.sessionsError = null;
   try {
     await state.client.request("sessions.delete", { key, deleteTranscript: true });
-    state.sessionsLoading = false;
-    await loadSessions(state, { includeLastMessage: true });
-  } catch (err) {
-    state.sessionsError = String(err);
-  } finally {
-    state.sessionsLoading = false;
-  }
-}
-
-export async function deleteSessions(state: SessionsState, keys: string[]) {
-  if (!state.client || !state.connected) {
-    return;
-  }
-  if (state.sessionsLoading) {
-    return;
-  }
-  const safeKeys = Array.from(
-    new Set(keys.filter((key) => key && key !== "agent.main.main")),
-  );
-  if (safeKeys.length === 0) {
-    return;
-  }
-  const label =
-    safeKeys.length === 1
-      ? '确定删除此会话？'
-      : `确定删除 ${safeKeys.length} 个会话？`;
-  const confirmed = await nativeConfirm(
-    `${label}`,
-  );
-  if (!confirmed) {
-    return;
-  }
-  state.sessionsLoading = true;
-  state.sessionsError = null;
-  try {
-    for (const key of safeKeys) {
-      await state.client.request("sessions.delete", { key, deleteTranscript: true });
-    }
     state.sessionsLoading = false;
     await loadSessions(state, { includeLastMessage: true });
   } catch (err) {

@@ -20,15 +20,12 @@ export type Tab =
   | "knowledgeVault"
   | "toolLibrary"
   | "modelLibrary"
-  | "tutorials"
-  | "documentation"
   | "aboutUs"
   | "community"
   | "agents"
   | "overview"
   | "channels"
   | "instances"
-  | "sessions"
   | "cron"
   | "skills"
   | "mcp"
@@ -38,10 +35,10 @@ export type Tab =
   | "agentSwarm"
   | "config"
   | "envVars"
+  | "apiKeys"
   | "models"
   | "debug"
   | "logs"
-  | "llmTrace"
   | "sandbox";
 
 const TAB_PATHS: Record<Tab, string> = {
@@ -53,15 +50,12 @@ const TAB_PATHS: Record<Tab, string> = {
   knowledgeVault: "/knowledge-vault",
   toolLibrary: "/tool-library",
   modelLibrary: "/model-library",
-  tutorials: "/tutorials",
-  documentation: "/documentation",
   aboutUs: "/about-us",
   community: "/community",
   agents: "/agents",
   overview: "/overview",
   channels: "/channels",
   instances: "/instances",
-  sessions: "/sessions",
   cron: "/cron",
   skills: "/skills",
   mcp: "/mcp",
@@ -71,10 +65,10 @@ const TAB_PATHS: Record<Tab, string> = {
   agentSwarm: "/agent-swarm",
   config: "/config",
   envVars: "/env-vars",
+  apiKeys: "/api-keys",
   models: "/models",
   debug: "/debug",
   logs: "/logs",
-  llmTrace: "/llm-trace",
   sandbox: "/sandbox",
 };
 
@@ -84,11 +78,7 @@ const ACTIVE_TOP_TAB_ICONS: Partial<Record<Tab, IconName>> = {
   message: "messageSquareActive",
   scheduledTasks: "alarmClockActive",
   employeeMarket: "usersActive",
-  skillLibrary: "zapActive",
   knowledgeVault: "documentation",
-  toolLibrary: "wrenchActive",
-  modelLibrary: "modelCubeActive",
-  tutorials: "bookActive",
   community: "globeActive",
   config: "settingsActive",
 };
@@ -200,10 +190,6 @@ export function iconForTab(tab: Tab, active = false): IconName {
       return "wrench";
     case "modelLibrary":
       return "modelCube";
-    case "tutorials":
-      return "book";
-    case "documentation":
-      return "documentation";
     case "aboutUs":
       return "info";
     case "community":
@@ -222,16 +208,12 @@ export function iconForTab(tab: Tab, active = false): IconName {
       return "link";
     case "instances":
       return "radio";
-    case "sessions":
-      return "scrollText";
     case "cron":
       return "loader";
     case "skills":
       return "zap";
     case "mcp":
       return "folder";
-    case "llmTrace":
-      return "traceBars";
     case "sandbox":
       return "sandbox";
     case "nodes":
@@ -240,6 +222,8 @@ export function iconForTab(tab: Tab, active = false): IconName {
       return "settings";
     case "envVars":
       return "envVars";
+    case "apiKeys":
+      return "key";
     case "models":
       return "modelCube";
     case "debug":
@@ -269,10 +253,6 @@ export function titleForTab(tab: Tab) {
       return "工具库";
     case "modelLibrary":
       return "模型库";
-    case "tutorials":
-      return "教程";
-    case "documentation":
-      return "在线文档";
     case "aboutUs":
       return "关于我们";
     case "community":
@@ -285,16 +265,12 @@ export function titleForTab(tab: Tab) {
       return t("navTitleChannels");
     case "instances":
       return t("navTitleInstances");
-    case "sessions":
-      return t("navTitleSessions");
     case "cron":
       return t("navTitleCron");
     case "skills":
       return t("navTitleSkills");
     case "mcp":
       return t("navTitleMcp");
-    case "llmTrace":
-      return t("navTitleLlmTrace");
     case "sandbox":
       return t("navTitleSandbox");
     case "nodes":
@@ -309,6 +285,8 @@ export function titleForTab(tab: Tab) {
       return t("navTitleConfig");
     case "envVars":
       return t("navTitleEnvVars");
+    case "apiKeys":
+      return "API Key";
     case "models":
       return t("navTitleModels");
     case "debug":
@@ -376,10 +354,6 @@ export function subtitleForTab(tab: Tab) {
       return "";
     case "modelLibrary":
       return "";
-    case "tutorials":
-      return "";
-    case "documentation":
-      return "";
     case "aboutUs":
       return "";
     case "community":
@@ -392,16 +366,12 @@ export function subtitleForTab(tab: Tab) {
       return t("subtitleChannels");
     case "instances":
       return t("subtitleInstances");
-    case "sessions":
-      return t("subtitleSessions");
     case "cron":
       return t("subtitleCron");
     case "skills":
       return t("subtitleSkills");
     case "mcp":
       return t("subtitleMcp");
-    case "llmTrace":
-      return t("subtitleLlmTrace");
     case "sandbox":
       return t("subtitleSandbox");
     case "nodes":
@@ -416,6 +386,8 @@ export function subtitleForTab(tab: Tab) {
       return t("subtitleConfig");
     case "envVars":
       return t("subtitleEnvVars");
+    case "apiKeys":
+      return "管理第三方接入密钥，配置开放路径与模型/资源绑定。";
     case "models":
       return t("subtitleModels");
     case "debug":

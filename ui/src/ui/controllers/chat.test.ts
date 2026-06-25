@@ -16,6 +16,7 @@ function createState(overrides: Partial<ChatState> = {}): ChatState {
     chatRunPhase: "idle",
     chatSending: false,
     chatStream: null,
+    chatReasoningStream: null,
     chatStreamStartedAt: null,
     chatA2UIMessages: [],
     chatThinkingLevel: null,

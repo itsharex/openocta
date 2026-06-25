@@ -27,7 +27,6 @@ type Strings = {
   subtitleOverview: string;
   subtitleChannels: string;
   subtitleInstances: string;
-  subtitleSessions: string;
   subtitleUsage: string;
   subtitleCron: string;
   subtitleSkills: string;
@@ -41,13 +40,11 @@ type Strings = {
   subtitleModels: string;
   subtitleDebug: string;
   subtitleLogs: string;
-  subtitleLlmTrace: string;
   // Nav titles (tab labels; proper nouns not translated)
   navTitleAgents: string;
   navTitleOverview: string;
   navTitleChannels: string;
   navTitleInstances: string;
-  navTitleSessions: string;
   navTitleUsage: string;
   navTitleCron: string;
   navTitleSkills: string;
@@ -62,7 +59,6 @@ type Strings = {
   navTitleModels: string;
   navTitleDebug: string;
   navTitleLogs: string;
-  navTitleLlmTrace: string;
   navTitleSandbox: string;
   navTitleApprovals: string;
   navTitleControl: string;
@@ -125,6 +121,17 @@ type Strings = {
   overviewScenario: string;
   overviewScenarioNone: string;
   overviewScenarioTasks: string;
+  overviewLocalAgents: string;
+  overviewLocalAgentsSub: string;
+  overviewLocalAgentsLoading: string;
+  overviewLocalAgentMissing: string;
+  overviewLocalAgentReady: string;
+  overviewLocalAgentProbe: string;
+  overviewLocalAgentInvoke: string;
+  overviewLocalAgentMention: string;
+  chatLocalAgentsTitle: string;
+  chatLocalAgentsHint: string;
+  chatLocalAgentsPicker: string;
   overviewNotes: string;
   overviewNotesSub: string;
   overviewNoteTailscale: string;
@@ -146,6 +153,10 @@ type Strings = {
   commonNA: string;
   commonYes: string;
   commonNo: string;
+  themeLight: string;
+  themeDark: string;
+  themeSystem: string;
+  themeToggle: string;
   chatQueueRemoveConfirm: string;
   chatBrowserPreviewTitle: string;
   chatBrowserPreviewToggle: string;
@@ -189,24 +200,6 @@ type Strings = {
   mcpTableType: string;
   mcpTableStatus: string;
   mcpTableActions: string;
-  llmTraceSearch: string;
-  llmTraceSearchPlaceholder: string;
-  llmTraceEnabled: string;
-  llmTraceDisabled: string;
-  llmTraceActionEnable: string;
-  llmTraceActionDisable: string;
-  llmTraceToggleTooltip: string;
-  llmTraceModeActive: string;
-  llmTraceModeAll: string;
-  llmTraceSessionKey: string;
-  llmTraceSessionId: string;
-  llmTraceUpdatedAt: string;
-  llmTraceFile: string;
-  llmTraceFileSize: string;
-  llmTraceView: string;
-  llmTraceBack: string;
-  llmTraceDownload: string;
-  llmTraceNoEntries: string;
   sandboxEnabled: string;
   sandboxDisabled: string;
   sandboxActionEnable: string;
@@ -466,24 +459,6 @@ type Strings = {
   instancesLastInput: string;
   instancesReason: string;
   instancesScopes: string;
-  // Sessions
-  sessionsTitle: string;
-  sessionsSub: string;
-  sessionsActiveWithin: string;
-  sessionsLimit: string;
-  sessionsIncludeGlobal: string;
-  sessionsIncludeUnknown: string;
-  sessionsStore: string;
-  sessionsKey: string;
-  sessionsLabel: string;
-  sessionsKind: string;
-  sessionsUpdated: string;
-  sessionsTokens: string;
-  sessionsThinking: string;
-  sessionsVerbose: string;
-  sessionsReasoning: string;
-  sessionsActions: string;
-  sessionsNoFound: string;
   // Usage
   usageNoTimeline: string;
   usageNoData: string;
@@ -1052,7 +1027,6 @@ const EN: Strings = {
   subtitleOverview: "Platform health and LLM usage overview.",
   subtitleChannels: "Manage channels and settings.",
   subtitleInstances: "Presence beacons from connected clients and nodes.",
-  subtitleSessions: "Inspect active sessions and adjust per-session defaults.",
   subtitleUsage: "",
   subtitleCron: "Schedule wakeups and recurring agent runs.",
   subtitleSkills: "Manage skill availability and API key injection.",
@@ -1066,14 +1040,12 @@ const EN: Strings = {
   subtitleModels: "Configure model providers and API keys.",
   subtitleDebug: "Gateway snapshots, events, and manual RPC calls.",
   subtitleLogs: "Live tail of the gateway file logs.",
-  subtitleLlmTrace: "View LLM trace details for sessions.",
   subtitleSandbox: "Sandbox, command validation, and approval queue.",
   subtitleApprovals: "Command approval queue; approve or deny by session.",
   navTitleAgents: "Agents",
   navTitleOverview: "Overview",
   navTitleChannels: "Channels",
   navTitleInstances: "Instances",
-  navTitleSessions: "Sessions",
   navTitleUsage: "Usage",
   navTitleCron: "Cron Jobs",
   navTitleSkills: "Skills",
@@ -1088,7 +1060,6 @@ const EN: Strings = {
   navTitleModels: "Models",
   navTitleDebug: "Debug",
   navTitleLogs: "Logs",
-  navTitleLlmTrace: "LLM Trace",
   navTitleSandbox: "Security Policy",
   navTitleApprovals: "Approvals",
   navTitleControl: "Control",
@@ -1131,6 +1102,17 @@ const EN: Strings = {
   overviewScenario: "Initialized scenario",
   overviewScenarioNone: "Not configured",
   overviewScenarioTasks: "Scenario setup tasks",
+  overviewLocalAgents: "Local agent collaboration",
+  overviewLocalAgentsSub: "Detect CLI agents installed on this machine (OpenClaw, Cursor, Codex, etc.).",
+  overviewLocalAgentsLoading: "Probing local agents…",
+  overviewLocalAgentMissing: "Not detected",
+  overviewLocalAgentReady: "Available",
+  overviewLocalAgentProbe: "Detection:",
+  overviewLocalAgentInvoke: "Invoke:",
+  overviewLocalAgentMention: "Mention in chat",
+  chatLocalAgentsTitle: "Local agents on this machine",
+  chatLocalAgentsHint: "Type @ in the message box or pick a tool from the menu.",
+  chatLocalAgentsPicker: "Agents",
   overviewNotes: "Notes",
   overviewNotesSub: "Quick reminders for remote control setups.",
   overviewNoteTailscale: "Tailscale serve",
@@ -1151,6 +1133,10 @@ const EN: Strings = {
   commonNA: "n/a",
   commonYes: "Yes",
   commonNo: "No",
+  themeLight: "Light theme",
+  themeDark: "Dark theme",
+  themeSystem: "System theme",
+  themeToggle: "Switch theme (light → dark → system)",
   chatQueueRemoveConfirm: "Remove this queued message?",
   chatBrowserPreviewTitle: "Server browser",
   chatBrowserPreviewToggle: "Browser preview",
@@ -1192,25 +1178,6 @@ const EN: Strings = {
   mcpTableType: "Type",
   mcpTableStatus: "Status",
   mcpTableActions: "Actions",
-  llmTraceSearch: "Search",
-  llmTraceSearchPlaceholder: "Filter by session key…",
-  llmTraceEnabled: "Enabled",
-  llmTraceDisabled: "Disabled",
-  llmTraceActionEnable: "Enable",
-  llmTraceActionDisable: "Disable",
-  llmTraceToggleTooltip:
-    "When enabled, new sessions will record model call Trace details (may impact performance). When disabled, new Trace details will not be recorded.",
-  llmTraceModeActive: "Active",
-  llmTraceModeAll: "All",
-  llmTraceSessionKey: "Session Key",
-  llmTraceSessionId: "Session ID",
-  llmTraceUpdatedAt: "Updated",
-  llmTraceFile: "File",
-  llmTraceFileSize: "Size",
-  llmTraceView: "View",
-  llmTraceBack: "Back",
-  llmTraceDownload: "Download",
-  llmTraceNoEntries: "No trace entries.",
   sandboxEnabled: "Enabled",
   sandboxDisabled: "Disabled",
   sandboxActionEnable: "Enable",
@@ -1488,23 +1455,6 @@ const EN: Strings = {
   instancesLastInput: "Last input",
   instancesReason: "Reason",
   instancesScopes: "scopes",
-  sessionsTitle: "Sessions",
-  sessionsSub: "Active session keys and per-session overrides.",
-  sessionsActiveWithin: "Active within (minutes)",
-  sessionsLimit: "Limit",
-  sessionsIncludeGlobal: "Include global",
-  sessionsIncludeUnknown: "Include unknown",
-  sessionsStore: "Store",
-  sessionsKey: "Key",
-  sessionsLabel: "Label",
-  sessionsKind: "Kind",
-  sessionsUpdated: "Updated",
-  sessionsTokens: "Tokens",
-  sessionsThinking: "Thinking",
-  sessionsVerbose: "Verbose",
-  sessionsReasoning: "Reasoning",
-  sessionsActions: "Actions",
-  sessionsNoFound: "No sessions found.",
   usageNoTimeline: "No timeline data yet.",
   usageNoData: "No data",
   usageHours: "Hours",
@@ -2068,7 +2018,6 @@ const ZH: Strings = {
   subtitleOverview: "平台运行状态与大模型用量概览。",
   subtitleChannels: "管理通道与设置。",
   subtitleInstances: "已连接客户端与节点的在线状态。",
-  subtitleSessions: "查看活跃会话并调整每会话默认值。",
   subtitleUsage: "",
   subtitleCron: "安排唤醒与定时代理任务。",
   subtitleSkills: "管理技能可用性与 API 密钥注入。",
@@ -2082,14 +2031,12 @@ const ZH: Strings = {
   subtitleModels: "配置模型厂商与 API 密钥。",
   subtitleDebug: "网关快照、事件与手动 RPC 调用。",
   subtitleLogs: "网关日志实时查看。",
-  subtitleLlmTrace: "查看会话的 LLM trace 详情。",
   subtitleSandbox: "Sandbox、命令校验与审批队列。",
   subtitleApprovals: "命令审批队列；按会话批准或拒绝。",
   navTitleAgents: "代理",
   navTitleOverview: "概览",
   navTitleChannels: "通道",
   navTitleInstances: "实例",
-  navTitleSessions: "会话",
   navTitleUsage: "用量",
   navTitleCron: "定时任务",
   navTitleSkills: "技能",
@@ -2104,7 +2051,6 @@ const ZH: Strings = {
   navTitleModels: "模型",
   navTitleDebug: "测试",
   navTitleLogs: "日志",
-  navTitleLlmTrace: "LLM Trace",
   navTitleSandbox: "安全策略",
   navTitleApprovals: "审批队列",
   navTitleControl: "控制",
@@ -2147,6 +2093,17 @@ const ZH: Strings = {
   overviewScenario: "初始化场景",
   overviewScenarioNone: "未配置",
   overviewScenarioTasks: "场景初始化任务",
+  overviewLocalAgents: "本地智能体协同",
+  overviewLocalAgentsSub: "自动探测本机已安装的 CLI 智能体（OpenClaw、Cursor、Codex 等）。",
+  overviewLocalAgentsLoading: "正在探测本地智能体…",
+  overviewLocalAgentMissing: "未检测到",
+  overviewLocalAgentReady: "可用",
+  overviewLocalAgentProbe: "探测方式：",
+  overviewLocalAgentInvoke: "调用示例：",
+  overviewLocalAgentMention: "对话中 @ 提及",
+  chatLocalAgentsTitle: "本机可用协同工具",
+  chatLocalAgentsHint: "在输入框输入 @ 或从菜单选择协同工具。",
+  chatLocalAgentsPicker: "协同工具",
   overviewNotes: "说明",
   overviewNotesSub: "远程控制相关简要提示。",
   overviewNoteTailscale: "Tailscale serve",
@@ -2167,6 +2124,10 @@ const ZH: Strings = {
   commonNA: "无",
   commonYes: "是",
   commonNo: "否",
+  themeLight: "浅色主题",
+  themeDark: "深色主题",
+  themeSystem: "跟随系统",
+  themeToggle: "切换主题（浅色 → 深色 → 跟随系统）",
   chatQueueRemoveConfirm: "确定移除此排队消息？",
   chatBrowserPreviewTitle: "服务端浏览器",
   chatBrowserPreviewToggle: "浏览器预览",
@@ -2208,25 +2169,6 @@ const ZH: Strings = {
   mcpTableType: "连接类型",
   mcpTableStatus: "状态",
   mcpTableActions: "操作",
-  llmTraceSearch: "搜索",
-  llmTraceSearchPlaceholder: "按 session key 筛选…",
-  llmTraceEnabled: "已开启",
-  llmTraceDisabled: "已关闭",
-  llmTraceActionEnable: "开启",
-  llmTraceActionDisable: "关闭",
-  llmTraceToggleTooltip:
-    "开启后，再进行会话会记录模型调用Trace详情，可能会有性能影响。关闭后，不再记录新的模型会话Trace详情。",
-  llmTraceModeActive: "活跃",
-  llmTraceModeAll: "全部",
-  llmTraceSessionKey: "Session Key",
-  llmTraceSessionId: "Session ID",
-  llmTraceUpdatedAt: "更新时间",
-  llmTraceFile: "文件",
-  llmTraceFileSize: "大小",
-  llmTraceView: "查看",
-  llmTraceBack: "返回",
-  llmTraceDownload: "下载",
-  llmTraceNoEntries: "暂无 trace 记录。",
   sandboxEnabled: "已开启",
   sandboxDisabled: "已关闭",
   sandboxActionEnable: "开启",
@@ -2503,23 +2445,6 @@ const ZH: Strings = {
   instancesLastInput: "最近输入",
   instancesReason: "原因",
   instancesScopes: "范围",
-  sessionsTitle: "会话",
-  sessionsSub: "活跃会话 Key 及每会话覆盖项。",
-  sessionsActiveWithin: "活跃时间（分钟）",
-  sessionsLimit: "数量上限",
-  sessionsIncludeGlobal: "包含全局",
-  sessionsIncludeUnknown: "包含未知",
-  sessionsStore: "存储",
-  sessionsKey: "Key",
-  sessionsLabel: "标签",
-  sessionsKind: "类型",
-  sessionsUpdated: "更新时间",
-  sessionsTokens: "Token",
-  sessionsThinking: "思考",
-  sessionsVerbose: "详细",
-  sessionsReasoning: "推理",
-  sessionsActions: "操作",
-  sessionsNoFound: "未找到会话。",
   usageNoTimeline: "暂无时间线数据。",
   usageNoData: "暂无数据",
   usageHours: "小时",

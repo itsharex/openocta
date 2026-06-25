@@ -2,7 +2,7 @@
 
 OpenOcta **场景（Scenario）** 是一组可重复执行的初始化任务：一次性安装某类业务所需的 Skill、MCP、数字员工，声明环境变量，并可选携带离线工具包。同一套清单可在 **安装引导（图形界面）**、**命令行脚本** 或 **CI/CD 流水线** 中复用。
 
-场景模板源码位于仓库 `scenarios/` 目录；完整字段规范见 [`scenarios/SPEC.md`](../scenarios/SPEC.md)。
+场景模板源码位于仓库 `deploy/scenarios/` 目录；完整字段规范见 [`deploy/scenarios/SPEC.md`](../deploy/scenarios/SPEC.md)。
 
 ---
 
@@ -29,7 +29,7 @@ OpenOcta **场景（Scenario）** 是一组可重复执行的初始化任务：�
 | `k8s-incident` | K8s 处置 | Skill `kubernetes-devops`、MCP `k8s-MCP` | `KUBECONFIG` |
 | `browser-office` | 浏览器办公 | Skill `browserless-agent`、MCP `playwright-MCP` | `HTTP_PROXY`（可选） |
 
-各场景的人类可读说明见 `scenarios/<id>/README.md`，机器可读清单见 `scenarios/<id>/scenario.json`。
+各场景的人类可读说明见 `deploy/scenarios/<id>/README.md`，机器可读清单见 `deploy/scenarios/<id>/scenario.json`。
 
 ---
 
@@ -71,7 +71,7 @@ OpenOcta **场景（Scenario）** 是一组可重复执行的初始化任务：�
 **Linux / macOS：**
 
 ```bash
-cd scenarios/host-inspection
+cd deploy/scenarios/host-inspection
 export OPENOCTA_GATEWAY_URL="http://127.0.0.1:18900"
 export OPENOCTA_GATEWAY_TOKEN="your-token"   # 若 Gateway 启用了 Token
 ./init.sh
@@ -80,7 +80,7 @@ export OPENOCTA_GATEWAY_TOKEN="your-token"   # 若 Gateway 启用了 Token
 **Windows PowerShell：**
 
 ```powershell
-cd scenarios\host-inspection
+cd deploy\scenarios\host-inspection
 $env:OPENOCTA_GATEWAY_URL = "http://127.0.0.1:18900"
 $env:OPENOCTA_GATEWAY_TOKEN = "your-token"
 .\init.ps1
@@ -89,7 +89,7 @@ $env:OPENOCTA_GATEWAY_TOKEN = "your-token"
 **Windows CMD：**
 
 ```cmd
-cd scenarios\host-inspection
+cd deploy\scenarios\host-inspection
 set OPENOCTA_GATEWAY_URL=http://127.0.0.1:18900
 set OPENOCTA_GATEWAY_TOKEN=your-token
 init.cmd
@@ -134,7 +134,7 @@ export SSH_USER="ops"
 
 ### 4.4 离线 / 跨环境部署
 
-将整个 `scenarios/<id>/` 目录复制到目标机器（含 `bundled/` 离线包），配置 `OPENOCTA_GATEWAY_*` 后运行 `init.sh` 或 `init.ps1`，效果与开发机一致。
+将整个 `deploy/scenarios/<id>/` 目录复制到目标机器（含 `bundled/` 离线包），配置 `OPENOCTA_GATEWAY_*` 后运行 `init.sh` 或 `init.ps1`，效果与开发机一致。
 
 `bundledTools` 中声明的离线包**不会**被 OpenOcta 自动安装，需运维手动安装或使用 CM 工具下发。
 
@@ -191,7 +191,7 @@ Gateway 从官网下载资源包，写入本地目录，并更新 `openocta.json
 ### 6.2 创建目录结构
 
 ```
-scenarios/my-custom-ops/
+deploy/scenarios/my-custom-ops/
 ├── README.md           # 人类可读说明（用途、前置条件、示例对话）
 ├── scenario.json       # 机器可读清单（必选）
 ├── init.sh             # Linux / macOS 初始化脚本（推荐）
@@ -263,7 +263,7 @@ scenarios/my-custom-ops/
 
 `platform` 枚举：`linux-rpm`、`linux-deb`、`windows-exe`、`macos`、`any`。
 
-完整字段语义见 [`scenarios/SPEC.md`](../scenarios/SPEC.md) 第 3 节。
+完整字段语义见 [`deploy/scenarios/SPEC.md`](../deploy/scenarios/SPEC.md) 第 3 节。
 
 ### 6.4 实现初始化脚本
 
@@ -274,7 +274,7 @@ scenarios/my-custom-ops/
 3. 打印 `env` 与 `bundledTools` 清单。
 4. 退出码 `0` 表示脚本执行完毕（单条安装失败可 warn 但不中断，与内置脚本一致）。
 
-Bash 核心片段（可参考 `scenarios/host-inspection/init.sh`）：
+Bash 核心片段（可参考 `deploy/scenarios/host-inspection/init.sh`）：
 
 ```bash
 GATEWAY_URL="${OPENOCTA_GATEWAY_URL:-http://127.0.0.1:18900}"
@@ -317,7 +317,7 @@ done < <(jq -c '.skills[]?' scenario.json)
 
 ### 6.7（可选）注册到安装引导
 
-图形界面**不会**自动扫描 `scenarios/` 目录。若希望新场景出现在安装引导的「场景初始化」步骤，需在源码中注册：
+图形界面**不会**自动扫描 `deploy/scenarios/` 目录。若希望新场景出现在安装引导的「场景初始化」步骤，需在源码中注册：
 
 **文件**：`ui/src/ui/scenario-templates.ts`
 
@@ -326,12 +326,12 @@ done < <(jq -c '.skills[]?' scenario.json)
   id: "my-custom-ops",
   name: "我的运维场景",
   summary: "...",
-  readmePath: "scenarios/my-custom-ops/README.md",
+  readmePath: "deploy/scenarios/my-custom-ops/README.md",
   initScriptPaths: {
-    sh: "scenarios/my-custom-ops/init.sh",
-    ps1: "scenarios/my-custom-ops/init.ps1",
-    cmd: "scenarios/my-custom-ops/init.cmd",
-    bat: "scenarios/my-custom-ops/init.bat",
+    sh: "deploy/scenarios/my-custom-ops/init.sh",
+    ps1: "deploy/scenarios/my-custom-ops/init.ps1",
+    cmd: "deploy/scenarios/my-custom-ops/init.cmd",
+    bat: "deploy/scenarios/my-custom-ops/init.bat",
   },
   tasks: [ /* 与 scenario.json 等价的任务列表 */ ],
 }
@@ -339,7 +339,7 @@ done < <(jq -c '.skills[]?' scenario.json)
 
 **同步要求**：`scenario.json` 与 `scenario-templates.ts` 中的资源、环境变量、离线包声明应保持一致；仅改 JSON 而不同步 TS 会导致引导页与 CLI 行为不一致。
 
-**不改 OpenOcta 源码的第三方**：只需交付 `scenarios/<id>/` 目录，用户配置 Gateway 后运行 `init.sh` 即可，无需注册 TS。
+**不改 OpenOcta 源码的第三方**：只需交付 `deploy/scenarios/<id>/` 目录，用户配置 Gateway 后运行 `init.sh` 即可，无需注册 TS。
 
 ---
 
@@ -391,9 +391,9 @@ OpenOcta 将 `scenario.json` 展开为有序任务列表：
 
 | 路径 | 说明 |
 |------|------|
-| [`scenarios/`](../scenarios/) | 场景目录与内置示例 |
-| [`scenarios/SPEC.md`](../scenarios/SPEC.md) | 完整规范（第三方集成 Checklist） |
-| [`scenarios/README.md`](../scenarios/README.md) | 场景目录快速入门 |
+| [`deploy/scenarios/`](../deploy/scenarios/) | 场景目录与内置示例 |
+| [`deploy/scenarios/SPEC.md`](../deploy/scenarios/SPEC.md) | 完整规范（第三方集成 Checklist） |
+| [`deploy/scenarios/README.md`](../deploy/scenarios/README.md) | 场景目录快速入门 |
 | `ui/src/ui/scenario-templates.ts` | 控制端内置场景与任务定义 |
 | `ui/src/ui/controllers/setup-wizard-scenarios.ts` | 引导页场景执行逻辑 |
 | `src/pkg/gateway/http/site_install.go` | Gateway 安装实现 |

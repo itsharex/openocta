@@ -10,12 +10,13 @@ import (
 	"github.com/openocta/openocta/pkg/a2a/executor"
 	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/agent/runtime"
+	"github.com/openocta/openocta/pkg/agent/stream"
 	"github.com/openocta/openocta/pkg/agent/tools"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/openocta/openocta/pkg/employees"
 	"github.com/openocta/openocta/pkg/gateway/swarmsvc"
 	"github.com/openocta/openocta/pkg/session"
 	"github.com/openocta/openocta/pkg/swarm"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
 // SwarmGatewayRunner executes agent turns for swarm members.
@@ -29,7 +30,7 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 		return "", nil
 	}
 	gw := r.Ctx
-	var modelFactory api.ModelFactory
+	var modelFactory agent.ModelFactory
 	if gw.Config != nil {
 		factory, err := agent.CreateModelFactoryFromConfig(gw.Config, agentID)
 		if err != nil {
@@ -54,6 +55,7 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 	}
 
 	agentTools := tools.DefaultToolsWithInvoker(invoker)
+	agentTools = AppendLocalAgentToolsForSession(agentTools, gw.Config, agentID, os.Getenv)
 	canSpawn := true
 	if swarm.IsSwarmSessionKey(sessionKey) {
 		if _, wsID, memberID, ok := swarm.ParseMemberSessionKey(sessionKey); ok {
@@ -103,11 +105,12 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 		EmployeeID:            employeeID,
 		EnableSubagents:       true,
 		EnableSandbox:         true,
-		EnableApprovalQueue:   true,
+		EnableApprovalQueue:   runtime.ApprovalQueueEnabled(gw.Config),
 		EnableSystemPrompt:    true,
 		SystemPromptOverrides: systemPromptOverrides,
 		AgentID:               agentID,
 		Env:                   os.Getenv,
+		TokenTracking:         true,
 	})
 	if err != nil {
 		return "", err
@@ -132,9 +135,9 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 		}
 	}
 
-	eventChan, streamErr := rt.RunStream(ctx, api.Request{Prompt: prompt, SessionID: sessionKey})
+	eventChan, streamErr := rt.RunStream(ctx, types.Request{Prompt: prompt, SessionID: sessionKey})
 	if streamErr != nil {
-		resp, runErr := rt.Run(ctx, api.Request{Prompt: prompt, SessionID: sessionKey})
+		resp, runErr := rt.Run(ctx, types.Request{Prompt: prompt, SessionID: sessionKey})
 		if runErr != nil {
 			return "", runErr
 		}
@@ -153,14 +156,14 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 	var lastText strings.Builder
 	for ev := range eventChan {
 		switch ev.Type {
-		case api.EventContentBlockDelta:
+		case stream.EventContentBlockDelta:
 			if ev.Delta != nil && ev.Delta.Text != "" {
 				lastText.WriteString(ev.Delta.Text)
 				if onDelta != nil {
 					onDelta("assistant", map[string]interface{}{"text": ev.Delta.Text})
 				}
 			}
-		case api.EventContentBlockStart:
+		case stream.EventContentBlockStart:
 			if onDelta != nil && ev.ContentBlock != nil && ev.ContentBlock.Type == "tool_use" {
 				onDelta("tool_call", map[string]interface{}{
 					"toolCallId": ev.ContentBlock.ID,
@@ -168,7 +171,7 @@ func (r *SwarmGatewayRunner) Run(ctx context.Context, agentID, sessionKey, messa
 					"arguments":  ev.ContentBlock.Input,
 				})
 			}
-		case api.EventToolExecutionResult:
+		case stream.EventToolExecutionResult:
 			if onDelta != nil {
 				isErr := ev.IsError != nil && *ev.IsError
 				outputStr := ""

@@ -9,11 +9,58 @@ import (
 	"github.com/openocta/openocta/pkg/cron"
 )
 
-// cronJobIDFromSessionKey extracts job ID from cron session key "agent:<agentId>:cron:<jobId>".
+// BuildCronChatSendParams assembles chat.send params from a cron job and resolved session info.
+func BuildCronChatSendParams(job cron.CronJob, sessionKey, sessionId, message string) ChatSendParams {
+	p := ChatSendParams{
+		SessionKey:     sessionKey,
+		Message:        message,
+		SessionID:      sessionId,
+		IdempotencyKey: "cron:" + job.ID,
+	}
+	if job.Delivery != nil {
+		mode := strings.TrimSpace(strings.ToLower(job.Delivery.Mode))
+		channel := strings.TrimSpace(job.Delivery.Channel)
+		if mode == "announce" && channel != "" && channel != "last" {
+			to := strings.TrimSpace(job.Delivery.To)
+			if to != "" {
+				p.Channel = channel
+				p.To = to
+				header := "定时任务: " + job.Name
+				if len(header) > 50 {
+					header = header[:47] + "......"
+				}
+				p.Header = header
+			}
+		}
+	}
+	if job.RunConfig != nil {
+		rc := job.RunConfig
+		if rc.ModelRef != "" {
+			p.ModelRef = rc.ModelRef
+		}
+		hasResources := len(rc.SkillKeys) > 0 || len(rc.McpServers) > 0
+		if hasResources {
+			p.Resources = map[string]interface{}{
+				"configured": true,
+				"skillKeys":  rc.SkillKeys,
+				"mcpServers": rc.McpServers,
+				"webSearch":  false,
+			}
+		}
+	}
+	return p
+}
+
+// cronJobIDFromSessionKey extracts job ID from cron session keys.
+// Supports agent:<agentId>:cron:<jobId> and agent:<agentId>:cron:<jobId>:run:<sessionId>.
 func cronJobIDFromSessionKey(sessionKey string) string {
 	rawKey := strings.TrimSpace(sessionKey)
-	parts := strings.Split(strings.ToLower(rawKey), ":")
-	if len(parts) >= 4 && parts[0] == "agent" && parts[2] == "cron" {
+	parts := strings.Split(rawKey, ":")
+	if len(parts) >= 6 && strings.EqualFold(parts[0], "agent") && strings.EqualFold(parts[2], "cron") && strings.EqualFold(parts[4], "run") {
+		return parts[3]
+	}
+	lowerParts := strings.Split(strings.ToLower(rawKey), ":")
+	if len(lowerParts) >= 4 && lowerParts[0] == "agent" && lowerParts[2] == "cron" {
 		rawParts := strings.Split(rawKey, ":")
 		if len(rawParts) >= 4 {
 			return rawParts[3]
@@ -58,8 +105,8 @@ func DeliverCronResultIfNeeded(ctx *Context, sessionKey, summary, status string)
 			channel = "last"
 		}
 		to := strings.TrimSpace(d.To)
-		if to == "" && channel == "last" {
-			return // cannot resolve "last" without to
+		if to == "" {
+			return
 		}
 		if ctx.InvokeMethod == nil {
 			return

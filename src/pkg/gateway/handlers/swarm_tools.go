@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/gateway/swarmsvc"
 	"github.com/openocta/openocta/pkg/swarm"
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
 
 // SwarmMemberCreateTool creates a child swarm member.

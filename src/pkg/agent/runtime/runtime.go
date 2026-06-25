@@ -1,43 +1,42 @@
-// Package runtime wraps agentsdk-go api.New for OPENOCTA agent execution.
+// Package runtime wraps Eino DeepAgent for OPENOCTA agent execution.
 package runtime
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/tencent-connect/botgo/log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/stellarlinkco/agentsdk-go/pkg/middleware"
+	"github.com/tencent-connect/botgo/log"
 
+	"github.com/openocta/openocta/pkg/agent/eino"
+	"github.com/openocta/openocta/pkg/agent/evolution"
+	"github.com/openocta/openocta/pkg/agent/stream"
+	"github.com/openocta/openocta/pkg/agent/tool"
 	agenttools "github.com/openocta/openocta/pkg/agent/tools"
+	"github.com/openocta/openocta/pkg/agent/types"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/paths"
-	octasecurity "github.com/openocta/openocta/pkg/security"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
-	agentsdkConfg "github.com/stellarlinkco/agentsdk-go/pkg/config"
-	"github.com/stellarlinkco/agentsdk-go/pkg/model"
-	"github.com/stellarlinkco/agentsdk-go/pkg/sandbox"
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
-	toolbuiltin "github.com/stellarlinkco/agentsdk-go/pkg/tool/builtin"
 )
 
-// Runtime wraps agentsdk-go Runtime for OPENOCTA.
+// Runtime wraps the Eino engine for OPENOCTA.
 type Runtime struct {
-	rt *api.Runtime
-	// agentRunBudget applies to Run when ctx has no deadline (OPENOCTA_AGENT_RUN_TIMEOUT / Options.AgentRunTimeout / DefaultAgentRunTimeout).
+	eng            *eino.Engine
 	agentRunBudget time.Duration
+	turnMu         sync.Mutex
+	turn           *eino.TurnSession
+	turnSessionID  string
 }
 
+// KnowledgeOptions configures vault indexing (memory_search).
+type KnowledgeOptions = eino.KnowledgeOptions
+
 // New creates a new Runtime with the given options.
-// When EnableSkills is true, skills are loaded from three locations (in order of precedence):
-// 1. Built-in skills (shipped with install: OPENOCTA_BUNDLED_SKILLS_DIR or executable-relative)
-// 2. Managed/local skills (~/.openocta/skills)
-// 3. Workspace skills (<workspace>/skills, i.e. ProjectRoot/skills)
 func New(ctx context.Context, opts Options) (*Runtime, error) {
 	if opts.ModelFactory == nil {
 		opts.ModelFactory = DefaultModelFactory()
@@ -46,22 +45,9 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 	if projectRoot == "" {
 		projectRoot = "."
 	}
-	preferGitBashOnWindows()
 
-	// Resolve enableSandbox early so BuiltinTools can use disabled sandbox when config says so.
-	enableSandbox := opts.EnableSandbox
-	if opts.Config != nil && opts.Config.Security != nil && opts.Config.Security.Sandbox != nil &&
-		opts.Config.Security.Sandbox.Enabled != nil {
-		enableSandbox = *opts.Config.Security.Sandbox.Enabled
-	} else {
-		enableSandbox = false
-	}
-
-	// Built-in tools (bash, file_read, file_write, grep, glob, etc.) plus any caller-provided tools.
-	// When sandbox disabled, use NewDisabledSandbox so tools skip path/permission validation.
 	var tools []tool.Tool
 	if !opts.DisableTools {
-		tools = BuiltinTools(projectRoot, !enableSandbox, resolveBashToolTimeout(opts))
 		if shouldRegisterWebTools(opts) {
 			for _, t := range agenttools.WebToolsFromConfig(opts.Config, projectRoot) {
 				tools = append(tools, t)
@@ -73,607 +59,270 @@ func New(ctx context.Context, opts Options) (*Runtime, error) {
 			}
 		}
 		if len(opts.Tools) > 0 {
-			extra := opts.Tools
-			if opts.EnableWebTools != nil && !*opts.EnableWebTools {
-				extra = agenttools.FilterOutWebTools(extra)
+			extra := agenttools.FilterOutWebTools(opts.Tools)
+			if shouldRegisterBrowserTools(opts) {
+				extra = agenttools.FilterOutBrowserTools(extra)
 			}
 			tools = append(tools, extra...)
 		}
-		// A2UI protocol tools (a2ui_push / a2ui_reset) for agent-driven UI in chat.
-		for _, t := range toolbuiltin.A2UITools() {
-			tools = append(tools, t)
-		}
-	}
-	apiOpts := api.Options{
-		ModelFactory: opts.ModelFactory,
-		Tools:        tools,
-		ProjectRoot:  projectRoot,
-	}
-	if opts.TokenLimit > 0 {
-		apiOpts.TokenLimit = opts.TokenLimit
-	}
-	// SDK 内部优化（见 agentsdk-go/docs/SDK-OPTIMIZATIONS.md）：
-	// 1) 结构化反思（Reflection）：把失败原因写入 middleware.State.Values["reflection.records"]
-	// 2) 工具输出落盘（ToolOutput）：OutputPersister 负责把过长输出落盘并在 history 中保留引用+摘要
-	if opts.DisableTools {
-		v := false
-		apiOpts.ReflectionEnabled = &v
-		apiOpts.EnabledBuiltinTools = []string{}
-	} else {
-		v := true
-		apiOpts.ReflectionEnabled = &v
-	}
-	if apiOpts.SettingsOverrides == nil {
-		apiOpts.SettingsOverrides = &agentsdkConfg.Settings{}
-	}
-	// toolOutput 默认阈值（bytes）。SDK 默认 64KB；这里下调以更积极地避免 history 被长输出淹没。
-	// 若你后续希望更精确地按“runes”控制，需要在 agentsdk-go 侧把 DefaultThresholdRunes 暴露到 settings 或 Options。
-	if apiOpts.SettingsOverrides.ToolOutput == nil {
-		apiOpts.SettingsOverrides.ToolOutput = &agentsdkConfg.ToolOutputConfig{}
-	}
-	if apiOpts.SettingsOverrides.ToolOutput.DefaultThresholdBytes <= 0 {
-		apiOpts.SettingsOverrides.ToolOutput.DefaultThresholdBytes = 16 * 1024
-	}
-	// 添加环境变量：1) 写入 SettingsOverrides.Env 供 hooks/settings 使用；2) 写入进程环境供 bash 等工具继承
-	if opts.Config != nil && opts.Config.Env != nil && len(opts.Config.Env.Vars) > 0 {
-		apiOpts.SettingsOverrides.Env = opts.Config.Env.Vars
-		for k, v := range opts.Config.Env.Vars {
-			if k != "" {
-				_ = os.Setenv(k, v)
-			}
-		}
-	}
-	//if len(opts.MCPServers) > 0 {
-	//	apiOpts.MCPServers = opts.MCPServers
-	//	if opts.Config != nil && opts.Config.Mcp != nil {
-	//		if mcpOverrides := buildMCPConfigOverrides(opts.Config.Mcp); mcpOverrides != nil {
-	//			apiOpts.SettingsOverrides.MCP = mcpOverrides
-	//		}
-	//	}
-	//}
-	var skillSandboxDirs []string
-	if opts.EnableSkills {
-		regs, dirs := LoadSkillRegistrationsWithBaseDirs(projectRoot, opts.Config)
-		employeeID := strings.TrimSpace(opts.EmployeeID)
-		if employeeID != "" {
-			env := opts.Env
-			if env == nil {
-				env = os.Getenv
-			}
-			empRegs, empDirs := LoadSkillRegistrationsForEmployee(projectRoot, opts.Config, employeeID, env)
-			regs = mergeSkillRegistrations(regs, empRegs)
-			dirs = mergeAbsDirs(dirs, empDirs)
-		}
-		if opts.SkillFilter != nil {
-			regs = FilterSkillRegistrations(regs, *opts.SkillFilter)
-			dirs = uniqueAbsSkillBaseDirsFromRegs(regs)
-		}
-		if len(regs) > 0 {
-			apiOpts.Skills = regs
-		}
-		skillSandboxDirs = dirs
-	}
-	if len(opts.DisallowedTools) > 0 {
-		apiOpts.DisallowedTools = append([]string(nil), opts.DisallowedTools...)
-	}
-	if opts.EnableSubagents && len(opts.Subagents) > 0 {
-		apiOpts.Subagents = opts.Subagents
 	}
 
-	if apiOpts.SettingsOverrides == nil {
-		apiOpts.SettingsOverrides = &agentsdkConfg.Settings{}
-	}
-
-	// Security policy from root-level security config (OpenOctaConfig.Security).
-	var (
-		sandboxRoot       *config.SandboxConfig
-		approvalQueueCfg  *config.SandboxApprovalQueue
-		approvalStorePath string
-		commandPolicy     *ResolvedCommandPolicy
-	)
-	if opts.Config != nil && opts.Config.Security != nil {
-		sec := opts.Config.Security
-		sandboxRoot = sec.Sandbox
-		commandPolicy = ResolveCommandPolicy(sec)
-		if sec.ApprovalQueue != nil {
-			approvalQueueCfg = sec.ApprovalQueue
-			approvalStorePath = resolveApprovalQueueStorePath(sandboxRoot, opts.Env)
-		}
-	}
-
-	// Wrap Bash tool with command validation (from commandPolicy or legacy validator).
-	var validatorCfg *config.SandboxValidatorConfig
-	if commandPolicy != nil && commandPolicy.Enabled {
-		validatorCfg = commandPolicy.ToLegacyValidator()
-	}
-	if validatorCfg != nil {
-		for i := range tools {
-			if tools[i] == nil {
-				continue
-			}
-			if shouldValidateCommandTool(tools[i].Name()) {
-				tools[i] = WrapToolWithCommandValidation(tools[i], validatorCfg)
-			}
-		}
-		apiOpts.Tools = tools
-	}
-	sandboxOpts := opts.Sandbox
-	if sandboxRoot != nil {
-		fromConfig := buildSandboxOptsFromConfig(sandboxRoot, projectRoot)
-		if fromConfig != nil {
-			sandboxOpts = mergeSandboxOpts(fromConfig, sandboxOpts)
-		}
-	}
-	if len(skillSandboxDirs) > 0 {
-		sandboxOpts = mergeSandboxOpts(sandboxOpts, &SandboxOpts{ExtraAllowedPaths: skillSandboxDirs})
-	}
-	// enableSandbox already resolved above from config
-	if enableSandbox {
-		apiOpts.Sandbox = buildSandboxOptions(projectRoot, sandboxOpts)
-		apiOpts.SettingsOverrides.Sandbox = &agentsdkConfg.SandboxConfig{
-			Enabled:                  &enableSandbox,
-			AutoAllowBashIfSandboxed: &enableSandbox, // enableSandbox 为true之后，默认允许命令在沙箱内运行且符合沙箱规则，直接执行，无需用户确认
-			AllowUnsandboxedCommands: &enableSandbox,
-			ExcludedCommands:         []string{},
-		}
-	} else {
-		apiOpts.SettingsOverrides.Sandbox = &agentsdkConfg.SandboxConfig{
-			Enabled: &enableSandbox,
-		}
-	}
-
-	var (
-		approvalQ         *octasecurity.ApprovalQueue
-		approvalBlockWait bool
-	)
-
-	// Approval Queue: when enabled, set Permissions.ask for Bash and attach OpenOcta middleware (SDK v2 无内置队列).
-	if opts.EnableApprovalQueue && approvalQueueCfg != nil && approvalQueueCfg.Enabled != nil && *approvalQueueCfg.Enabled {
-		if apiOpts.SettingsOverrides.Permissions == nil {
-			apiOpts.SettingsOverrides.Permissions = &agentsdkConfg.PermissionsConfig{}
-		}
-		// Ask for Bash tool calls by default; approvals are persisted and can whitelist sessions via TTL.
-		if !containsRule(apiOpts.SettingsOverrides.Permissions.Ask, "bash") {
-			apiOpts.SettingsOverrides.Permissions.Ask = append(apiOpts.SettingsOverrides.Permissions.Ask, "bash")
-		}
-		// Allow windows_exec_cmd on Windows to prevent missing tool response messages.
-		// This tool should execute directly without requiring user confirmation.
-		if runtime.GOOS == "windows" && !containsRule(apiOpts.SettingsOverrides.Permissions.Allow, "windows_exec_cmd") {
-			apiOpts.SettingsOverrides.Permissions.Allow = append(apiOpts.SettingsOverrides.Permissions.Allow, "windows_exec_cmd")
-		}
-
-		// Write approval queue config to ~/.openocta/workspace/.claude/settings.json.
-		// When commandPolicy is present, use its allow/ask/deny; else use approvalQueue.
-		var permsOverride *ApprovalQueuePermsOverride
-		if commandPolicy != nil && commandPolicy.Enabled {
-			allow, ask, deny := commandPolicy.ToApprovalQueuePerms()
-			permsOverride = &ApprovalQueuePermsOverride{Allow: allow, Ask: ask, Deny: deny}
-		}
-		if err := writeApprovalQueueSettings(opts.Env, approvalQueueCfg, permsOverride); err != nil {
-			log.Errorf("Warning: failed to write approval queue settings: %v", err)
-		}
-
-		if strings.TrimSpace(approvalStorePath) != "" {
-			q, err := octasecurity.GetApprovalQueue(approvalStorePath)
-			if err == nil {
-				approvalQ = q
-				approvalBlockWait = approvalQueueCfg.BlockOnApproval == nil || *approvalQueueCfg.BlockOnApproval
-			} else {
-				log.Errorf("Warning: failed to create approval queue: %v", err)
-			}
-		}
-	} else {
-		// Approval queue is disabled, remove settings.json if it exists
-		if err := removeApprovalQueueSettings(opts.Env); err != nil {
-			log.Errorf("Warning: failed to remove approval queue settings: %v", err)
-		}
-	}
-
-	var mw []middleware.Middleware
-
-	if opts.Config != nil && opts.Config.Gateway != nil && opts.Config.Gateway.LlmTrace != nil &&
-		opts.Config.Gateway.LlmTrace.Enabled != nil && *opts.Config.Gateway.LlmTrace.Enabled {
-		mw = append(mw, middleware.NewTraceMiddleware(
-			filepath.Join(projectRoot, ".trace"),
-			llmTraceMiddlewareOptions(opts.Config.Gateway.LlmTrace)...,
-		))
-	}
-
-	// Command validation middleware (BeforeTool): emits early errors for audit/logging.
-	if validatorCfg != nil && (validatorCfg.Enabled == nil || *validatorCfg.Enabled) {
-		mw = append(mw, middleware.Funcs{
-			Identifier: "openocta-command-validator",
-			OnBeforeTool: func(_ context.Context, st *middleware.State) error {
-				call, ok := st.ToolCall.(model.ToolCall)
-				if !ok {
-					return nil
-				}
-				if shouldValidateCommandTool(call.Name) {
-					if cmd, _ := call.Arguments["command"].(string); strings.TrimSpace(cmd) != "" {
-						return ValidateCommandWithConfig(cmd, validatorCfg)
-					}
-				}
-				return nil
-			},
-		})
-	}
-
-	if approvalQ != nil {
-		mw = append(mw, approvalQueueMiddleware(approvalQueueOptions{
-			Queue:                approvalQ,
-			BlockWait:            approvalBlockWait,
-			CommandPolicy:        commandPolicy,
-			AutoAllowSandboxBash: enableSandbox,
-		}))
-	}
-
-	// Browser navigation deduplication: prevents LLM from repeatedly opening
-	// the same URL within a short window during multi-step UI automation.
-	mw = append(mw, newBrowserDedupMiddleware(0))
-
-	if opts.TokenTracking {
-		env := opts.Env
-		if env == nil {
-			env = func(string) string { return "" }
-		}
-		agentID := opts.AgentID
-		if strings.TrimSpace(agentID) == "" {
-			agentID = "main"
-		}
-		mw = append(mw, NewTokenUsageMiddleware(agentID, env))
-	}
-
-	apiOpts.Middleware = mw
-	// Enable A2UI stream events and tools in agentsdk-go.
-	{
-		v := true
-		apiOpts.EnableA2UI = &v
-	}
-	if opts.Knowledge != nil {
-		apiOpts.Knowledge = opts.Knowledge
-	} else {
-		apiOpts.Knowledge = resolveKnowledgeOptions(opts.Config, opts.Env, opts.AgentID)
-	}
-	// L4 自主进化：curated MEMORY/USER/SOUL/PROMPT + memory 工具（Hermes 风格 frozen snapshot）。
-	{
-		evoDir := projectRoot
-		if opts.Config != nil && opts.Config.Agents != nil && opts.Config.Agents.Defaults != nil {
-			if ws := strings.TrimSpace(opts.Config.Agents.Defaults.Workspace); ws != "" {
-				evoDir = ws
-			}
-		}
-		if env := opts.Env; env != nil {
-			if ws := strings.TrimSpace(env("OPENOCTA_WORKSPACE")); ws != "" {
-				evoDir = ws
-			}
-		}
-		apiOpts.Evolution = &api.EvolutionOptions{
-			Enabled: true,
-			Dir:     filepath.Join(evoDir, ".agents", "evolution"),
-		}
-	}
+	var instruction string
 	if opts.EnableSystemPrompt {
-		var base string
 		if opts.SystemPromptOverrides != "" {
-			base = opts.SystemPromptOverrides
+			instruction = opts.SystemPromptOverrides
 		} else {
 			env := opts.Env
 			if env == nil {
 				env = func(string) string { return "" }
 			}
 			prompt, err := BuildSystemPrompt(SystemPromptOptions{
-				// 默认不再加载 ~/.openocta/workspace 根目录下的 .md，
-				// 避免不同会话把生成内容混入系统提示。
 				WorkspaceDir: "",
 				ProjectRoot:  projectRoot,
 			})
 			if err == nil {
-				base = prompt
+				instruction = prompt
 			}
 		}
-		if skillsSection := BuildSystemPromptSkillsSection(projectRoot, opts); skillsSection != "" {
-			if base != "" {
-				base = strings.TrimSpace(base) + "\n\n" + skillsSection
+		if skillsSection := BuildSystemPromptSkillsSection(projectRoot, opts); skillsSection != "" && !einoSkillMiddlewareActive(projectRoot, opts) {
+			if instruction != "" {
+				instruction = strings.TrimSpace(instruction) + "\n\n" + skillsSection
 			} else {
-				base = skillsSection
+				instruction = skillsSection
 			}
 		}
 		if knowledgeSection := BuildSystemPromptKnowledgeSection(opts.Config, opts.AgentID, opts.Env); knowledgeSection != "" {
-			if base != "" {
-				base = strings.TrimSpace(base) + "\n\n" + knowledgeSection
+			if instruction != "" {
+				instruction = strings.TrimSpace(instruction) + "\n\n" + knowledgeSection
 			} else {
-				base = knowledgeSection
+				instruction = knowledgeSection
 			}
 		}
-		if base != "" {
-			apiOpts.SystemPrompt = base
+		instruction = augmentEvolutionPrompt(projectRoot, opts, instruction)
+	}
+
+	var validateCommand func(string) error
+	if opts.Config != nil && opts.Config.Security != nil {
+		if policy := ResolveCommandPolicy(opts.Config.Security); policy != nil && policy.Enabled {
+			validatorCfg := policy.ToLegacyValidator()
+			if validatorCfg != nil {
+				validateCommand = func(cmd string) error {
+					return ValidateCommandWithConfig(cmd, validatorCfg)
+				}
+			}
 		}
 	}
 
-	// todo: 生产环境建议去掉，仅用于开发环境
-	//apiOpts.OTEL = api.OTELConfig{
-	//	Enabled:     true,
-	//	ServiceName: "openclaw",
-	//	Endpoint:    "http://192.168.50.254:14318",
-	//}
-	applySessionHistory(&apiOpts, projectRoot, opts)
-	applyChatAgentOptimizations(&apiOpts, opts)
-	applyToolExecutionPolicy(&apiOpts, opts)
-	applyAPITimeouts(&apiOpts, opts)
-	runBudget := resolveAgentRunTimeout(opts)
-	rt, err := api.New(ctx, apiOpts)
+	var knowledge *eino.KnowledgeOptions
+	if opts.Knowledge != nil {
+		knowledge = opts.Knowledge
+	} else {
+		knowledge = resolveKnowledgeOptions(opts.Config, opts.Env, opts.AgentID)
+	}
+
+	skillsDir := ""
+	if opts.EnableSkills {
+		skillsDir = eino.ResolveSkillsDir(projectRoot, opts.Config, opts.EmployeeID, opts.SkillFilter, opts.Env)
+	}
+
+	eng, err := eino.NewEngine(ctx, eino.BuildConfig{
+		ModelFactory:    opts.ModelFactory,
+		Tools:           tools,
+		ProjectRoot:     projectRoot,
+		Instruction:     instruction,
+		DisableTools:    opts.DisableTools,
+		SkillsDir:       skillsDir,
+		Knowledge:       knowledge,
+		MaxIteration:    50,
+		ValidateCommand: validateCommand,
+		EnableApproval:  opts.EnableApprovalQueue,
+		Env:             opts.Env,
+		Config:          opts.Config,
+		TokenLimit:      opts.TokenLimit,
+		AgentID:         opts.AgentID,
+		TokenTracking:   opts.TokenTracking,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &Runtime{rt: rt, agentRunBudget: runBudget}, nil
+	runBudget := resolveAgentRunTimeout(opts)
+	eng.SetAgentRunBudget(runBudget)
+
+	// Approval queue settings file (Gateway UI compatibility).
+	if opts.EnableApprovalQueue && opts.Config != nil && opts.Config.Security != nil && opts.Config.Security.ApprovalQueue != nil {
+		if opts.Config.Security.ApprovalQueue.Enabled != nil && *opts.Config.Security.ApprovalQueue.Enabled {
+			var permsOverride *ApprovalQueuePermsOverride
+			if policy := ResolveCommandPolicy(opts.Config.Security); policy != nil && policy.Enabled {
+				allow, ask, deny := policy.ToApprovalQueuePerms()
+				permsOverride = &ApprovalQueuePermsOverride{Allow: allow, Ask: ask, Deny: deny}
+			}
+			if err := writeApprovalQueueSettings(opts.Env, opts.Config.Security.ApprovalQueue, permsOverride); err != nil {
+				log.Errorf("Warning: failed to write approval queue settings: %v", err)
+			}
+		}
+	}
+
+	return &Runtime{eng: eng, agentRunBudget: runBudget}, nil
+}
+
+func augmentEvolutionPrompt(projectRoot string, opts Options, base string) string {
+	evoDir := projectRoot
+	if opts.Config != nil && opts.Config.Agents != nil && opts.Config.Agents.Defaults != nil {
+		if ws := strings.TrimSpace(opts.Config.Agents.Defaults.Workspace); ws != "" {
+			evoDir = ws
+		}
+	}
+	if opts.Env != nil {
+		if ws := strings.TrimSpace(opts.Env("OPENOCTA_WORKSPACE")); ws != "" {
+			evoDir = ws
+		}
+	}
+	dir := filepath.Join(evoDir, ".agents", "evolution")
+	store, err := evolution.Open(evolution.Config{Dir: dir})
+	if err != nil {
+		return base
+	}
+	snap := store.SnapshotForSession("")
+	return evolution.AugmentSystemPrompt(base, snap)
+}
+
+// ApprovalQueueEnabled reports whether security.approvalQueue.enabled is explicitly true.
+func ApprovalQueueEnabled(cfg *config.OpenOctaConfig) bool {
+	if cfg == nil || cfg.Security == nil || cfg.Security.ApprovalQueue == nil {
+		return false
+	}
+	return cfg.Security.ApprovalQueue.Enabled != nil && *cfg.Security.ApprovalQueue.Enabled
 }
 
 // Options configures the Runtime.
 type Options struct {
-	ModelFactory api.ModelFactory
-	Tools        []tool.Tool
-	// ProjectRoot is the workspace/project root (used as api.Options.ProjectRoot and for loading workspace skills).
-	ProjectRoot string
-	// Config is optional; when set, used for skill load config (e.g. extraDirs) and eligibility.
-	Config *config.OpenOctaConfig
-	// EnableSkills loads skills from built-in, ~/.openocta/skills, and <workspace>/skills and registers them with the runtime.
-	EnableSkills bool
-	// EmployeeID when set with EnableSkills merges digital-employee skills (~/.openocta/employee_skills/<id>, manifest.skillIds filter).
-	EmployeeID string
-	// EnableSubagents enables subagent dispatch when Subagents is non-empty.
-	EnableSubagents bool
-	// EnableSandbox attaches sandbox manager for tool execution (filesystem/network/resource limits).
-	EnableSandbox bool
-	// EnableApprovalQueue enables approval queue + permission ask wiring when config.security.approvalQueue.enabled is true.
-	// When false, config may still be present but no approval wiring is installed.
-	EnableApprovalQueue bool
-	// Subagents is the list of subagent registrations (used when EnableSubagents is true).
-	Subagents []api.SubagentRegistration
-	// Sandbox overrides default sandbox options when EnableSandbox is true (optional).
-	Sandbox *SandboxOpts
-	// MCPServers is the list of MCP server specs (e.g. stdio://cmd args or URL). Load from config via BuildMCPServersFromConfig.
-	MCPServers []string
-	// TokenTracking enables token usage recording; default true when creating runtime for chat.
-	TokenTracking bool
-	// AgentID is used to resolve session transcript path for token usage logging (e.g. "main").
-	AgentID string
-	// Env is used to resolve state dir (e.g. os.Getenv).
-	Env func(string) string
-	// EnableSystemPrompt builds system prompt from ~/.openocta/workspace and ProjectRoot/prompt (deduped by filename) and sets api.Options.SystemPrompt.
-	EnableSystemPrompt bool
-	// SystemPromptOverrides if non-empty replaces the auto-built system prompt when EnableSystemPrompt is true.
+	ModelFactory          eino.ChatModelFactory
+	Tools                 []tool.Tool
+	ProjectRoot           string
+	Config                *config.OpenOctaConfig
+	EnableSkills          bool
+	EmployeeID            string
+	EnableSubagents       bool
+	EnableSandbox         bool
+	EnableApprovalQueue   bool
+	TokenTracking         bool
+	AgentID               string
+	Env                   func(string) string
+	EnableSystemPrompt    bool
 	SystemPromptOverrides string
-	// Knowledge configures Obsidian vault indexing (memory_search / session_search).
-	Knowledge *api.KnowledgeOptions
-	// AgentRunTimeout bounds Run/RunStream when ctx has no deadline; zero uses OPENOCTA_AGENT_RUN_TIMEOUT or DefaultAgentRunTimeout (10m). See EnvAgentRunTimeout.
-	AgentRunTimeout time.Duration
-	// MiddlewareTimeout is api.Options.MiddlewareTimeout (per middleware stage); zero uses OPENOCTA_MIDDLEWARE_TIMEOUT if set.
-	MiddlewareTimeout time.Duration
-	// HookTimeout is api.Options.HookTimeout; zero uses OPENOCTA_HOOK_TIMEOUT if set, otherwise agentsdk hook default.
-	HookTimeout time.Duration
-	// SessionHistoryLoader overrides default OpenOcta history loading (file + optional transcript). See agentsdk-go docs/session-history.md.
-	SessionHistoryLoader api.SessionHistoryLoader
-	// SessionHistoryMaxMessages is applied when SessionHistoryLoader is set, or overrides session.sessionHistory.maxMessages for the default loader.
-	SessionHistoryMaxMessages int
-	// SessionHistoryRoles filters loaded messages by role when SessionHistoryLoader is set, or overrides session.sessionHistory.roles for the default loader.
-	SessionHistoryRoles []string
-	// SessionHistoryTransform runs after load + SDK built-in policy (role filter / max messages).
-	SessionHistoryTransform api.SessionHistoryTransform
-	// TokenLimit is api.Options.TokenLimit: when > 0, trims conversation history to an estimated token budget (e.g. from models.providers.*.models[].contextWindow).
-	TokenLimit int
-	// SkillFilter when non-nil restricts loaded skills to matching names/keys (empty slice = none).
-	SkillFilter *[]string
-	// McpServerFilter when non-nil restricts MCP servers by config key (empty slice = none); applied in chat handler.
-	McpServerFilter *[]string
-	// EnableWebTools when non-nil controls web_search/web_fetch/download_image registration.
-	// false = do not register web tools for this run (chat UI webSearch off).
-	// nil = register when WebToolsFromConfig allows (agent/cron paths).
-	EnableWebTools *bool
-	// DisallowedTools is passed to agentsdk-go api.Options for additional tool blacklisting.
-	DisallowedTools []string
-	// DisableTools skips all tool registration (pure LLM completion paths such as skill analyze/compose).
-	DisableTools bool
-	// BashToolTimeout overrides config/env bash command hard timeout (default DefaultBashToolTimeout).
-	BashToolTimeout time.Duration
-	// ParallelToolCalls when non-nil overrides tools.exec.parallel (default false: serial tool execution).
-	ParallelToolCalls *bool
+	Knowledge             *KnowledgeOptions
+	AgentRunTimeout       time.Duration
+	MiddlewareTimeout     time.Duration
+	HookTimeout           time.Duration
+	TokenLimit            int
+	SkillFilter           *[]string
+	McpServerFilter       *[]string
+	EnableWebTools        *bool
+	DisallowedTools       []string
+	DisableTools          bool
+	BashToolTimeout       time.Duration
+	ParallelToolCalls     *bool
 }
 
-func shouldRegisterWebTools(opts Options) bool {
-	if opts.EnableWebTools != nil {
-		return *opts.EnableWebTools
-	}
-	return true
+// Request is an alias for types.Request.
+type Request = types.Request
+
+// Response is an alias for types.Response.
+type Response = types.Response
+
+// StreamEvent is an alias for stream.StreamEvent.
+type StreamEvent = stream.StreamEvent
+
+func DefaultModelFactory() eino.ChatModelFactory {
+	return eino.DefaultModelFactory()
 }
 
-func shouldRegisterBrowserTools(opts Options) bool {
-	if opts.Config != nil && opts.Config.Browser != nil && opts.Config.Browser.Enabled != nil {
-		return *opts.Config.Browser.Enabled
+func (r *Runtime) Run(ctx context.Context, req Request) (*Response, error) {
+	if r == nil || r.eng == nil {
+		return nil, eino.ErrRuntimeClosed
 	}
-	return true
+	return r.eng.Run(ctx, req)
 }
 
-func resolveApprovalQueueStorePath(s *config.SandboxConfig, env func(string) string) string {
-	// Precedence:
-	// 1) sandbox.approvalStore (legacy) or sandbox.approvalQueue.* (future)
-	// For now, use approvalStore if provided; otherwise default stateDir/agents/approvals/approvals.json.
-	if s != nil && s.ApprovalStore != nil && strings.TrimSpace(*s.ApprovalStore) != "" {
-		p := strings.TrimSpace(*s.ApprovalStore)
-		// If a directory is supplied, store approvals in a stable filename under it.
-		if !strings.HasSuffix(strings.ToLower(p), ".json") {
-			return filepath.Join(p, "approvals.json")
-		}
-		return p
+func (r *Runtime) RunStream(ctx context.Context, req Request) (<-chan StreamEvent, error) {
+	if r == nil || r.eng == nil {
+		return nil, eino.ErrRuntimeClosed
 	}
-	if env == nil {
-		env = func(string) string { return "" }
-	}
-	stateDir := paths.ResolveStateDir(env)
-	return filepath.Join(stateDir, "agents", "approvals", "approvals.json")
+	return r.eng.RunStream(ctx, req)
 }
 
-func containsRule(rules []string, want string) bool {
-	want = strings.ToLower(strings.TrimSpace(want))
-	for _, r := range rules {
-		if strings.ToLower(strings.TrimSpace(r)) == want {
-			return true
-		}
+// RunStreamTurn executes via Eino TurnLoop (supports preempt / abort / resume).
+func (r *Runtime) RunStreamTurn(ctx context.Context, req Request, runID string, preempt bool) (<-chan StreamEvent, error) {
+	if r == nil || r.eng == nil {
+		return nil, eino.ErrRuntimeClosed
 	}
-	return false
+	ts := r.ensureTurnSession(strings.TrimSpace(req.SessionID))
+	return ts.PushMessage(ctx, req, runID, preempt)
 }
 
-// SandboxOpts holds optional sandbox overrides for the runtime.
-type SandboxOpts struct {
-	Root              string
-	AllowedPaths      []string
-	ExtraAllowedPaths []string
-	NetworkAllow      []string
-	ResourceLimit     sandbox.ResourceLimits
+// ResumeStream continues an interrupted agent run after user approval.
+func (r *Runtime) ResumeStream(ctx context.Context, sessionID, runID string, approval eino.TurnApproval) (<-chan StreamEvent, error) {
+	if r == nil || r.eng == nil {
+		return nil, eino.ErrRuntimeClosed
+	}
+	ts := r.ensureTurnSession(strings.TrimSpace(sessionID))
+	return ts.PushApproval(ctx, runID, approval)
 }
 
-// buildSandboxOptsFromConfig builds SandboxOpts from root-level sandbox config.
-func buildSandboxOptsFromConfig(c *config.SandboxConfig, projectRoot string) *SandboxOpts {
-	if c == nil {
-		return nil
+// ResumeStreamWithTargets resumes using explicit Eino interrupt target map.
+func (r *Runtime) ResumeStreamWithTargets(ctx context.Context, sessionID, runID string, targets map[string]any) (<-chan StreamEvent, error) {
+	if r == nil || r.eng == nil {
+		return nil, eino.ErrRuntimeClosed
 	}
-	o := &SandboxOpts{}
-	if c.Root != nil && strings.TrimSpace(*c.Root) != "" {
-		o.Root = *c.Root
-	}
-	if len(c.AllowedPaths) > 0 {
-		o.AllowedPaths = append([]string{}, c.AllowedPaths...)
-	}
-	if len(c.NetworkAllow) > 0 {
-		o.NetworkAllow = append([]string{}, c.NetworkAllow...)
-	}
-	if c.ResourceLimit != nil {
-		if c.ResourceLimit.MaxCPUPercent != nil {
-			o.ResourceLimit.MaxCPUPercent = *c.ResourceLimit.MaxCPUPercent
-		}
-		if c.ResourceLimit.MaxMemoryBytes != nil {
-			o.ResourceLimit.MaxMemoryBytes = *c.ResourceLimit.MaxMemoryBytes
-		}
-		if c.ResourceLimit.MaxDiskBytes != nil {
-			o.ResourceLimit.MaxDiskBytes = *c.ResourceLimit.MaxDiskBytes
-		}
-	}
-	return o
+	return r.eng.ResumeStream(ctx, sessionID, runID, targets)
 }
 
-// mergeSandboxOpts merges override into base; base may be nil (then override is returned).
-func mergeSandboxOpts(base, override *SandboxOpts) *SandboxOpts {
-	if base == nil {
-		return override
+// ClearSessionCheckpoints wipes Runner/TurnLoop checkpoint files for a session.
+func (r *Runtime) ClearSessionCheckpoints(sessionID string) {
+	if r == nil || r.eng == nil {
+		eino.ClearPersistedSessionCheckpoints(sessionID)
+		return
 	}
-	if override == nil {
-		return base
-	}
-	out := *base
-	if override.Root != "" {
-		out.Root = override.Root
-	}
-	if len(override.AllowedPaths) > 0 {
-		out.AllowedPaths = override.AllowedPaths
-	}
-	if len(override.ExtraAllowedPaths) > 0 {
-		out.ExtraAllowedPaths = append(append([]string{}, out.ExtraAllowedPaths...), override.ExtraAllowedPaths...)
-	}
-	if len(override.NetworkAllow) > 0 {
-		out.NetworkAllow = override.NetworkAllow
-	}
-	if override.ResourceLimit.MaxCPUPercent > 0 || override.ResourceLimit.MaxMemoryBytes > 0 || override.ResourceLimit.MaxDiskBytes > 0 {
-		out.ResourceLimit = override.ResourceLimit
-	}
-	return &out
+	r.eng.ClearAllSessionCheckpoints(sessionID)
 }
 
-func appendDedupePaths(base []string, extra []string) []string {
-	seen := make(map[string]struct{})
-	var out []string
-	add := func(p string) {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			return
-		}
-		abs, err := filepath.Abs(filepath.Clean(p))
-		if err != nil || abs == "" {
-			return
-		}
-		if _, ok := seen[abs]; ok {
-			return
-		}
-		seen[abs] = struct{}{}
-		out = append(out, abs)
+// AbortSessionTurn stops the session TurnLoop immediately (chat.abort).
+func (r *Runtime) AbortSessionTurn() {
+	if r == nil {
+		return
 	}
-	for _, p := range base {
-		add(p)
-	}
-	for _, p := range extra {
-		add(p)
-	}
-	return out
-}
-
-func buildSandboxOptions(projectRoot string, overrides *SandboxOpts) api.SandboxOptions {
-	root := projectRoot
-	allowedPaths := []string{filepath.Join(projectRoot, "workspace"), filepath.Join(projectRoot, "shared")}
-	networkAllow := []string{}
-	var resourceLimit sandbox.ResourceLimits
-	if overrides != nil {
-		if overrides.Root != "" {
-			root = overrides.Root
-		}
-		if len(overrides.AllowedPaths) > 0 {
-			allowedPaths = overrides.AllowedPaths
-		}
-		if len(overrides.ExtraAllowedPaths) > 0 {
-			allowedPaths = appendDedupePaths(allowedPaths, overrides.ExtraAllowedPaths)
-		}
-		if len(overrides.NetworkAllow) > 0 {
-			networkAllow = overrides.NetworkAllow
-		}
-		if overrides.ResourceLimit.MaxCPUPercent > 0 || overrides.ResourceLimit.MaxMemoryBytes > 0 || overrides.ResourceLimit.MaxDiskBytes > 0 {
-			resourceLimit = overrides.ResourceLimit
-		}
-	}
-	return api.SandboxOptions{
-		Root:          root,
-		AllowedPaths:  allowedPaths,
-		NetworkAllow:  networkAllow,
-		ResourceLimit: resourceLimit,
+	r.turnMu.Lock()
+	ts := r.turn
+	r.turn = nil
+	r.turnSessionID = ""
+	r.turnMu.Unlock()
+	if ts != nil {
+		ts.StopImmediate()
 	}
 }
 
-// DefaultModelFactory returns an Anthropic provider (reads ANTHROPIC_API_KEY from env).
-func DefaultModelFactory() api.ModelFactory {
-	return &model.AnthropicProvider{ModelName: "claude-sonnet-4-5-20250929"}
+func (r *Runtime) ensureTurnSession(sessionID string) *eino.TurnSession {
+	r.turnMu.Lock()
+	defer r.turnMu.Unlock()
+	if r.turn != nil && r.turnSessionID == sessionID {
+		return r.turn
+	}
+	if r.turn != nil {
+		r.turn.StopImmediate()
+	}
+	r.turn = eino.NewTurnSession(r.eng, sessionID)
+	r.turnSessionID = sessionID
+	return r.turn
 }
 
-// Run executes a single request.
-func (r *Runtime) Run(ctx context.Context, req api.Request) (*api.Response, error) {
-	ctx, cancel := wrapRunContext(ctx, r.agentRunBudget)
-	defer cancel()
-	return r.rt.Run(ctx, req)
-}
-
-// RunStream executes with streaming events.
-// Streaming runs keep the passed ctx (caller should set a deadline, e.g. gateway chat). We do not wrap with
-// agentRunBudget here: defer-cancel on return would abort the SDK background goroutine immediately.
-func (r *Runtime) RunStream(ctx context.Context, req api.Request) (<-chan api.StreamEvent, error) {
-	return r.rt.RunStream(ctx, req)
-}
-
-// Close shuts down the runtime.
 func (r *Runtime) Close() error {
-	if r == nil || r.rt == nil {
+	if r == nil || r.eng == nil {
 		return nil
 	}
-	return r.rt.Close()
+	r.AbortSessionTurn()
+	return r.eng.Close()
 }
 
-// ClearSessionHistory removes the agentsdk-go persisted history for the given session ID.
-// History is stored under projectRoot/.claude/history/<sessionID>.json (sessionID is path-sanitized).
-// Call this when creating a new session (/new) so the old session's history is not reused.
 func ClearSessionHistory(projectRoot, sessionID string) {
 	projectRoot = strings.TrimSpace(projectRoot)
 	sessionID = strings.TrimSpace(sessionID)
@@ -688,7 +337,6 @@ func ClearSessionHistory(projectRoot, sessionID string) {
 	_ = os.Remove(path)
 }
 
-// historySessionFileName sanitizes sessionID for use as a filename, matching agentsdk-go's logic.
 func historySessionFileName(sessionID string) string {
 	const fallback = "default"
 	trimmed := strings.TrimSpace(sessionID)
@@ -696,13 +344,9 @@ func historySessionFileName(sessionID string) string {
 		return fallback
 	}
 	var b strings.Builder
-	b.Grow(len(trimmed))
 	for _, r := range trimmed {
 		switch {
-		case r >= 'a' && r <= 'z',
-			r >= 'A' && r <= 'Z',
-			r >= '0' && r <= '9',
-			r == '-', r == '_':
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
 			b.WriteRune(r)
 		default:
 			b.WriteByte('-')
@@ -715,21 +359,51 @@ func historySessionFileName(sessionID string) string {
 	return sanitized
 }
 
-// buildMCPConfigOverrides builds agentsdk-go MCPConfig overrides from OpenOcta MCP config.
-// NOTE: 当前引入的 agentsdk-go 版本的 MCPConfig 暂未暴露超时等可覆盖字段，
-// 这里预留扩展点，后续 SDK 增加字段后可以在此处进行映射。
-func buildMCPConfigOverrides(c *config.McpConfig) *agentsdkConfg.MCPConfig {
-	if c == nil {
-		return nil
-	}
-	// 目前先不返回覆盖配置，以避免与 SDK 内部默认行为产生不兼容。
-	// 将来如果 MCPConfig 新增可配置字段（例如 TimeoutSeconds、ToolTimeoutSeconds），
-	// 可以在这里从 c 中读取并写入到返回值中。
-	_ = c
-	return nil
+func shouldRegisterWebTools(_ Options) bool {
+	// web_search / web_fetch temporarily disabled; see tools.webToolsEnabled.
+	return false
 }
 
-// getSettingsPath returns the path to ~/.openocta/workspace/.claude/settings.json
+func shouldRegisterBrowserTools(opts Options) bool {
+	if opts.Config != nil && opts.Config.Browser != nil && opts.Config.Browser.Enabled != nil {
+		return *opts.Config.Browser.Enabled
+	}
+	return true
+}
+
+func einoSkillMiddlewareActive(projectRoot string, opts Options) bool {
+	if !opts.EnableSkills {
+		return false
+	}
+	return strings.TrimSpace(eino.ResolveSkillsDir(projectRoot, opts.Config, opts.EmployeeID, opts.SkillFilter, opts.Env)) != ""
+}
+
+func resolveApprovalQueueStorePath(s *config.SandboxConfig, env func(string) string) string {
+	if s != nil && s.ApprovalStore != nil && strings.TrimSpace(*s.ApprovalStore) != "" {
+		p := strings.TrimSpace(*s.ApprovalStore)
+		if !strings.HasSuffix(strings.ToLower(p), ".json") {
+			return filepath.Join(p, "approvals.json")
+		}
+		return p
+	}
+	if env == nil {
+		env = func(string) string { return "" }
+	}
+	stateDir := paths.ResolveStateDir(env)
+	return filepath.Join(stateDir, "agents", "approvals", "approvals.json")
+}
+
+type SandboxOpts struct {
+	Root              string
+	AllowedPaths      []string
+	ExtraAllowedPaths []string
+	NetworkAllow      []string
+}
+
+type ApprovalQueuePermsOverride struct {
+	Allow, Ask, Deny []string
+}
+
 func getSettingsPath(env func(string) string) string {
 	if env == nil {
 		env = func(string) string { return "" }
@@ -738,108 +412,77 @@ func getSettingsPath(env func(string) string) string {
 	return filepath.Join(stateDir, "workspace", ".claude", "settings.json")
 }
 
-// ApprovalQueuePermsOverride provides allow/ask/deny from commandPolicy when present.
-type ApprovalQueuePermsOverride struct {
-	Allow, Ask, Deny []string
-}
-
-// writeApprovalQueueSettings writes approval queue configuration to settings.json
-// Format follows the .claude/settings.json specification from settings-configuration.md.
-// When permsOverride is set (from commandPolicy), it takes precedence over cfg.Allow/Ask/Deny.
 func writeApprovalQueueSettings(env func(string) string, cfg *config.SandboxApprovalQueue, permsOverride *ApprovalQueuePermsOverride) error {
 	settingsPath := getSettingsPath(env)
-
-	// Build permissions config
-	perms := &agentsdkConfg.PermissionsConfig{
+	perms := struct {
+		DefaultMode                  string   `json:"defaultMode,omitempty"`
+		DisableBypassPermissionsMode string   `json:"disableBypassPermissionsMode,omitempty"`
+		Allow                        []string `json:"allow,omitempty"`
+		Ask                          []string `json:"ask,omitempty"`
+		Deny                         []string `json:"deny,omitempty"`
+	}{
 		DefaultMode:                  "bypassPermissions",
 		DisableBypassPermissionsMode: "enable",
 	}
-
 	var allow, ask, deny []string
 	if permsOverride != nil {
 		allow, ask, deny = permsOverride.Allow, permsOverride.Ask, permsOverride.Deny
 	} else if cfg != nil {
 		allow, ask, deny = cfg.Allow, cfg.Ask, cfg.Deny
 	}
-
-	// Add allow rules
 	for _, cmd := range allow {
 		if cmd != "" {
 			perms.Allow = append(perms.Allow, fmt.Sprintf("Bash(%s:*)", cmd))
 		}
 	}
-
-	// Add ask rules (commands requiring approval)
 	for _, cmd := range ask {
 		if cmd != "" {
 			perms.Ask = append(perms.Ask, fmt.Sprintf("Bash(%s:*)", cmd))
 		}
 	}
-
-	// Add deny rules
 	for _, cmd := range deny {
 		if cmd != "" {
 			perms.Deny = append(perms.Deny, fmt.Sprintf("Bash(%s:*)", cmd))
 		}
 	}
-
-	// Build settings structure
 	settings := struct {
-		Permissions *agentsdkConfg.PermissionsConfig `json:"permissions,omitempty"`
-	}{
-		Permissions: perms,
-	}
-
-	// Create directory if needed
+		Permissions *struct {
+			DefaultMode                  string   `json:"defaultMode,omitempty"`
+			DisableBypassPermissionsMode string   `json:"disableBypassPermissionsMode,omitempty"`
+			Allow                        []string `json:"allow,omitempty"`
+			Ask                          []string `json:"ask,omitempty"`
+			Deny                         []string `json:"deny,omitempty"`
+		} `json:"permissions,omitempty"`
+	}{Permissions: &perms}
 	dir := filepath.Dir(settingsPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create settings directory: %w", err)
+		return err
 	}
-
-	// Marshal to JSON
 	data, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
+		return err
 	}
-
-	// Write file
-	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write settings file: %w", err)
-	}
-
-	return nil
+	return os.WriteFile(settingsPath, data, 0644)
 }
 
-// removeApprovalQueueSettings removes the settings.json file when approval queue is disabled
 func removeApprovalQueueSettings(env func(string) string) error {
 	settingsPath := getSettingsPath(env)
-
-	// Check if file exists
 	if _, err := os.Stat(settingsPath); err != nil {
-		if os.IsNotExist(err) {
-			// File doesn't exist, nothing to do
-			return nil
+		return nil
+	}
+	return os.Remove(settingsPath)
+}
+
+func resolveAgentRunTimeout(opts Options) time.Duration {
+	if opts.AgentRunTimeout > 0 {
+		return opts.AgentRunTimeout
+	}
+	if v := strings.TrimSpace(os.Getenv("OPENOCTA_AGENT_RUN_TIMEOUT")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
 		}
-		return fmt.Errorf("failed to check settings file: %w", err)
 	}
-
-	// Remove the file
-	if err := os.Remove(settingsPath); err != nil {
-		return fmt.Errorf("failed to remove settings file: %w", err)
-	}
-
-	return nil
+	return 10 * time.Minute
 }
 
-// newBrowserDedupMiddleware returns a middleware that prevents the LLM from
-// repeatedly opening the same URL within a short window during multi-step
-// UI automation. This is a stub implementation; the full deduplication logic
-// can be added later if needed.
-func newBrowserDedupMiddleware(windowMs int) middleware.Middleware {
-	return middleware.Funcs{
-		Identifier: "browser-dedup",
-		OnBeforeTool: func(_ context.Context, st *middleware.State) error {
-			return nil
-		},
-	}
-}
+var _ = runtime.GOOS

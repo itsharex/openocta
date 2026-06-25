@@ -43,17 +43,18 @@ func (s *hooksAgentSink) Deliver(_ context.Context, msg *channels.InboundMessage
 		channelID = "feishu"
 	}
 
-	to := msg.ChatID
+	to := strings.TrimSpace(msg.ChatID)
 	if to == "" {
-		to = msg.SenderID
+		to = strings.TrimSpace(msg.SenderID)
 	}
-	to = strings.ToLower(to) // 统一转小写，避免大小写不一致
+	// sessionKey 用小写 peer，避免大小写导致重复会话；IM 回传保留原始 ID（如 weixin context_token 缓存键）。
+	sessionPeer := strings.ToLower(to)
 
 	// 默认 sessionKey：agent:main:channel:<channelId>:<peerId>
 	// 当该渠道配置了 digitalEmployeeId 且员工未被删除时，使用数字员工会话：
 	// agent:main:employee:<employeeId>
 	// 这样会复用员工的 prompt/skills/mcp，并将所有入口统一进该员工的会话（不再按渠道/peer 拆分 sessionKey）。
-	sessionKey := fmt.Sprintf("agent:main:channel:%s:%s", channelID, to)
+	sessionKey := fmt.Sprintf("agent:main:channel:%s:%s", channelID, sessionPeer)
 	if s.ctx != nil && s.ctx.Config != nil && s.ctx.Config.Channels != nil {
 		if chCfg := s.ctx.Config.Channels.GetChannelConfig(channelID); chCfg != nil {
 			if rawEmp, ok := chCfg["digitalEmployeeId"]; ok {
@@ -69,6 +70,14 @@ func (s *hooksAgentSink) Deliver(_ context.Context, msg *channels.InboundMessage
 		}
 	}
 
+	var deliverMeta map[string]interface{}
+	if len(msg.Meta) > 0 {
+		deliverMeta = make(map[string]interface{}, len(msg.Meta))
+		for k, v := range msg.Meta {
+			deliverMeta[k] = v
+		}
+	}
+
 	params := handlers.HooksAgentParams{
 		Message:    text,
 		MessageID:  msg.ID,
@@ -79,6 +88,7 @@ func (s *hooksAgentSink) Deliver(_ context.Context, msg *channels.InboundMessage
 		Channel:    channelID,
 		To:         to,
 		ChatType:   strings.TrimSpace(msg.ChatType),
+		Metadata:   deliverMeta,
 	}
 	_ = s.ctx.HooksAgent(params)
 	return nil

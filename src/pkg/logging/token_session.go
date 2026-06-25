@@ -17,6 +17,7 @@ type TokenUsageSessionLine struct {
 	SessionID     string `json:"sessionId,omitempty"`     // session identifier
 	RequestID     string `json:"requestId,omitempty"`     // request identifier
 	Model         string `json:"model,omitempty"`         // model name
+	Provider      string `json:"provider,omitempty"`      // provider id
 	Input         int64  `json:"input"`                   // input tokens
 	Output        int64  `json:"output"`                  // output tokens
 	CacheRead     int64  `json:"cacheRead,omitempty"`     // cache read tokens

@@ -1,7 +1,7 @@
 /** Per-session chat resource selection (skills / MCP / web search). */
 
 export type ChatSessionResources = {
-  /** When false, all skills/MCP are available; web search is off unless webSearch is true. */
+  /** When false, all skills/MCP are available; web search stays enabled by default. */
   configured: boolean;
   skillKeys: string[];
   mcpServers: string[];
@@ -12,7 +12,7 @@ export const defaultChatSessionResources = (): ChatSessionResources => ({
   configured: false,
   skillKeys: [],
   mcpServers: [],
-  webSearch: false,
+  webSearch: true,
 });
 
 export function chatResourcesPayload(resources: ChatSessionResources) {
@@ -28,11 +28,7 @@ export function chatResourcesSelectionCount(resources: ChatSessionResources): nu
   if (!resources.configured) {
     return 0;
   }
-  let n = resources.skillKeys.length + resources.mcpServers.length;
-  if (resources.webSearch) {
-    n += 1;
-  }
-  return n;
+  return resources.skillKeys.length + resources.mcpServers.length;
 }
 
 export type ChatResourcesPanelUi = {

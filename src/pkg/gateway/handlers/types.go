@@ -5,13 +5,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/agent/tools"
+	"github.com/openocta/openocta/pkg/apikeys"
 	"github.com/openocta/openocta/pkg/channels"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/cron"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
 	"github.com/openocta/openocta/pkg/outbound"
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
 
 // gatewayInvokerAdapter adapts Context.InvokeMethod to tools.GatewayInvoker.
@@ -90,6 +91,8 @@ type Context struct {
 	ReloadChannelRuntimes func()
 	// MarkChannelLoggedOut is called after successful logout to update in-memory state. Nil to skip.
 	MarkChannelLoggedOut func(channelId string, cleared bool, accountId string)
+	// ApiKeyService manages third-party API keys for open endpoints.
+	ApiKeyService *apikeys.Service
 }
 
 // HooksAgentParams is the input for HooksAgent callback.
@@ -102,7 +105,8 @@ type HooksAgentParams struct {
 	Deliver        bool
 	Channel        string
 	To             string
-	ChatType       string // "dm"|"group"|"channel" 等，供 QQ 等通道区分发送 API
+	ChatType       string                 // "dm"|"group"|"channel" 等，供 QQ 等通道区分发送 API
+	Metadata       map[string]interface{} // 通道入站元数据（如 weixin context_token、dingtalk session_webhook）
 	Model          string
 	Thinking       string
 	TimeoutSeconds *int

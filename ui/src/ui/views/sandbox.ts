@@ -424,7 +424,7 @@ export function renderSandbox(props: SandboxProps) {
                       (e: ApprovalEntry) => {
                         const canAct = e.status === "pending";
                         const sessionPath = e.sessionKey
-                          ? `${props.pathForTab("sessions")}?key=${encodeURIComponent(e.sessionKey)}`
+                          ? `${props.pathForTab("message")}?session=${encodeURIComponent(e.sessionKey)}`
                           : "";
                         return html`
                           <div class="mcp-table-row table-row">

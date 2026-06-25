@@ -139,6 +139,7 @@ type JobCreate struct {
 	WakeMode          string
 	Enabled           bool
 	Delivery          *CronDelivery
+	RunConfig         *CronRunConfig
 }
 
 // Add adds a new job.
@@ -162,6 +163,7 @@ func (s *Service) Add(input JobCreate) (CronJob, error) {
 		WakeMode:          input.WakeMode,
 		Payload:           input.Payload,
 		Delivery:          input.Delivery,
+		RunConfig:         input.RunConfig,
 		State: CronJobState{
 			NextRunAtMs: &next,
 		},
@@ -189,6 +191,7 @@ type JobPatch struct {
 	WakeMode          *string
 	Payload           *CronPayload
 	Delivery          *CronDelivery
+	RunConfig         *CronRunConfig
 }
 
 // GetJob returns a copy of the job by ID, or false if not found.
@@ -235,6 +238,9 @@ func (s *Service) Update(id string, patch JobPatch) (CronJob, error) {
 			}
 			if patch.Delivery != nil {
 				s.store.Jobs[i].Delivery = patch.Delivery
+			}
+			if patch.RunConfig != nil {
+				s.store.Jobs[i].RunConfig = patch.RunConfig
 			}
 			if patch.DigitalEmployeeID != nil {
 				s.store.Jobs[i].DigitalEmployeeID = normalizeDigitalEmployeeID(*patch.DigitalEmployeeID)
@@ -299,25 +305,23 @@ func (s *Service) Run(id string, mode string) error {
 			status = "skipped"
 			errMsg = `isolated job requires payload.kind="agentTurn"`
 		} else {
-			// 若选择了数字员工，则优先使用数字员工稳定会话 key：
-			// agent:main:employee:<employeeId>
-			// 并让网关通过 sessions.ensure / sessions store 解析 sessionId（首次会话也能自动构建）。
-			if emp := strings.TrimSpace(strings.ToLower(jobCopy.DigitalEmployeeID)); emp != "" {
-				sessionKey = "agent:main:employee:" + emp
-				cronSessionID = ""
-			} else {
-				// 手动触发（mode=force）：生成新 sessionKey agent:main:cron:<jobId>:run:<sessionId>
-				// 定时调度（mode=due）：使用 jobs.json 中的 sessionKey，缺省为 agent:main:cron:<jobId>
+			customSessionKey := strings.TrimSpace(jobCopy.SessionKey)
+			if customSessionKey != "" {
+				sessionKey = customSessionKey
 				if mode == "force" {
 					cronSessionID = uuid.New().String()
-					sessionKey = "agent:main:cron:" + jobCopy.ID + ":run:" + cronSessionID
 				} else {
-					sessionKey = strings.TrimSpace(jobCopy.SessionKey)
-					if sessionKey == "" {
-						sessionKey = "agent:main:cron:" + jobCopy.ID
-					}
 					cronSessionID = jobCopy.ID
 				}
+			} else if emp := strings.TrimSpace(strings.ToLower(jobCopy.DigitalEmployeeID)); emp != "" {
+				sessionKey = "agent:main:employee:" + emp
+				cronSessionID = ""
+			} else if mode == "force" {
+				cronSessionID = uuid.New().String()
+				sessionKey = "agent:main:cron:" + jobCopy.ID + ":run:" + cronSessionID
+			} else {
+				sessionKey = "agent:main:cron:" + jobCopy.ID
+				cronSessionID = jobCopy.ID
 			}
 		}
 	}

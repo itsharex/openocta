@@ -8,16 +8,15 @@ import (
 	"github.com/openocta/openocta/pkg/agent"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/paths"
-	"github.com/stellarlinkco/agentsdk-go/pkg/api"
 )
 
-func resolveKnowledgeOptions(cfg *config.OpenOctaConfig, env func(string) string, agentID string) *api.KnowledgeOptions {
+func resolveKnowledgeOptions(cfg *config.OpenOctaConfig, env func(string) string, agentID string) *KnowledgeOptions {
 	if env == nil {
 		env = os.Getenv
 	}
 	enabled := knowledgeEnabled(cfg)
 	if !enabled {
-		return &api.KnowledgeOptions{Enabled: false}
+		return &KnowledgeOptions{Enabled: false}
 	}
 
 	stateDir := paths.ResolveStateDir(env)
@@ -26,7 +25,7 @@ func resolveKnowledgeOptions(cfg *config.OpenOctaConfig, env func(string) string
 
 	agent.EnsureVaultDir(vaultDir)
 
-	return &api.KnowledgeOptions{
+	return &KnowledgeOptions{
 		Enabled:  true,
 		VaultDir: vaultDir,
 		IndexDir: indexDir,

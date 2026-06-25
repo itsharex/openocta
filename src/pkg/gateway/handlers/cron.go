@@ -149,6 +149,10 @@ func CronAddHandler(opts HandlerOpts) error {
 	if v, ok := params["digitalEmployeeId"].(string); ok {
 		digitalEmployeeID = strings.TrimSpace(v)
 	}
+	runConfig := parseRunConfig(params["runConfig"])
+	if params["runConfig"] == nil {
+		runConfig = nil
+	}
 	j, err := ctx.CronService.Add(cron.JobCreate{
 		Name:              name,
 		Description:       description,
@@ -161,6 +165,7 @@ func CronAddHandler(opts HandlerOpts) error {
 		WakeMode:          wakeMode,
 		Enabled:           enabled,
 		Delivery:          delivery,
+		RunConfig:         runConfig,
 	})
 	if err != nil {
 		opts.Respond(false, nil, &protocol.ErrorShape{
@@ -331,6 +336,9 @@ func CronUpdateHandler(opts HandlerOpts) error {
 			patch.DigitalEmployeeID = &de
 		} else if _, exists := p["digitalEmployeeId"]; exists && p["digitalEmployeeId"] == nil {
 			// 显式 null 不修改；保持行为与其他字段一致（此处不做处理）
+		}
+		if _, exists := p["runConfig"]; exists {
+			patch.RunConfig = parseRunConfig(p["runConfig"])
 		}
 	}
 	j, err := svc.Update(jobID, patch)
@@ -600,4 +608,28 @@ func parseDelivery(v interface{}) *cron.CronDelivery {
 		To:         to,
 		BestEffort: bestEffort,
 	}
+}
+
+func parseRunConfig(v interface{}) *cron.CronRunConfig {
+	if v == nil {
+		return &cron.CronRunConfig{}
+	}
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return &cron.CronRunConfig{}
+	}
+	rc := &cron.CronRunConfig{}
+	if s, ok := m["modelRef"].(string); ok {
+		rc.ModelRef = strings.TrimSpace(s)
+	}
+	if skills := parseStringSliceParam(m["skillKeys"]); skills != nil {
+		rc.SkillKeys = skills
+	}
+	if mcps := parseStringSliceParam(m["mcpServers"]); mcps != nil {
+		rc.McpServers = mcps
+	}
+	if rawExtra, ok := m["extraParams"].(map[string]interface{}); ok && len(rawExtra) > 0 {
+		rc.ExtraParams = rawExtra
+	}
+	return rc
 }

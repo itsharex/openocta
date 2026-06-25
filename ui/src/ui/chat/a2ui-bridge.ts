@@ -2,44 +2,7 @@ import * as v0_9 from "@a2ui/web_core/v0_9";
 import { basicCatalog } from "@a2ui/lit/v0_9";
 import type { LitComponentApi } from "@a2ui/lit/v0_9";
 import type { GatewayBrowserClient } from "../gateway.ts";
-import { canonicalGatewaySessionKey } from "../sessions/session-key-utils.js";
-import {
-  coalesceA2UIMessages,
-  collectReferencedIdsFromProperties,
-  componentsArrayFromRaw,
-  normalizeComponentMap,
-  placeholderComponents,
-  repairComponentList,
-  type A2uiMessageRecord,
-  type ComponentRecord,
-  updateComponentsHasRoot,
-} from "./a2ui-repair.ts";
-import { repairTextPresentation } from "./a2ui-text-repair.ts";
-
-const A2UI_LAYOUT_ONLY = new Set([
-  "Column",
-  "Row",
-  "Card",
-  "List",
-  "Modal",
-  "Tabs",
-  "Text",
-  "Divider",
-  "Icon",
-]);
-
-const A2UI_INTERACTIVE = new Set([
-  "Button",
-  "TextField",
-  "CheckBox",
-  "Switch",
-  "Slider",
-  "DateTimeInput",
-  "ChoicePicker",
-  "Video",
-  "AudioPlayer",
-  "Image",
-]);
+import { canonicalGatewaySessionKey } from "../sessions/session-key-utils.ts";
 
 type Processor = v0_9.MessageProcessor<LitComponentApi>;
 
@@ -62,158 +25,29 @@ function normalizeCatalogId(catalogId: unknown): string {
   }
 }
 
-function repairUpdateComponents(uc: A2uiMessageRecord): void {
-  uc.components = repairComponentList(uc.components);
-}
-
-function defaultRootUpdate(surfaceId: string): v0_9.A2uiMessage {
-  return {
-    version: "v0.9",
-    updateComponents: {
-      surfaceId,
-      components: [{ id: "root", component: "Text", text: "" }],
-    },
-  } as v0_9.A2uiMessage;
-}
-
 function cloneMessage(raw: unknown): v0_9.A2uiMessage {
   if (raw == null || typeof raw !== "object") {
     return raw as v0_9.A2uiMessage;
   }
-  const msg = structuredClone(raw) as A2uiMessageRecord;
+  const msg = structuredClone(raw) as Record<string, unknown>;
   const createSurface = msg.createSurface;
   if (createSurface != null && typeof createSurface === "object") {
-    (createSurface as A2uiMessageRecord).catalogId = normalizeCatalogId(
-      (createSurface as A2uiMessageRecord).catalogId,
+    (createSurface as Record<string, unknown>).catalogId = normalizeCatalogId(
+      (createSurface as Record<string, unknown>).catalogId,
     );
   }
   const beginRendering = msg.beginRendering;
   if (beginRendering != null && typeof beginRendering === "object") {
-    (beginRendering as A2uiMessageRecord).catalogId = normalizeCatalogId(
-      (beginRendering as A2uiMessageRecord).catalogId,
+    (beginRendering as Record<string, unknown>).catalogId = normalizeCatalogId(
+      (beginRendering as Record<string, unknown>).catalogId,
     );
-  }
-  if (msg.updateComponents != null && typeof msg.updateComponents === "object") {
-    repairUpdateComponents(msg.updateComponents as A2uiMessageRecord);
   }
   return msg as v0_9.A2uiMessage;
 }
 
-/** Normalize agent shorthand (e.g. catalogId "basic") before the processor runs. */
+/** Normalize gateway/agent shorthand before handing messages to @a2ui/web_core. */
 export function normalizeA2UIMessages(messages: unknown[]): v0_9.A2uiMessage[] {
   return messages.map(cloneMessage);
-}
-
-/** Normalize and repair a batch so surfaces can render (root component, flat component format). */
-export function repairA2UIMessages(messages: unknown[]): v0_9.A2uiMessage[] {
-  const normalized = normalizeA2UIMessages(messages);
-  const coalesced = coalesceA2UIMessages(normalized);
-  const withSurfaces = ensureCreateSurfaceMessages(coalesced);
-  const created = new Set<string>();
-  const hasRoot = new Set<string>();
-
-  for (const msg of withSurfaces) {
-    const sid = msg.createSurface?.surfaceId;
-    if (sid) {
-      created.add(sid);
-    }
-    if (msg.updateComponents) {
-      const uc = msg.updateComponents as unknown as A2uiMessageRecord;
-      repairUpdateComponents(uc);
-      const updateSid = msg.updateComponents.surfaceId;
-      if (updateSid && updateComponentsHasRoot(uc.components as ComponentRecord[])) {
-        hasRoot.add(updateSid);
-      }
-    }
-  }
-
-  const out = [...withSurfaces];
-  for (const sid of created) {
-    if (!hasRoot.has(sid)) {
-      out.push(defaultRootUpdate(sid));
-    }
-  }
-  return out;
-}
-
-/** Inject createSurface when agent only sends updateComponents (common a2ui_push mistake). */
-function ensureCreateSurfaceMessages(messages: v0_9.A2uiMessage[]): v0_9.A2uiMessage[] {
-  const haveCreate = new Set<string>();
-  const needSurface = new Set<string>();
-
-  for (const msg of messages) {
-    const cs = msg.createSurface?.surfaceId;
-    if (cs) {
-      haveCreate.add(cs);
-    }
-    const uc = msg.updateComponents?.surfaceId;
-    if (uc) {
-      needSurface.add(uc);
-    }
-    const dm = msg.updateDataModel?.surfaceId;
-    if (dm) {
-      needSurface.add(dm);
-    }
-  }
-
-  const prefix: v0_9.A2uiMessage[] = [];
-  for (const sid of needSurface) {
-    if (haveCreate.has(sid)) {
-      continue;
-    }
-    haveCreate.add(sid);
-    prefix.push({
-      version: "v0.9",
-      createSurface: { surfaceId: sid, catalogId: BASIC_CATALOG_ID },
-    } as v0_9.A2uiMessage);
-  }
-  return prefix.length > 0 ? [...prefix, ...messages] : messages;
-}
-
-/** Last-resort: inject any component ids still referenced on the surface but missing from the model. */
-export function ensureProcessorSurfacesComplete(processor: Processor): void {
-  for (const [surfaceId, surface] of processor.model.surfacesMap.entries()) {
-    const defined = new Set<string>();
-    for (const [id] of surface.componentsModel.entries) {
-      defined.add(id);
-    }
-
-    const missing = new Set<string>();
-    for (const [, comp] of surface.componentsModel.entries) {
-      const props = comp.properties as ComponentRecord;
-      for (const ref of collectReferencedIdsFromProperties(props)) {
-        if (!defined.has(ref)) {
-          missing.add(ref);
-        }
-      }
-    }
-
-    if (missing.size === 0) {
-      continue;
-    }
-
-    const components: ComponentRecord[] = [];
-    const seen = new Set<string>(defined);
-    for (const id of missing) {
-      for (const ph of placeholderComponents(id)) {
-        const phId = ph.id;
-        if (typeof phId !== "string" || !phId || seen.has(phId)) {
-          continue;
-        }
-        seen.add(phId);
-        components.push(normalizeComponentMap(ph));
-      }
-    }
-    if (components.length === 0) {
-      continue;
-    }
-    processor.processMessages([
-      {
-        version: "v0.9",
-        updateComponents: { surfaceId, components },
-      } as v0_9.A2uiMessage,
-    ]);
-  }
 }
 
 export function createChatA2UIProcessor(onAction: v0_9.ActionListener): Processor {
@@ -224,43 +58,9 @@ export function processA2UIMessages(processor: Processor, messages: unknown[]): 
   if (messages.length === 0) {
     return;
   }
-  const repaired = repairA2UIMessages(messages);
-  const pending: v0_9.A2uiMessage[] = [];
-  const scheduled = new Set<string>();
-
-  for (const msg of repaired) {
-    const createSid = msg.createSurface?.surfaceId;
-    if (createSid) {
-      if (processor.model.getSurface(createSid) || scheduled.has(createSid)) {
-        continue;
-      }
-      scheduled.add(createSid);
-      pending.push(msg);
-      continue;
-    }
-
-    const updateSid = msg.updateComponents?.surfaceId;
-    if (
-      updateSid &&
-      !processor.model.getSurface(updateSid) &&
-      !scheduled.has(updateSid)
-    ) {
-      scheduled.add(updateSid);
-      pending.push({
-        version: "v0.9",
-        createSurface: { surfaceId: updateSid, catalogId: BASIC_CATALOG_ID },
-      } as v0_9.A2uiMessage);
-    }
-    pending.push(msg);
-  }
-
-  if (pending.length > 0) {
-    processor.processMessages(pending);
-  }
-  ensureProcessorSurfacesComplete(processor);
+  processor.processMessages(normalizeA2UIMessages(messages));
 }
 
-/** Create a fresh processor (e.g. when a new chat run starts). */
 export function createFreshChatA2UIProcessor(onAction: v0_9.ActionListener): Processor {
   return createChatA2UIProcessor(onAction);
 }
@@ -297,7 +97,15 @@ export function a2uiMessageSurfaceId(block: unknown): string | null {
     return null;
   }
   const record = block as Record<string, unknown>;
-  for (const key of ["createSurface", "updateComponents", "deleteSurface", "beginRendering"] as const) {
+  for (const key of [
+    "createSurface",
+    "updateComponents",
+    "updateDataModel",
+    "deleteSurface",
+    "beginRendering",
+    "surfaceUpdate",
+    "dataModelUpdate",
+  ] as const) {
     const payload = record[key];
     if (payload == null || typeof payload !== "object") {
       continue;
@@ -371,60 +179,161 @@ export function extractA2UIBlocks(message: unknown): unknown[] {
       blocks.push(item.a2ui);
     }
   }
-  return blocks;
+  return dedupeA2UIMessages(blocks);
 }
 
-function isTextOnlyA2UIComponents(components: ComponentRecord[]): boolean {
-  if (components.length === 0) {
-    return false;
-  }
-  let hasText = false;
-  for (const comp of components) {
-    const type = typeof comp.component === "string" ? comp.component : "";
-    if (A2UI_INTERACTIVE.has(type)) {
-      return false;
-    }
-    if (!A2UI_LAYOUT_ONLY.has(type)) {
-      return false;
-    }
-    if (type === "Text" && typeof comp.text === "string" && comp.text.trim()) {
-      hasText = true;
-    }
-  }
-  return hasText;
-}
-
-/**
- * When A2UI is text-only (no buttons/inputs), return markdown for chat-text rendering.
- * Returns null when interactive widgets are present.
- */
-export function extractA2UITextMarkdown(blocks: unknown[]): string | null {
-  if (blocks.length === 0) {
-    return null;
-  }
-  const repaired = repairA2UIMessages(blocks);
-  const texts: string[] = [];
-  for (const msg of repaired) {
-    const uc = msg.updateComponents;
-    if (!uc?.components) {
+/** Plain-text fallback from persisted A2UI updateDataModel payloads (e.g. path /content). */
+export function extractA2UIDisplayTextFromBlocks(blocks: unknown[]): string | null {
+  let latest: string | null = null;
+  for (const raw of blocks) {
+    if (raw == null || typeof raw !== "object") {
       continue;
     }
-    const components = repairComponentList(uc.components);
-    if (!isTextOnlyA2UIComponents(components)) {
-      return null;
+    const udm = (raw as Record<string, unknown>).updateDataModel;
+    if (udm == null || typeof udm !== "object") {
+      continue;
+    }
+    const value = (udm as Record<string, unknown>).value;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        latest = trimmed;
+      }
+    }
+  }
+  return latest;
+}
+
+export function extractA2UIDisplayText(message: unknown): string | null {
+  return extractA2UIDisplayTextFromBlocks(extractA2UIBlocks(message));
+}
+
+const TEXT_ONLY_A2UI_COMPONENTS = new Set(["Text", "Column", "Row"]);
+
+/** True when A2UI blocks only render static text (no buttons, inputs, etc.). */
+export function isTextOnlyA2UIDisplay(blocks: unknown[]): boolean {
+  if (!extractA2UIDisplayTextFromBlocks(blocks)) {
+    return false;
+  }
+  const normalized = dedupeA2UIMessages(blocks);
+  for (const block of normalized) {
+    if (block == null || typeof block !== "object") {
+      continue;
+    }
+    const updateComponents = (block as Record<string, unknown>).updateComponents;
+    if (updateComponents == null || typeof updateComponents !== "object") {
+      continue;
+    }
+    const components = (updateComponents as Record<string, unknown>).components;
+    if (!Array.isArray(components)) {
+      continue;
     }
     for (const comp of components) {
-      if (comp.component !== "Text" || typeof comp.text !== "string" || !comp.text.trim()) {
+      if (comp == null || typeof comp !== "object") {
         continue;
       }
-      const trimmed = comp.text.trim();
-      if (texts[texts.length - 1] !== trimmed) {
-        texts.push(trimmed);
+      const name = (comp as Record<string, unknown>).component;
+      if (typeof name === "string" && !TEXT_ONLY_A2UI_COMPONENTS.has(name)) {
+        return false;
       }
     }
   }
-  if (texts.length === 0) {
+  return true;
+}
+
+function normalizeDataModelPath(path: unknown): string {
+  if (typeof path !== "string" || path.trim() === "") {
+    return "/";
+  }
+  return path.trim();
+}
+
+function a2uiUpdateDataModelKey(block: Record<string, unknown>): string | null {
+  const udm = block.updateDataModel;
+  if (udm == null || typeof udm !== "object") {
     return null;
   }
-  return repairTextPresentation(texts.join("\n\n"));
+  const payload = udm as Record<string, unknown>;
+  const sid = a2uiMessageSurfaceId(block) ?? "";
+  return `${sid}\0${normalizeDataModelPath(payload.path)}`;
+}
+
+/** Coalesce streaming A2UI messages: keep latest updateDataModel per surface/path. */
+export function dedupeA2UIMessages(messages: unknown[]): unknown[] {
+  if (messages.length <= 1) {
+    return messages;
+  }
+  const out: unknown[] = [];
+  const updateDataModelIdx = new Map<string, number>();
+  const updateComponentsIdx = new Map<string, number>();
+  const createSurfaceSeen = new Set<string>();
+
+  for (const raw of messages) {
+    if (raw == null || typeof raw !== "object") {
+      continue;
+    }
+    const block = raw as Record<string, unknown>;
+    const fingerprint = JSON.stringify(block);
+    const last = out[out.length - 1];
+    if (last != null && JSON.stringify(last) === fingerprint) {
+      continue;
+    }
+
+    const udmKey = a2uiUpdateDataModelKey(block);
+    if (udmKey != null) {
+      const idx = updateDataModelIdx.get(udmKey);
+      if (idx !== undefined) {
+        out[idx] = raw;
+        continue;
+      }
+      updateDataModelIdx.set(udmKey, out.length);
+      out.push(raw);
+      continue;
+    }
+
+    if (block.updateComponents != null && typeof block.updateComponents === "object") {
+      const sid = a2uiMessageSurfaceId(block) ?? "";
+      const idx = updateComponentsIdx.get(sid);
+      if (idx !== undefined) {
+        out[idx] = raw;
+        continue;
+      }
+      updateComponentsIdx.set(sid, out.length);
+      out.push(raw);
+      continue;
+    }
+
+    if (block.createSurface != null && typeof block.createSurface === "object") {
+      const sid = a2uiMessageSurfaceId(block) ?? "";
+      if (sid && createSurfaceSeen.has(sid)) {
+        continue;
+      }
+      if (sid) {
+        createSurfaceSeen.add(sid);
+      }
+      out.push(raw);
+      continue;
+    }
+
+    out.push(raw);
+  }
+  return out;
+}
+
+/** Merge A2UI blocks into assistant message content without duplicate server messages. */
+export function mergeA2UIIntoMessageContent(content: unknown[], blocks: unknown[]): unknown[] {
+  if (blocks.length === 0) {
+    return content;
+  }
+  const nonA2UI = content.filter((part) => {
+    if (part == null || typeof part !== "object") {
+      return true;
+    }
+    return (part as Record<string, unknown>).type !== "a2ui";
+  });
+  const existing = content
+    .filter((part) => part != null && typeof part === "object" && (part as Record<string, unknown>).type === "a2ui")
+    .map((part) => (part as Record<string, unknown>).a2ui);
+  const merged = dedupeA2UIMessages([...existing, ...blocks]);
+  return [...nonA2UI, ...merged.map((a2ui) => ({ type: "a2ui", a2ui }))];
 }

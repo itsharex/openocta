@@ -11,6 +11,12 @@ func TestValidateChatAttachmentMeta(t *testing.T) {
 	if err := validateChatAttachmentMeta("photo.png", "image/png", chatAttachmentMaxBytes); err != nil {
 		t.Fatalf("expected png at limit to pass, got %v", err)
 	}
+	if err := validateChatAttachmentMeta("clip.mp4", "video/mp4", chatAttachmentVideoMaxBytes); err != nil {
+		t.Fatalf("expected mp4 at video limit to pass, got %v", err)
+	}
+	if err := validateChatAttachmentMeta("clip.mp4", "video/mp4", chatAttachmentVideoMaxBytes+1); err == nil {
+		t.Fatal("expected oversize video to be rejected")
+	}
 	if err := validateChatAttachmentMeta("archive.zip", "application/zip", 64); err == nil {
 		t.Fatal("expected zip to be rejected")
 	}

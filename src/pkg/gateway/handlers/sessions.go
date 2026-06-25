@@ -1351,6 +1351,37 @@ func loadSessionEntryFromStore(storePath, key string, storeKeys []string) (sessi
 	return session.SessionEntry{}, false
 }
 
+// sessionIDFromCronSessionKey extracts the transcript session ID from cron session keys.
+//   - agent:main:cron:<jobId>:run:<runId> → runId
+//   - agent:main:cron:<jobId> → jobId
+//   - cron:<jobId>:run:<runId> → runId (legacy)
+func sessionIDFromCronSessionKey(sessionKey string) (string, bool) {
+	raw := strings.TrimSpace(sessionKey)
+	if raw == "" {
+		return "", false
+	}
+	parts := strings.Split(raw, ":")
+	if len(parts) >= 6 && strings.EqualFold(parts[0], "agent") && strings.EqualFold(parts[2], "cron") && strings.EqualFold(parts[4], "run") {
+		sid := strings.TrimSpace(parts[5])
+		if sid != "" {
+			return sid, true
+		}
+	}
+	if len(parts) == 4 && strings.EqualFold(parts[0], "agent") && strings.EqualFold(parts[2], "cron") {
+		sid := strings.TrimSpace(parts[3])
+		if sid != "" {
+			return sid, true
+		}
+	}
+	if len(parts) >= 4 && strings.EqualFold(parts[0], "cron") && strings.EqualFold(parts[2], "run") {
+		sid := strings.TrimSpace(parts[3])
+		if sid != "" {
+			return sid, true
+		}
+	}
+	return "", false
+}
+
 // ResolveChatSessionID resolves session ID from params and optional context (sessions store).
 // Used by chat.history, chat.send, chat.inject. Order: params["sessionId"] if set; else store by sessionKey; else SessionIDFromSessionKey(sessionKey).
 // Returns validated sessionID, sessionFile (if from store), storePath (if from store), and any validation error.
@@ -1393,6 +1424,13 @@ func ResolveChatSessionID(params map[string]interface{}, ctx *Context) (sessionI
 			}
 			return validated, entry.SessionFile, target.storePath, nil
 		}
+	}
+	if sid, ok := sessionIDFromCronSessionKey(key); ok {
+		validated, err := session.ValidateSessionID(sid)
+		if err != nil {
+			return "", "", "", err
+		}
+		return validated, validated + ".jsonl", "", nil
 	}
 	fallbackID := tools.SessionIDFromSessionKey(sessionKey)
 	validated, err := session.ValidateSessionID(fallbackID)

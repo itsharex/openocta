@@ -15,10 +15,6 @@ func Register(r *channels.Registry) {
 	if r == nil {
 		return
 	}
-	//r.Register(discord.Plugin)
-	//r.Register(telegram.Plugin)
-	//r.Register(whatsapp.Plugin)
-	//r.Register(slack.Plugin)
 	r.Register(dingtalk.Plugin)
 	r.Register(feishu.Plugin)
 	r.Register(qq.Plugin)

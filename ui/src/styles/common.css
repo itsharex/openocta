@@ -108,7 +108,7 @@
     top: 1px;
     width: 3px;
     height: 6px;
-    border: 1px solid #fff;
+    border: 1px solid var(--accent-foreground);
     border-top: none;
     border-left: none;
     transform: rotate(45deg);
@@ -125,7 +125,7 @@
     position: absolute;
     top: 0;
     left: 0;
-    background: #fff;
+    background: var(--bg-elevated);
     transition: all 0.1s ease;
   }
   &:checked::after {
@@ -171,7 +171,7 @@
       transition: all .3s;
       width: 12px;
       height: 12px;
-      background-color: #FFFFFF;
+      background-color: var(--accent-foreground);
     }
   }
   &.is-checked {
@@ -181,6 +181,7 @@
       &::after {
         left: 100%;
         margin-left: -12px;
+        background-color: var(--accent-foreground);
       }
     }
   }
@@ -188,10 +189,13 @@
 
 
 .card {
-  background: var(--bg);
-  border-radius: 8px;
+  background: var(--bg-elevated, var(--bg));
+  border-radius: var(--radius-lg, 8px);
   padding: 20px;
-  transition: transform var(--duration-normal) var(--ease-out);
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .card-title {
@@ -668,10 +672,6 @@
   align-items: center;
 }
 
-:root[data-theme="light"] .btn.primary {
-  background: #24BA51;
-}
-
 :root[data-theme="light"] .btn-kbd {
   background: rgba(0, 0, 0, 0.08);
 }
@@ -684,5 +684,13 @@
 :root[data-theme="light"] .list-item,
 :root[data-theme="light"] .table-row,
 :root[data-theme="light"] .chip {
-  background: var(--bg);
+  background: var(--bg-elevated);
+}
+
+:root[data-theme="dark"] .btn-kbd {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] .btn.primary .btn-kbd {
+  background: rgba(0, 0, 0, 0.2);
 }

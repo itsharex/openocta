@@ -21,6 +21,8 @@ import { generateUUID } from "./uuid.ts";
 export type ChatHost = {
   connected: boolean;
   chatMessage: string;
+  chatComposeHasText?: boolean;
+  chatComposeClearToken?: number;
   chatAttachments: ChatAttachment[];
   chatAttachmentError?: string | null;
   chatModelRef?: string | null;
@@ -265,9 +267,11 @@ export async function handleSendChat(
     return;
   }
   const previousDraft = host.chatMessage;
+  const isSystemCommand =
+    messageOverride != null && (messageOverride.startsWith("/") || messageOverride.startsWith("!"));
   const message = (messageOverride ?? host.chatMessage).trim();
   const attachments = host.chatAttachments ?? [];
-  const attachmentsToSend = messageOverride == null ? attachments : [];
+  const attachmentsToSend = isSystemCommand ? [] : attachments;
   const hasAttachments = attachmentsToSend.length > 0;
 
   // Allow sending with just attachments (no message text required)
@@ -281,11 +285,19 @@ export async function handleSendChat(
   }
 
   const refreshSessions = opts?.refreshSessions ?? isChatResetCommand(message);
-  if (messageOverride == null) {
+  const preserveCompose = Boolean(opts?.restoreDraft && messageOverride);
+  if (!preserveCompose) {
     host.chatMessage = "";
-    // Clear attachments when sending
-    host.chatAttachments = [];
-    host.chatAttachmentError = null;
+    if (host.chatComposeClearToken != null) {
+      host.chatComposeClearToken += 1;
+    }
+    if (host.chatComposeHasText != null) {
+      host.chatComposeHasText = false;
+    }
+    if (!isSystemCommand) {
+      host.chatAttachments = [];
+      host.chatAttachmentError = null;
+    }
   }
 
   if (isChatBusy(host)) {
@@ -294,10 +306,10 @@ export async function handleSendChat(
   }
 
   await sendChatMessageNow(host, message, {
-    previousDraft: messageOverride == null ? previousDraft : undefined,
+    previousDraft: !isSystemCommand ? previousDraft : undefined,
     restoreDraft: Boolean(messageOverride && opts?.restoreDraft),
     attachments: hasAttachments ? attachmentsToSend : undefined,
-    previousAttachments: messageOverride == null ? attachments : undefined,
+    previousAttachments: !isSystemCommand ? attachments : undefined,
     restoreAttachments: Boolean(messageOverride && opts?.restoreDraft),
     refreshSessions,
   });

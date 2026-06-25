@@ -822,20 +822,6 @@ func (s *Server) handleSiteCategories(w http.ResponseWriter, r *http.Request) {
 	s.proxySiteGET(w, r, "/api/v1/categories", proxySiteGETSilentJSONArray)
 }
 
-func (s *Server) handleSiteEduCategories(w http.ResponseWriter, r *http.Request) {
-	s.proxySiteGET(w, r, "/api/v1/edu/categories", proxySiteGETSilentJSONArray)
-}
-
-func (s *Server) handleSiteEduLessonDetail(w http.ResponseWriter, r *http.Request) {
-	// /api/v1/edu/lessons/{id}
-	id := strings.TrimSpace(r.PathValue("id"))
-	if id == "" || strings.Contains(id, "/") {
-		http.NotFound(w, r)
-		return
-	}
-	s.proxySiteGET(w, r, "/api/v1/edu/lessons/"+url.PathEscape(id), proxySiteGETSilentJSONObject)
-}
-
 // handleSiteUploads 代理官网的静态资源（如 logo），将 /api/v1/site/uploads/{path...} 转发到 {base}/uploads/{path}
 func (s *Server) handleSiteUploads(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSpace(r.PathValue("path"))

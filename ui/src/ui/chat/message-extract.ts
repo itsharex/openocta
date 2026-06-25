@@ -45,6 +45,32 @@ function isPlaceholderAssistantText(text: string): boolean {
   return text.trim() === ".";
 }
 
+/** Raw model/API payloads that must not be shown to users. */
+function isLeakedAssistantText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("(empty response:") || lower.startsWith("empty response:")) {
+    return true;
+  }
+  if (
+    (lower.includes("'type':'thinking'") || lower.includes('"type":"thinking"')) &&
+    (lower.includes("stop_reason") || lower.includes("'stop_reason'"))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function sanitizeAssistantText(text: string | null): string | null {
+  if (!text) {
+    return text;
+  }
+  return isLeakedAssistantText(text) ? null : text;
+}
+
 function messageHasToolCalls(message: Record<string, unknown>): boolean {
   const content = message.content;
   if (!Array.isArray(content)) {
@@ -77,7 +103,7 @@ export function extractText(message: unknown): string | null {
   const content = m.content;
   if (typeof content === "string") {
     const processed = role === "assistant" ? stripThinkingTags(content) : stripEnvelope(content);
-    return stripPlaceholderAssistantText(role, m, processed);
+    return stripPlaceholderAssistantText(role, m, sanitizeAssistantText(processed));
   }
   if (Array.isArray(content)) {
     const parts = content
@@ -92,12 +118,12 @@ export function extractText(message: unknown): string | null {
     if (parts.length > 0) {
       const joined = parts.join("\n");
       const processed = role === "assistant" ? stripThinkingTags(joined) : stripEnvelope(joined);
-      return stripPlaceholderAssistantText(role, m, processed);
+      return stripPlaceholderAssistantText(role, m, sanitizeAssistantText(processed));
     }
   }
   if (typeof m.text === "string") {
     const processed = role === "assistant" ? stripThinkingTags(m.text) : stripEnvelope(m.text);
-    return stripPlaceholderAssistantText(role, m, processed);
+    return stripPlaceholderAssistantText(role, m, sanitizeAssistantText(processed));
   }
   return null;
 }
@@ -119,11 +145,35 @@ export function extractThinking(message: unknown): string | null {
   const m = message as Record<string, unknown>;
   const content = m.content;
   const parts: string[] = [];
+
+  const reasoningContent =
+    typeof m.reasoning_content === "string"
+      ? m.reasoning_content.trim()
+      : typeof m.reasoningContent === "string"
+        ? m.reasoningContent.trim()
+        : "";
+  if (reasoningContent) {
+    parts.push(reasoningContent);
+  }
+
   if (Array.isArray(content)) {
     for (const p of content) {
       const item = p as Record<string, unknown>;
-      if (item.type === "thinking" && typeof item.thinking === "string") {
+      const kind = typeof item.type === "string" ? item.type.toLowerCase() : "";
+      if (kind === "thinking" && typeof item.thinking === "string") {
         const cleaned = item.thinking.trim();
+        if (cleaned) {
+          parts.push(cleaned);
+        }
+      }
+      if (kind === "reasoning" && typeof item.reasoning === "string") {
+        const cleaned = item.reasoning.trim();
+        if (cleaned) {
+          parts.push(cleaned);
+        }
+      }
+      if (kind === "reasoning_content" && typeof item.text === "string") {
+        const cleaned = item.text.trim();
         if (cleaned) {
           parts.push(cleaned);
         }

@@ -69,6 +69,8 @@ prepare-wails-icons: imgs/openocta_logo_wails.png
 # Wails 桌面应用（单二进制，内嵌 Gateway，端口 18900）
 wails: embed prepare-wails-icons
 	cd src && wails build -skipbindings
+	@chmod +x scripts/copy-bundled-assets.sh 2>/dev/null || true
+	@./scripts/copy-bundled-assets.sh
 
 # Windows NSIS 安装器（需在 Windows + NSIS 环境；逻辑见 ./build.sh wails-nsis）
 wails-nsis:

@@ -91,11 +91,16 @@ export type AppViewState = {
   chatLoading: boolean;
   chatSending: boolean;
   chatMessage: string;
+  chatComposeHasText: boolean;
+  chatComposeClearToken: number;
+  chatComposeInsertToken: number;
+  chatComposeInsertSnippet: string;
   chatAttachments: ChatAttachment[];
   chatAttachmentError: string | null;
   chatMessages: unknown[];
   chatToolMessages: unknown[];
   chatStream: string | null;
+  chatReasoningStream: string | null;
   chatStreamStartedAt: number | null;
   chatA2UIMessages: unknown[];
   chatFilePreview: import("./chat/file-blocks.ts").FilePreviewRequest | null;
@@ -231,12 +236,6 @@ export type AppViewState = {
   /** 消息页侧栏：按名称 / 标签字段 / 副标题等模糊过滤会话 */
   sessionSidebarQuery: string;
   sessionsError: string | null;
-  sessionsFilterActive: string;
-  sessionsFilterLimit: string;
-  sessionsIncludeGlobal: boolean;
-  sessionsIncludeUnknown: boolean;
-  sessionsBulkMode: boolean;
-  sessionsSelectedKeys: string[];
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
@@ -246,6 +245,9 @@ export type AppViewState = {
   usageChartMode: "tokens" | "cost";
   usageDailyChartMode: "total" | "by-type";
   usageTimeZone: "local" | "utc";
+  localAgentsLoading: boolean;
+  localAgentsReport: import("./local-agents.js").LocalAgentsProbeReport | null;
+  localAgentsError: string | null;
   cronLoading: boolean;
   cronJobs: CronJob[];
   cronStatus: CronStatus | null;
@@ -257,6 +259,16 @@ export type AppViewState = {
   cronAddModalOpen: boolean;
   cronEditModalOpen: boolean;
   cronEditJobId: string | null;
+  apiKeysLoading: boolean;
+  apiKeys: import("./controllers/api-keys.ts").ApiKeyEntry[];
+  apiKeysError: string | null;
+  apiKeysBusy: boolean;
+  apiKeysForm: import("./controllers/api-keys.ts").ApiKeyFormState;
+  apiKeysFormModalOpen: boolean;
+  apiKeysFormModalMode: "create" | "edit";
+  apiKeysViewSecret: import("./controllers/api-keys.ts").ApiKeySecretView | null;
+  apiKeysCreatedSecret: string | null;
+  apiKeysExamplesModalOpen: boolean;
   skillsLoading: boolean;
   skillsReport: SkillStatusReport | null;
   skillsError: string | null;
@@ -299,17 +311,6 @@ export type AppViewState = {
   mcpFormDirty: boolean;
   mcpRawJson: string;
   mcpRawError: string | null;
-  // LLM Trace
-  llmTraceLoading: boolean;
-  llmTraceResult: import("./controllers/llm-trace.js").TraceListResult | null;
-  llmTraceError: string | null;
-  llmTraceMode: "active" | "all";
-  llmTraceSearch: string;
-  llmTraceEnabled: boolean;
-  llmTraceSaving: boolean;
-  llmTraceViewContent: string | null;
-  llmTraceViewingSessionId: string | null;
-  llmTraceViewLoading: boolean;
   // Security (replaces sandbox)
   securityForm: import("./controllers/security.js").SecurityConfigForm | Record<string, unknown> | null;
   // Approvals
@@ -385,7 +386,7 @@ export type AppViewState = {
   digitalEmployeeEditEnabled: boolean;
   digitalEmployeeEditError: string | null;
   digitalEmployeeEditBusy: boolean;
-  // Remote catalogs (employee market / skill library / tool library / tutorials)
+  // Remote catalogs (employee market / skill library / tool library)
   employeeMarketLoadedOnce: boolean;
   employeeMarketLoading: boolean;
   employeeMarketError: string | null;
@@ -466,15 +467,6 @@ export type AppViewState = {
   toolLibraryQueryDebounceTimer: number | null;
   toolLibraryReloadVersion: number;
 
-  tutorialsLoadedOnce: boolean;
-  tutorialsLoading: boolean;
-  tutorialsError: string | null;
-  tutorialCategories: import("./controllers/remote-market.ts").EduCategory[];
-  tutorialsActiveTab: import("./views/tutorials.ts").TutorialTab;
-  tutorialsQuery: string;
-  tutorialsSelectedCategoryId: number | null;
-  tutorialsPlayingLink: string | null;
-  tutorialsQueryDebounceTimer: number | null;
   aboutUninstallModalOpen: boolean;
   aboutUninstallMode: "program" | "full";
   aboutUninstallLoading: boolean;

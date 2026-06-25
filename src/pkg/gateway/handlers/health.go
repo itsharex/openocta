@@ -168,8 +168,6 @@ func NewRegistry(ctx *Context) Registry {
 		"sessions.usage":             SessionsUsageHandler,
 		"sessions.usage.timeseries":  SessionsUsageTimeseriesHandler,
 		"sessions.usage.logs":        SessionsUsageLogsHandler,
-		"trace.list":                 TraceListHandler,
-		"trace.content":              TraceContentHandler,
 		"approvals.list":             ApprovalsListHandler,
 		"approvals.approve":          ApprovalsApproveHandler,
 		"approvals.deny":             ApprovalsDenyHandler,
@@ -203,6 +201,7 @@ func NewRegistry(ctx *Context) Registry {
 		"chat.history":               ChatHistoryHandler,
 		"chat.attachment.read":       ChatAttachmentReadHandler,
 		"chat.abort":                 ChatAbortHandler,
+		"chat.resume":                ChatResumeHandler,
 		"chat.send":                  ChatSendHandler,
 		"chat.extractSkill":          ChatExtractSkillHandler,
 		"skills.compose":             SkillComposeHandler,
@@ -219,6 +218,8 @@ func NewRegistry(ctx *Context) Registry {
 		"swarm.message.send":         SwarmMessageSendHandler,
 		"swarm.graph.get":            SwarmGraphGetHandler,
 		"swarm.history.get":          SwarmHistoryGetHandler,
+		"localAgents.probe":          LocalAgentsProbeHandler,
+		"localAgents.status":         LocalAgentsStatusHandler,
 		"web.login.start":            WebLoginStubHandler,
 		"web.login.wait":             WebLoginStubHandler,
 	}
@@ -230,6 +231,15 @@ func NewRegistry(ctx *Context) Registry {
 		r["cron.update"] = CronUpdateHandler
 		r["cron.run"] = CronRunHandler
 		r["cron.runs"] = CronRunsHandler
+	}
+	if ctx != nil && ctx.ApiKeyService != nil {
+		r["apiKeys.list"] = ApiKeysListHandler
+		r["apiKeys.create"] = ApiKeysCreateHandler
+		r["apiKeys.update"] = ApiKeysUpdateHandler
+		r["apiKeys.remove"] = ApiKeysRemoveHandler
+		r["apiKeys.defaults"] = ApiKeysDefaultsHandler
+		r["apiKeys.secret"] = ApiKeysSecretHandler
+		r["apiKeys.regenerate"] = ApiKeysRegenerateHandler
 	}
 	return r
 }

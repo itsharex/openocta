@@ -5,7 +5,7 @@ const nativeConfirmMock = vi.hoisted(() => vi.fn());
 vi.mock("../native-dialog-bridge.ts", () => ({
   nativeConfirm: nativeConfirmMock,
 }));
-import { isChatRunActive, renderChat, validateChatAttachmentFile, type ChatProps } from "./chat.ts";
+import { isChatRunActive, renderChat, validateChatAttachmentFile, CHAT_ATTACHMENT_MAX_BYTES, CHAT_ATTACHMENT_VIDEO_MAX_BYTES, type ChatProps } from "./chat.ts";
 
 function createSessions(): SessionsListResult {
   return {
@@ -238,7 +238,7 @@ describe("chat view", () => {
       renderChat(
         createProps({
           resourcesPanelOpen: true,
-          resources: { configured: false, skillKeys: [], mcpServers: [], webSearch: false },
+          resources: { configured: false, skillKeys: [], mcpServers: [], webSearch: true },
           onResourcesChange,
           onResourcesPanelClose,
           onResourcesPanelToggle: vi.fn(),
@@ -281,7 +281,7 @@ describe("chat view", () => {
       renderChat(
         createProps({
           resourcesPanelOpen: true,
-          resources: { configured: false, skillKeys: [], mcpServers: [], webSearch: false },
+          resources: { configured: false, skillKeys: [], mcpServers: [], webSearch: true },
           onResourcesChange: vi.fn(),
           onResourcesPanelClose,
           onResourcesPanelToggle: vi.fn(),
@@ -393,11 +393,28 @@ describe("chat attachment validation", () => {
       validateChatAttachmentFile({ name: "demo.zip", type: "application/zip", size: 100 } as File).ok,
     ).toBe(false);
     expect(
-      validateChatAttachmentFile({ name: "demo.pdf", type: "application/pdf", size: 1024 * 1024 + 1 } as File)
-        .ok,
+      validateChatAttachmentFile({
+        name: "demo.pdf",
+        type: "application/pdf",
+        size: CHAT_ATTACHMENT_MAX_BYTES + 1,
+      } as File).ok,
     ).toBe(false);
     expect(
       validateChatAttachmentFile({ name: "notes.txt", type: "text/plain", size: 128 } as File).ok,
     ).toBe(true);
+    expect(
+      validateChatAttachmentFile({
+        name: "clip.mp4",
+        type: "video/mp4",
+        size: CHAT_ATTACHMENT_VIDEO_MAX_BYTES,
+      } as File).ok,
+    ).toBe(true);
+    expect(
+      validateChatAttachmentFile({
+        name: "clip.mp4",
+        type: "video/mp4",
+        size: CHAT_ATTACHMENT_VIDEO_MAX_BYTES + 1,
+      } as File).ok,
+    ).toBe(false);
   });
 });

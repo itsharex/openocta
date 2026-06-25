@@ -1,10 +1,10 @@
-// Package tools bridges OpenOcta tools to agentsdk-go tool.Tool interface.
+// Package tools bridges OpenOcta tools to the agent tool interface.
 package tools
 
 import (
 	"context"
 
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
+	"github.com/openocta/openocta/pkg/agent/tool"
 )
 
 // Registry holds custom tools for the agent runtime.
@@ -32,20 +32,12 @@ func (r *Registry) Tools() []tool.Tool {
 	return r.tools
 }
 
-// EchoTool is a minimal demo tool (Phase 3b).
+// EchoTool is a minimal demo tool.
 type EchoTool struct{}
 
-// Name returns the tool name.
-func (EchoTool) Name() string {
-	return "echo"
-}
+func (EchoTool) Name() string        { return "echo" }
+func (EchoTool) Description() string { return "Echo back the input text (demo tool)" }
 
-// Description returns the tool description.
-func (EchoTool) Description() string {
-	return "Echo back the input text (demo tool)"
-}
-
-// Schema returns the parameter schema.
 func (EchoTool) Schema() *tool.JSONSchema {
 	return &tool.JSONSchema{
 		Type: "object",
@@ -59,9 +51,7 @@ func (EchoTool) Schema() *tool.JSONSchema {
 	}
 }
 
-// Execute runs the tool.
 func (EchoTool) Execute(ctx context.Context, params map[string]interface{}) (*tool.ToolResult, error) {
-	_ = ctx
 	text, _ := params["text"].(string)
 	if text == "" {
 		return &tool.ToolResult{Success: false, Output: "text is required"}, nil
@@ -69,27 +59,16 @@ func (EchoTool) Execute(ctx context.Context, params map[string]interface{}) (*to
 	return &tool.ToolResult{Success: true, Output: text}, nil
 }
 
-// DefaultTools returns the default tool set (Echo, OsInfo, WindowsCmd). Use DefaultToolsWithInvoker when gateway context is available.
+// DefaultTools returns the default tool set.
 func DefaultTools() []tool.Tool {
-	return []tool.Tool{
-		EchoTool{},
-		OsInfoTool{},
-		//EnvProbeTool{},
-		//WindowsCmdTool{},
-	}
+	return []tool.Tool{}
 }
 
-// DefaultToolsWithInvoker returns built-in tools that can call the gateway (cron, config, sessions, etc.).
-// Pass nil invoker to get only EchoTool, OsInfo, WindowsCmdTool.
+// DefaultToolsWithInvoker returns tools including gateway invoker when available.
 func DefaultToolsWithInvoker(invoker GatewayInvoker) []tool.Tool {
-	list := []tool.Tool{
-		EchoTool{},
-		OsInfoTool{},
-		//EnvProbeTool{},
-		//WindowsCmdTool{},
-	}
+	tools := DefaultTools()
 	if invoker != nil {
-		list = append(list, GatewayTool{Invoker: invoker})
+		tools = append(tools, GatewayTool{Invoker: invoker})
 	}
-	return list
+	return tools
 }

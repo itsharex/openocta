@@ -7,9 +7,9 @@ import (
 	"github.com/openocta/openocta/pkg/config"
 )
 
-// ChatRunResources holds per-request skill/MCP/web-search overrides from the web chat UI.
+// ChatRunResources holds per-request skill/MCP overrides from the web chat UI.
 // When Configured is false, all eligible skills and MCP servers are loaded.
-// Web tools are enabled only when WebSearch is true.
+// web_search / web_fetch are temporarily disabled (see tools.webToolsEnabled).
 type ChatRunResources struct {
 	Configured bool
 	SkillKeys  []string
@@ -96,8 +96,9 @@ func filterMCPServersByKeys(servers map[string]config.McpServerEntry, allowed []
 	return out
 }
 
-func chatRunEnableWebTools(res ChatRunResources) bool {
-	return res.WebSearch
+func chatRunEnableWebTools(_ ChatRunResources) bool {
+	// web_search / web_fetch temporarily disabled; see tools.webToolsEnabled.
+	return false
 }
 
 // chatRunDisallowedTools is deprecated; web tools are omitted via EnableWebTools instead.

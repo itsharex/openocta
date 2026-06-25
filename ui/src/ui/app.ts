@@ -65,7 +65,7 @@ import {
   handleSendChat as handleSendChatInternal,
   removeQueuedMessage as removeQueuedMessageInternal,
 } from "./app-chat.ts";
-import { DEFAULT_CRON_FORM, DEFAULT_LOG_LEVEL_FILTERS } from "./app-defaults.ts";
+import { DEFAULT_CRON_FORM, DEFAULT_API_KEY_FORM, DEFAULT_LOG_LEVEL_FILTERS } from "./app-defaults.ts";
 import { connectGateway as connectGatewayInternal } from "./app-gateway.ts";
 import {
   handleConnected,
@@ -200,9 +200,14 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() chatLoading = false;
   @state() chatSending = false;
   @state() chatMessage = "";
+  @state() chatComposeHasText = false;
+  @state() chatComposeClearToken = 0;
+  @state() chatComposeInsertToken = 0;
+  @state() chatComposeInsertSnippet = "";
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
   @state() chatStream: string | null = null;
+  @state() chatReasoningStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatA2UIMessages: unknown[] = [];
   @state() chatFilePreview: import("./chat/file-blocks.ts").FilePreviewRequest | null = null;
@@ -328,16 +333,6 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() mcpAddEditMode: "form" | "raw" = "form";
   @state() mcpAddRawJson = "{}";
   @state() mcpAddRawError: string | null = null;
-  @state() llmTraceLoading = false;
-  @state() llmTraceResult: import("./controllers/llm-trace.js").TraceListResult | null = null;
-  @state() llmTraceError: string | null = null;
-  @state() llmTraceMode: "active" | "all" = "active";
-  @state() llmTraceSearch = "";
-  @state() llmTraceEnabled = false;
-  @state() llmTraceSaving = false;
-  @state() llmTraceViewContent: string | null = null;
-  @state() llmTraceViewingSessionId: string | null = null;
-  @state() llmTraceViewLoading = false;
   @state() securityForm: import("./controllers/security.js").SecurityConfigForm | Record<string, unknown> | null = null;
   @state() approvalsLoading = false;
   @state() approvalsResult: import("./controllers/approvals.js").ApprovalsListResult | null = null;
@@ -414,12 +409,6 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() sessionOverflow: { top: number; right: number; key: string } | null = null;
   @state() sessionSidebarQuery = "";
   @state() sessionsError: string | null = null;
-  @state() sessionsFilterActive = "";
-  @state() sessionsFilterLimit = "120";
-  @state() sessionsIncludeGlobal = true;
-  @state() sessionsIncludeUnknown = false;
-  @state() sessionsBulkMode = false;
-  @state() sessionsSelectedKeys: string[] = [];
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
@@ -437,6 +426,10 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() usageDailyChartMode: "total" | "by-type" = "by-type";
   @state() usageTimeZone: "local" | "utc" = "local";
 
+  @state() localAgentsLoading = false;
+  @state() localAgentsReport: import("./local-agents.js").LocalAgentsProbeReport | null = null;
+  @state() localAgentsError: string | null = null;
+
   @state() cronLoading = false;
   @state() cronJobs: CronJob[] = [];
   @state() cronStatus: CronStatus | null = null;
@@ -448,6 +441,17 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() cronAddModalOpen = false;
   @state() cronEditModalOpen = false;
   @state() cronEditJobId: string | null = null;
+
+  @state() apiKeysLoading = false;
+  @state() apiKeys: import("./controllers/api-keys.ts").ApiKeyEntry[] = [];
+  @state() apiKeysError: string | null = null;
+  @state() apiKeysBusy = false;
+  @state() apiKeysForm: import("./controllers/api-keys.ts").ApiKeyFormState = { ...DEFAULT_API_KEY_FORM };
+  @state() apiKeysFormModalOpen = false;
+  @state() apiKeysFormModalMode: "create" | "edit" = "create";
+  @state() apiKeysViewSecret: import("./controllers/api-keys.ts").ApiKeySecretView | null = null;
+  @state() apiKeysCreatedSecret: string | null = null;
+  @state() apiKeysExamplesModalOpen = false;
 
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
@@ -552,7 +556,7 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() digitalEmployeeEditError: string | null = null;
   @state() digitalEmployeeEditBusy = false;
 
-  // Remote catalogs (employee market / skill library / tool library / tutorials)
+  // Remote catalogs (employee market / skill library / tool library)
   @state() employeeMarketLoadedOnce = false;
   @state() employeeMarketLoading = false;
   @state() employeeMarketError: string | null = null;
@@ -627,14 +631,6 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() toolLibraryMcpEditModalOpen = false;
   @state() toolLibraryMcpEditServerKey = "";
 
-  @state() tutorialsLoadedOnce = false;
-  @state() tutorialsLoading = false;
-  @state() tutorialsError: string | null = null;
-  @state() tutorialCategories: import("./controllers/remote-market.ts").EduCategory[] = [];
-  @state() tutorialsActiveTab: import("./views/tutorials.ts").TutorialTab = "video";
-  @state() tutorialsQuery = "";
-  @state() tutorialsSelectedCategoryId: number | null = null;
-  @state() tutorialsPlayingLink: string | null = null;
   @state() aboutUninstallModalOpen = false;
   @state() aboutUninstallMode: "program" | "full" = "program";
   @state() aboutUninstallLoading = false;

@@ -7,6 +7,7 @@ import { groupByCategoryKey } from "../utils/category-helpers.ts";
 import { icons } from "../icons.js";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
+import { renderToolCategoryAside } from "./catalog-category-aside.ts";
 import { t } from "../strings.js";
 import {
   isMcpAddFormValid,
@@ -29,11 +30,15 @@ export type ToolLibraryProps = {
   query: string;
   category?: string;
   categoryDescendants?: string[];
+  gatewayHost?: string;
+  token?: string;
+  categoryReloadVersion?: number;
   items: McpListItem[];
   selectedId: number | string | null;
   selectedDetail: McpDetail | null;
   onQueryChange: (next: string) => void;
   onCategoryChange?: (next: string) => void;
+  onCategoryTreeSelect?: (name: string, descendantNames: string[]) => void;
   onRefresh: () => void;
   addModalOpen?: boolean;
   addName?: string;
@@ -405,6 +410,22 @@ export function renderToolLibrary(props: ToolLibraryProps) {
     <main class="emp-page">
       <section class="emp-list-wrap">
         <div class="emp-content">
+          ${renderToolCategoryAside({
+            items: props.items ?? [],
+            selectedCategory: effectiveCategory,
+            keyword: props.query,
+            gatewayHost: props.gatewayHost,
+            token: props.token,
+            reloadVersion: props.categoryReloadVersion ?? 0,
+            disabled: props.loading,
+            onSelect: (name, descendantNames) => {
+              if (props.onCategoryTreeSelect) {
+                props.onCategoryTreeSelect(name, descendantNames);
+                return;
+              }
+              props.onCategoryChange?.(name);
+            },
+          })}
           <div class="emp-main">
             ${
               props.addModalOpen && props.onAddClose

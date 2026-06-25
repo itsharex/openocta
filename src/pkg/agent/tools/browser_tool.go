@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/browser"
 	"github.com/openocta/openocta/pkg/config"
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
 )
 
 // BrowserToolNames lists built-in browser automation tools.
@@ -18,6 +18,22 @@ var BrowserToolNames = []string{"browser"}
 // IsBrowserToolName reports whether name is the browser tool.
 func IsBrowserToolName(name string) bool {
 	return strings.EqualFold(strings.TrimSpace(name), "browser")
+}
+
+// FilterOutBrowserTools removes built-in browser tools from a tool list.
+// Used when BrowserToolsFromConfig already registered the canonical browser tool.
+func FilterOutBrowserTools(tools []tool.Tool) []tool.Tool {
+	if len(tools) == 0 {
+		return tools
+	}
+	out := make([]tool.Tool, 0, len(tools))
+	for _, t := range tools {
+		if t == nil || IsBrowserToolName(t.Name()) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
 }
 
 // BrowserToolsFromConfig registers the browser tool when enabled in config.

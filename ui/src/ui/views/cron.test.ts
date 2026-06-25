@@ -111,7 +111,7 @@ describe("cron view", () => {
 
     expect(container.querySelector(".cron-config-modal")).not.toBeNull();
     expect(container.querySelector(".emp-detail-modal__close svg")).not.toBeNull();
-    expect(container.textContent).toContain("New Job");
+    expect(container.textContent).toContain("新建任务");
     expect(container.textContent).toContain("Add job");
   });
 
@@ -186,7 +186,7 @@ describe("cron view", () => {
     const link = container.querySelector("a.session-link");
     expect(link).not.toBeNull();
     expect(link?.getAttribute("href")).toContain(
-      "/ui/message?session=agent%3Amain%3Acron%3Ajob-1",
+      "/ui/message?session=agent%3Amain%3Acron%3Ajob-1%3Arun%3Aabc",
     );
   });
 

@@ -13,8 +13,7 @@ import {
 import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normalizer.ts";
 import { extractToolCards } from "./tool-cards.ts";
 import { resolveToolDisplay } from "../tool-display.ts";
-import { extractA2UIBlocks, extractA2UITextMarkdown } from "./a2ui-bridge.ts";
-import { isA2UIProtocolTool } from "./constants.ts";
+import { extractA2UIBlocks, dedupeA2UIMessages, extractA2UIDisplayText, isTextOnlyA2UIDisplay } from "./a2ui-bridge.ts";
 import {
   extractFileBlocks,
   extractFileBlocksFromA2UIBlocks,
@@ -273,13 +272,28 @@ export function renderReadingIndicatorGroup(
   assistant?: AssistantIdentity,
   startedAt?: number,
   phase?: "thinking" | "tool" | "streaming",
+  reasoningText?: string,
 ) {
+  const reasoningMarkdown = reasoningText?.trim()
+    ? formatReasoningMarkdown(reasoningText.trim())
+    : null;
   return html`
     <div class="chat-group assistant">
       ${renderAssistantAvatar(assistant, { busy: true })}
       <div class="chat-group-messages">
         <div class="chat-bubble chat-reading-indicator" aria-live="polite">
-          <span class="chat-reading-indicator__label">${runPhaseLabel(phase)}</span>
+          ${
+            reasoningMarkdown
+              ? html`
+                  <details class="chat-thinking" open>
+                    <summary class="chat-thinking__summary">思考过程</summary>
+                    <div class="chat-thinking__content">
+                      ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
+                    </div>
+                  </details>
+                `
+              : html`<span class="chat-reading-indicator__label">${runPhaseLabel(phase)}</span>`
+          }
         </div>
       </div>
     </div>
@@ -302,6 +316,7 @@ export function renderA2UIGroup(
         sessionKey,
         onA2UIAction,
         onFilePreview,
+        inline: true,
       })}</div>
     </div>
   `;
@@ -312,17 +327,35 @@ export function renderStreamingGroup(
   startedAt: number,
   onOpenSidebar?: (content: string) => void,
   assistant?: AssistantIdentity,
+  reasoningText?: string,
 ) {
   const timestamp = new Date(startedAt).toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
   const name = assistant?.name ?? "Assistant";
+  const reasoningMarkdown = reasoningText?.trim()
+    ? formatReasoningMarkdown(reasoningText.trim())
+    : null;
 
   return html`
     <div class="chat-group assistant">
       ${renderAssistantAvatar(assistant, { busy: true })}
       <div class="chat-group-messages">
+        ${
+          reasoningMarkdown
+            ? html`
+                <div class="chat-bubble streaming fade-in">
+                  <details class="chat-thinking" open>
+                    <summary class="chat-thinking__summary">思考过程</summary>
+                    <div class="chat-thinking__content">
+                      ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
+                    </div>
+                  </details>
+                </div>
+              `
+            : nothing
+        }
         ${renderGroupedMessage(
           {
             role: "assistant",
@@ -562,6 +595,10 @@ function collapseWhitespace(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
+function hasVisibleAssistantText(text: string | null | undefined): text is string {
+  return typeof text === "string" && text.length > 0 && text.trim().length > 0;
+}
+
 /** Plain text under ### tool headings (for deduping with extractText). */
 function stripAggregatedToolHeadings(aggregated: string): string {
   return aggregated
@@ -764,9 +801,6 @@ function segmentAssistantTurn(
         segments.push(currentToolSegment);
       }
       for (const card of callCards) {
-        if (isA2UIProtocolTool(card.name)) {
-          continue;
-        }
         currentRun = {
           command: toolCommandText(card),
           tool: card.name || "tool",
@@ -779,14 +813,6 @@ function segmentAssistantTurn(
     }
 
     if (isToolResult) {
-      const toolName =
-        cards[0]?.name ||
-        (typeof (message as Record<string, unknown>).toolName === "string"
-          ? ((message as Record<string, unknown>).toolName as string)
-          : "");
-      if (isA2UIProtocolTool(toolName)) {
-        continue;
-      }
       const output = text ? extractToolOutputText(text) : "";
       const durationMs = extractDurationMs(message) ?? undefined;
       if (!currentToolSegment) {
@@ -971,6 +997,31 @@ function renderToolSegment(
   `;
 }
 
+function collectToolRunsFromSegments(segments: Segment[]): ToolRunEntry[] {
+  const runs: ToolRunEntry[] = [];
+  for (const seg of segments) {
+    if (seg.type === "tools") {
+      runs.push(...seg.runs);
+    }
+  }
+  return runs;
+}
+
+function renderToolOutputBubble(runs: ToolRunEntry[]) {
+  const last = [...runs].reverse().find((run) => run.output.trim().length > 0);
+  if (!last) {
+    return nothing;
+  }
+  const output = last.output.trim();
+  const command = last.command?.trim() || last.tool?.trim() || "";
+  return html`
+    <div class="chat-bubble">
+      ${command ? html`<div class="chat-tool-run__command muted">$ ${command}</div>` : nothing}
+      <pre class="chat-tool-run__output chat-tool-run__output--inline">${output}</pre>
+    </div>
+  `;
+}
+
 function renderAssistantTurnMessages(
   group: MessageGroup,
   opts: {
@@ -995,7 +1046,8 @@ function renderAssistantTurnMessages(
     (path) => !isPathCoveredByImageKeys(path, groupImageKeys, groupFiles),
   );
 
-  // Find the last segment that is a text segment and contains actual text (the final assistant response)
+  // Find the last segment that contains user-visible response content.
+  // Thinking-only segments remain in the process panel.
   let finalResponseIdx = -1;
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i];
@@ -1004,7 +1056,16 @@ function renderAssistantTurnMessages(
       const images = extractImages(seg.message);
       const files = extractFileBlocks(seg.message);
       const a2uiBlocks = extractA2UIBlocks(seg.message);
-      if (text || images.length > 0 || files.length > 0 || a2uiBlocks.length > 0) {
+      const thinking = extractThinkingCached(seg.message)?.trim() ?? "";
+      const hasOnlyThinking =
+        Boolean(thinking) &&
+        !text &&
+        images.length === 0 &&
+        files.length === 0 &&
+        a2uiBlocks.length === 0;
+      const hasVisibleResponse =
+        text || images.length > 0 || files.length > 0 || a2uiBlocks.length > 0;
+      if (hasVisibleResponse && !hasOnlyThinking) {
         finalResponseIdx = i;
         break;
       }
@@ -1013,16 +1074,30 @@ function renderAssistantTurnMessages(
 
   let processSegments: Segment[] = [];
   let finalResponseSegment: Segment | null = null;
+  let visibleToolRuns: ToolRunEntry[] | null = null;
 
   if (finalResponseIdx !== -1) {
     processSegments = segments.filter((_, idx) => idx !== finalResponseIdx);
     finalResponseSegment = segments[finalResponseIdx];
   } else {
     processSegments = segments;
+    const toolRuns = collectToolRunsFromSegments(segments);
+    const runsWithOutput = toolRuns.filter((run) => run.output.trim().length > 0);
+    if (runsWithOutput.length > 0) {
+      visibleToolRuns = runsWithOutput;
+      // Tool output is the user-visible answer; keep only thinking/text in the process panel.
+      processSegments = segments.filter((seg) => seg.type !== "tools");
+    }
   }
 
+  const showProcessPanel =
+    processSegments.length > 0 &&
+    (processSegments.some((s) => s.type === "tools") ||
+      processSegments.some((s) => s.type === "text") ||
+      !!group.isStreaming);
+
   return html`
-    ${processSegments.length > 0
+    ${showProcessPanel
       ? html`
           <details class="chat-process-details" ?open=${!!group.isStreaming || processSegments.some((s) => s.type === "tools")}>
             <summary class="chat-process-summary">
@@ -1064,12 +1139,13 @@ function renderAssistantTurnMessages(
         `
       : nothing}
 
+    ${visibleToolRuns ? renderToolOutputBubble(visibleToolRuns) : nothing}
     ${finalResponseSegment?.type === "text"
       ? renderGroupedMessage(
           finalResponseSegment.message,
           {
             isStreaming: finalResponseSegment.isStreaming,
-            showReasoning: false, // Reasoning has been rendered inside processSegments
+            showReasoning: opts.showReasoning,
             showToolTrace: false,
             hideFileAttachments: true,
             client: opts.client,
@@ -1136,7 +1212,7 @@ function renderCollapsedToolResult(
           opts.showReasoning && reasoningMarkdown
             ? html`
                 <details class="chat-thinking" open>
-                  <summary class="chat-thinking__summary">Reasoning</summary>
+                  <summary class="chat-thinking__summary">思考过程</summary>
                   <div class="chat-thinking__content">
                     ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
                   </div>
@@ -1170,10 +1246,15 @@ function renderA2UIContent(
     inline?: boolean;
   },
 ) {
-  if (blocks.length === 0) {
+  const normalized = dedupeA2UIMessages(blocks);
+  if (normalized.length === 0) {
     return nothing;
   }
-  const files = extractFileBlocksFromA2UIBlocks(blocks);
+  // Static text surfaces are rendered as markdown in the bubble (reliable newlines).
+  if (isTextOnlyA2UIDisplay(normalized)) {
+    return nothing;
+  }
+  const files = extractFileBlocksFromA2UIBlocks(normalized);
   const fileSection = html`
     ${renderImageFileBlocks(files, opts.onFilePreview)}
     ${renderFileAttachments(
@@ -1181,18 +1262,6 @@ function renderA2UIContent(
       opts.onFilePreview,
     )}
   `;
-  const textMarkdown = extractA2UITextMarkdown(blocks);
-  if (textMarkdown) {
-    const displayMarkdown = stripOpenOctaAttachmentsMarker(textMarkdown);
-    return html`
-      ${fileSection}
-      ${
-        displayMarkdown.trim()
-          ? html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(displayMarkdown))}</div>`
-          : nothing
-      }
-    `;
-  }
   return html`
     ${fileSection}
     <chat-a2ui-panel
@@ -1200,7 +1269,7 @@ function renderA2UIContent(
       .showTitle=${!(opts.inline ?? false)}
       .client=${opts.client ?? null}
       .sessionKey=${opts.sessionKey ?? "main"}
-      .messages=${blocks}
+      .messages=${normalized}
       .onA2UIAction=${opts.onA2UIAction ?? null}
     ></chat-a2ui-panel>
   `;
@@ -1251,27 +1320,30 @@ function renderGroupedMessage(
   const images = extractImages(message);
   const hasImages = images.length > 0;
   const a2uiBlocks = extractA2UIBlocks(message);
-  const hasA2UI = a2uiBlocks.length > 0;
+  const a2uiDisplayText = a2uiBlocks.length > 0 ? extractA2UIDisplayText(message) : null;
+  const showA2UIPanel = a2uiBlocks.length > 0 && !isTextOnlyA2UIDisplay(a2uiBlocks);
+  const hasA2UI = showA2UIPanel;
   const fileBlocks = extractFileBlocks(message);
   const hasFiles = fileBlocks.length > 0;
 
   const extractedText = extractTextCached(message);
-  const extractedThinking =
-    opts.showReasoning && role === "assistant" ? extractThinkingCached(message) : null;
-  const markdownBase =
-    hasA2UI ? null : extractedText?.trim() ? extractedText : null;
+  const extractedThinking = role === "assistant" ? extractThinkingCached(message) : null;
+  const markdownBase = hasVisibleAssistantText(extractedText)
+    ? extractedText
+    : hasVisibleAssistantText(a2uiDisplayText)
+      ? a2uiDisplayText
+      : null;
   const reasoningMarkdown = extractedThinking ? formatReasoningMarkdown(extractedThinking) : null;
   let markdown = markdownBase ? stripMarkdownLocalImageRefs(markdownBase) : null;
-  if (markdown && !markdown.trim()) {
+  if (markdown && !hasVisibleAssistantText(markdown)) {
     markdown = null;
   }
-  const canCopyMarkdown = role === "assistant" && Boolean(markdown?.trim());
+  const canCopyMarkdown = role === "assistant" && hasVisibleAssistantText(markdown);
 
   const bubbleClasses = [
     "chat-bubble",
     canCopyMarkdown ? "has-copy" : "",
-    opts.isStreaming ? "streaming" : "",
-    "fade-in",
+    opts.isStreaming ? "streaming fade-in" : "",
   ]
     .filter(Boolean)
     .join(" ");

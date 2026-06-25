@@ -36,11 +36,11 @@ afterEach(() => {
 
 describe("control UI routing", () => {
   it("hydrates the tab from the location", async () => {
-    const app = mountApp("/sessions");
+    const app = mountApp("/channels");
     await app.updateComplete;
 
-    expect(app.tab).toBe("sessions");
-    expect(window.location.pathname).toBe("/sessions");
+    expect(app.tab).toBe("channels");
+    expect(window.location.pathname).toBe("/channels");
   });
 
   it("respects /ui base paths", async () => {
@@ -63,12 +63,12 @@ describe("control UI routing", () => {
 
   it("honors explicit base path overrides", async () => {
     window.__OPENCLAW_CONTROL_UI_BASE_PATH__ = "/openclaw";
-    const app = mountApp("/openclaw/sessions");
+    const app = mountApp("/openclaw/channels");
     await app.updateComplete;
 
     expect(app.basePath).toBe("/openclaw");
-    expect(app.tab).toBe("sessions");
-    expect(window.location.pathname).toBe("/openclaw/sessions");
+    expect(app.tab).toBe("channels");
+    expect(window.location.pathname).toBe("/openclaw/channels");
   });
 
   it("updates the URL when clicking nav items", async () => {
@@ -92,13 +92,11 @@ describe("control UI routing", () => {
     expect(app.querySelector<HTMLElement>(".content")?.scrollTop).toBe(0);
   });
 
-  it("highlights the active top tab for catalog routes", async () => {
+  it("highlights the active top tab for primary routes", async () => {
     const cases = [
       ["/employee-market", "员工市场"],
-      ["/skill-library", "技能库"],
-      ["/tool-library", "工具库"],
-      ["/model-library", "模型"],
-      ["/tutorials", "教程"],
+      ["/knowledge-vault", "知识库"],
+      ["/scheduled-tasks", "定时任务"],
     ] as const;
 
     for (const [pathname, expected] of cases) {
@@ -112,7 +110,15 @@ describe("control UI routing", () => {
     }
   });
 
-  it("renders the model tab before tutorials and removes the community tab", async () => {
+  it("highlights config top tab for agent library routes", async () => {
+    const app = mountApp("/skill-library");
+    await app.updateComplete;
+
+    expect(app.tab).toBe("skillLibrary");
+    expect(app.querySelector(".top-tab--active")?.textContent).toContain("配置");
+  });
+
+  it("renders the five primary top tabs plus config", async () => {
     const app = mountApp("/message");
     await app.updateComplete;
 
@@ -120,11 +126,7 @@ describe("control UI routing", () => {
       node.textContent?.trim() ?? "",
     );
 
-    expect(labels).toContain("模型");
-    expect(labels).not.toContain("社区");
-    expect(labels.indexOf("模型")).toBeGreaterThan(-1);
-    expect(labels.indexOf("教程")).toBeGreaterThan(-1);
-    expect(labels.indexOf("模型")).toBeLessThan(labels.indexOf("教程"));
+    expect(labels).toEqual(["消息", "员工市场", "知识库", "定时任务", "配置"]);
   });
 
   it("auto-scrolls chat history to the latest message", async () => {

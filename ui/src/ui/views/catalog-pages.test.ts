@@ -1,7 +1,6 @@
 import { render } from "lit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  EduCategory,
   EmployeeDetail,
   EmployeeListItem,
   McpDetail,
@@ -33,7 +32,6 @@ import {
   renderModelLibrary,
   type ModelLibraryProps,
 } from "./model-library.ts";
-import { renderTutorials, type TutorialsProps } from "./tutorials.ts";
 
 function renderIntoContainer(result: unknown, container: HTMLElement) {
   render(result as never, container);
@@ -159,43 +157,6 @@ function toolProps(overrides: Partial<ToolLibraryProps> = {}): ToolLibraryProps 
     onToggleEnabled: async () => undefined,
     onEdit: () => undefined,
     installedMcpMap: new Map<number, string>(),
-    ...overrides,
-  };
-}
-
-function tutorialCategories(): EduCategory[] {
-  return [
-    {
-      id: 1,
-      name: "极速体验",
-      courses: [
-        {
-          id: 10,
-          title: "Windows 极速体验",
-          lessons: [
-            { id: 101, title: "Windows 快速安装", duration: "03:28", link: "https://www.bilibili.com/video/BV1xx411c7mD" },
-          ],
-        },
-      ],
-    },
-  ];
-}
-
-function tutorialProps(overrides: Partial<TutorialsProps> = {}): TutorialsProps {
-  return {
-    activeTab: "video",
-    loading: false,
-    error: null,
-    categories: tutorialCategories(),
-    query: "",
-    selectedCategoryId: 1,
-    playingLink: null,
-    onTabChange: () => undefined,
-    onQueryChange: () => undefined,
-    onSelectCategory: () => undefined,
-    onLessonClick: () => undefined,
-    onPlayingClose: () => undefined,
-    onRefresh: () => undefined,
     ...overrides,
   };
 }
@@ -852,48 +813,5 @@ describe("catalog pages", () => {
     expect(talkButton).not.toBeUndefined();
     talkButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onOpenEmployee).toHaveBeenCalledWith("test");
-  });
-
-  it("renders tutorials list and player states", () => {
-    const container = document.createElement("div");
-    const onLessonClick = vi.fn();
-    renderIntoContainer(renderTutorials(tutorialProps({ onLessonClick })), container);
-
-    expect(container.textContent).toContain("OpenOcta 教程");
-    expect(container.textContent).toContain("Windows 极速体验");
-
-    const lesson = container.querySelector(".tutorials-lesson--clickable");
-    expect(lesson).not.toBeNull();
-    lesson?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(onLessonClick).toHaveBeenCalledTimes(1);
-
-    renderIntoContainer(
-      renderTutorials(
-        tutorialProps({ playingLink: "https://www.bilibili.com/video/BV1xx411c7mD" }),
-      ),
-      container,
-    );
-    expect(container.querySelector(".emp-detail-modal")).not.toBeNull();
-    expect(container.querySelector(".emp-detail-modal__close svg")).not.toBeNull();
-    expect(container.querySelector("iframe")).not.toBeNull();
-    expect(container.textContent).toContain("在哔哩哔哩打开");
-  });
-
-  it("renders documentation tab inside tutorials", () => {
-    const container = document.createElement("div");
-    renderIntoContainer(
-      renderTutorials(
-        tutorialProps({
-          activeTab: "documentation",
-          onOpenDocumentationExternal: () => undefined,
-        }),
-      ),
-      container,
-    );
-
-    expect(container.textContent).toContain("视频教程");
-    expect(container.textContent).toContain("文档教程");
-    expect(container.querySelector(".documentation-embed__frame")).not.toBeNull();
-    expect(container.querySelector(".tutorials-outcomes")).toBeNull();
   });
 });

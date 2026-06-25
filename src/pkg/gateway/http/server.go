@@ -10,7 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/openocta/openocta/embed"
 	"github.com/openocta/openocta/pkg/acp/mcp"
+	"github.com/openocta/openocta/pkg/agent/eino"
 	"github.com/openocta/openocta/pkg/agent/runtime"
+	"github.com/openocta/openocta/pkg/apikeys"
 	"github.com/openocta/openocta/pkg/channels"
 	"github.com/openocta/openocta/pkg/channels/builtin"
 	"github.com/openocta/openocta/pkg/channels/dingtalk"
@@ -25,16 +27,14 @@ import (
 	"github.com/openocta/openocta/pkg/gateway/swarmsvc"
 	"github.com/openocta/openocta/pkg/gateway/ws"
 	initpkg "github.com/openocta/openocta/pkg/init"
+	"github.com/openocta/openocta/pkg/localagents"
 	"github.com/openocta/openocta/pkg/logging"
 	"github.com/openocta/openocta/pkg/outbound"
 	"github.com/openocta/openocta/pkg/paths"
-	"github.com/stellarlinkco/agentsdk-go/pkg/middleware"
 	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/http/pprof"
-	_ "net/http/pprof"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,7 +43,15 @@ import (
 	"time"
 )
 
-// httpTraceJSONLWriter implements middleware.HTTPTraceWriter (agentsdk-go v2 精简了 HTTP trace API).
+// httpTraceEvent is a minimal HTTP trace record written to http.jsonl.
+type httpTraceEvent struct {
+	Method   string `json:"method,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Status   int    `json:"status,omitempty"`
+	Duration int64  `json:"duration_ms,omitempty"`
+}
+
+// httpTraceJSONLWriter appends HTTP trace events to a JSONL file.
 type httpTraceJSONLWriter struct {
 	mu   sync.Mutex
 	path string
@@ -56,7 +64,7 @@ func newHTTPTraceJSONLWriter(dir string) (*httpTraceJSONLWriter, error) {
 	return &httpTraceJSONLWriter{path: filepath.Join(dir, "http.jsonl")}, nil
 }
 
-func (w *httpTraceJSONLWriter) WriteHTTPTrace(ev *middleware.HTTPTraceEvent) error {
+func (w *httpTraceJSONLWriter) WriteHTTPTrace(ev *httpTraceEvent) error {
 	if w == nil || ev == nil {
 		return nil
 	}
@@ -117,6 +125,10 @@ func NewServer(addr string, version string) *Server {
 	if cronSvc != nil {
 		cronSvcIf = cronSvc
 	}
+	apiKeySvc, apiKeyErr := apikeys.NewService(filepath.Join(stateDir, "api-keys", "keys.json"))
+	if apiKeyErr != nil {
+		slog.Warn("api keys: failed to init store", "error", apiKeyErr)
+	}
 	chReg := channels.NewRegistry()
 	chRuntimeMgr := channels.NewManager()
 	outReg := outbound.NewAdapterRegistry()
@@ -149,9 +161,25 @@ func NewServer(addr string, version string) *Server {
 		slog.Warn("init employees at startup failed", "error", err)
 	}
 
+	if err := initpkg.InitBundled(); err != nil {
+		slog.Warn("init bundled assets at startup failed", "error", err)
+	}
+
+	go func() {
+		probeCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		if cfg != nil && cfg.LocalAgents != nil && len(cfg.LocalAgents.CustomPaths) > 0 {
+			localagents.SetCustomPaths(cfg.LocalAgents.CustomPaths)
+		}
+		localagents.ProbeAll(probeCtx, true)
+	}()
+
 	if err := runtime.InitKnowledgeEngine(context.Background(), cfg); err != nil {
 		slog.Warn("knowledge index preload failed", "error", err)
 	}
+
+	eino.SetupCozeLoop(cfg)
+	eino.SetupUsageCallback()
 
 	// MCP: connect to configured MCP servers and expose tools to the agent
 	//var mcpManager *mcp.Manager
@@ -173,6 +201,7 @@ func NewServer(addr string, version string) *Server {
 		OutboundRegistry:    outReg,
 		CronService:         cronSvcIf,
 		GetCronStorePath:    func() string { return filepath.Join(stateDir, "cron", "jobs.json") },
+		ApiKeyService:       apiKeySvc,
 		AgentRunSeq:         make(map[string]int64), // Initialize sequence counter
 		Config:              cfg,                    // Store loaded config
 		ChannelManager:      chRuntimeMgr,
@@ -283,6 +312,7 @@ func NewServer(addr string, version string) *Server {
 			To:             p.To,
 			ChatType:       p.ChatType,
 			MessageID:      p.MessageID,
+			Metadata:       p.Metadata,
 			Thinking:       p.Thinking,
 			TimeoutMs:      timeoutMs,
 		})
@@ -317,12 +347,7 @@ func NewServer(addr string, version string) *Server {
 				} else if sessionId == "" {
 					sessionId = job.ID
 				}
-				handlers.InvokeChatSend(ctx, handlers.ChatSendParams{
-					SessionKey:     sessionKey,
-					Message:        message,
-					SessionID:      sessionId,
-					IdempotencyKey: "cron:" + job.ID,
-				})
+				handlers.InvokeChatSend(ctx, handlers.BuildCronChatSendParams(job, sessionKey, sessionId, message))
 			},
 		})
 		cronSvc.Start()
@@ -448,7 +473,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/desktop/browser", s.requireGatewayToken(s.handleDesktopBrowser))
 	s.mux.HandleFunc("OPTIONS /api/desktop/browser", s.handleDesktopBrowserOptions)
 
-	// Site API proxies (employee market / skills / mcps / tutorials).
+	// Site API proxies (employee market / skills / mcps).
 	// Frontend calls Gateway same-origin; Gateway forwards to OPENOCTA_SITE_API_BASE_URL.
 	// CORS: allow dev UI (e.g. localhost:5173) to call gateway (e.g. 127.0.0.1:18900).
 	s.mux.HandleFunc("OPTIONS /api/v1/", s.handleSiteOptions)
@@ -462,8 +487,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/v1/skills/{folder}", s.requireGatewayToken(s.handleSiteSkillDetail))
 	s.mux.HandleFunc("GET /api/v1/skills/{folder}/download", s.requireGatewayToken(s.handleSiteSkillDownload))
 	s.mux.HandleFunc("GET /api/v1/categories", s.requireGatewayToken(s.handleSiteCategories))
-	s.mux.HandleFunc("GET /api/v1/edu/categories", s.requireGatewayToken(s.handleSiteEduCategories))
-	s.mux.HandleFunc("GET /api/v1/edu/lessons/{id}", s.requireGatewayToken(s.handleSiteEduLessonDetail))
 	s.mux.HandleFunc("GET /api/v1/site/uploads/{path...}", s.handleSiteUploads)
 	s.mux.HandleFunc("POST /api/v1/install", s.requireGatewayToken(s.handleSiteInstall))
 
@@ -473,13 +496,16 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /ws", s.handleWSUpgrade)
 	s.mux.HandleFunc("POST /hooks/", s.handleHooks)
 	s.mux.HandleFunc("POST /hooks", s.handleHooks)
-	s.mux.HandleFunc("GET /debug/pprof/", pprof.Index)
+	s.mux.HandleFunc("POST /ping", s.handleOpenAPI)
+	s.mux.HandleFunc("GET /openocta/open/v1/ping", s.handleOpenAPI)
+	s.mux.HandleFunc("POST /openocta/open/v1/{subpath...}", s.handleOpenAPI)
+	// s.mux.HandleFunc("GET /debug/pprof/", pprof.Index)
 
 	// 为了支持 cmdline 和 profile 等特定功能，建议也显式注册这几个（Index 里其实包含了大部分，但显式注册更稳妥）
-	s.mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
-	s.mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
-	s.mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
-	s.mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+	// s.mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+	// s.mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+	// s.mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+	// s.mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 }
 
 // resolveDistDirFile resolves the frontend dist directory from the file system.
@@ -723,6 +749,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		_ = s.mcpManager.Close()
 		s.mcpManager = nil
 	}
+	eino.ShutdownCozeLoop(ctx)
 	if s.server == nil {
 		return nil
 	}

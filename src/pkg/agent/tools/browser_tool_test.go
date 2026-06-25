@@ -3,6 +3,7 @@ package tools_test
 import (
 	"testing"
 
+	"github.com/openocta/openocta/pkg/agent/tool"
 	"github.com/openocta/openocta/pkg/agent/tools"
 	"github.com/openocta/openocta/pkg/config"
 )
@@ -14,6 +15,17 @@ func TestBrowserToolsFromConfigDefaultEnabled(t *testing.T) {
 	}
 	if got[0].Name() != "browser" {
 		t.Fatalf("unexpected tool name: %s", got[0].Name())
+	}
+}
+
+func TestFilterOutBrowserTools(t *testing.T) {
+	all := []tool.Tool{
+		tools.BrowserToolViaInvoker{},
+		&tools.BrowserTool{},
+	}
+	filtered := tools.FilterOutBrowserTools(all)
+	if len(filtered) != 0 {
+		t.Fatalf("expected no browser tools, got %d", len(filtered))
 	}
 }
 

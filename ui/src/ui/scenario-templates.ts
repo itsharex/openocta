@@ -84,19 +84,19 @@ export function readInitializedScenarioId(
 /** 场景列表底部提示：更多场景尚未开放 */
 export const SCENARIO_COMING_SOON_HINT = "更多场景即将推出，敬请期待。";
 
-/** Built-in scenario templates; scripts live under repo `scenarios/<id>/`. */
+/** Built-in scenario templates; scripts live under repo `deploy/scenarios/<id>/`. */
 export const SCENARIO_TEMPLATES: ScenarioTemplate[] = [
   {
     id: "host-inspection",
     name: "主机巡检场景",
     summary:
       "定期巡检主机 CPU、内存、磁盘与服务状态。自动安装 Server Patrol 巡检 Skill，并准备 SSH 客户端离线包。",
-    readmePath: "scenarios/host-inspection/README.md",
+    readmePath: "deploy/scenarios/host-inspection/README.md",
     initScriptPaths: {
-      sh: "scenarios/host-inspection/init.sh",
-      ps1: "scenarios/host-inspection/init.ps1",
-      cmd: "scenarios/host-inspection/init.cmd",
-      bat: "scenarios/host-inspection/init.bat",
+      sh: "deploy/scenarios/host-inspection/init.sh",
+      ps1: "deploy/scenarios/host-inspection/init.ps1",
+      cmd: "deploy/scenarios/host-inspection/init.cmd",
+      bat: "deploy/scenarios/host-inspection/init.bat",
     },
     quickPrompts: [
       "对目标主机执行服务器巡检并输出 Markdown 报告",
@@ -121,7 +121,7 @@ export const SCENARIO_TEMPLATES: ScenarioTemplate[] = [
           name: "openssh-clients",
           description: "SSH 客户端（离线包）",
           platform: "linux-deb",
-          relativePath: "scenarios/host-inspection/bundled/.gitkeep",
+          relativePath: "deploy/scenarios/host-inspection/bundled/.gitkeep",
         },
       },
     ],

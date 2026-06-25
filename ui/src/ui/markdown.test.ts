@@ -28,4 +28,17 @@ describe("toSanitizedMarkdownHtml", () => {
     expect(html).toContain("<code");
     expect(html).toContain("console.log(1)");
   });
+
+  it("preserves markdown list line breaks", () => {
+    const html = toSanitizedMarkdownHtml("files:\n\n- CHANGELOG.md\n- UPLOAD_FORMAT.md");
+    expect(html).toContain("<li>");
+    expect(html).toContain("CHANGELOG.md");
+  });
+
+  it("preserves single newlines as line breaks", () => {
+    const html = toSanitizedMarkdownHtml("line one\nline two\ndrwxr-xr-x");
+    expect(html).toContain("<br>");
+    expect(html).toContain("line one");
+    expect(html).toContain("line two");
+  });
 });

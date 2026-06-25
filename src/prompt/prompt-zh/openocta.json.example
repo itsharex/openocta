@@ -40,11 +40,6 @@
       "allowInsecureAuth": false,
       "dangerouslyDisableDeviceAuth": false
     },
-    "llmTrace": {
-      "enabled": false,
-      "htmlRender": true,
-      "htmlDebounceMs": 1000
-    },
     "http": {
       "endpoints": {
         "chatCompletions": {
@@ -60,6 +55,12 @@
         "mode": "auto"
       }
     }
+  },
+  "cozeloop": {
+    "enable": false,
+    "apiBaseUrl": "http://192.168.50.253:8888",
+    "workspaceId": "YOUR_WORKSPACE_ID",
+    "apiToken": "YOUR_API_TOKEN"
   },
   "agents": {
     "defaults": {

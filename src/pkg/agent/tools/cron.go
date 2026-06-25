@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/stellarlinkco/agentsdk-go/pkg/tool"
+	"github.com/openocta/openocta/pkg/agent/tool"
 )
 
 // CronTool exposes cron list/status/add/update/remove/run/runs to the agent via the gateway.

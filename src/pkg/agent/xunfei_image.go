@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/stellarlinkco/agentsdk-go/pkg/model"
+	"github.com/openocta/openocta/pkg/agent/model"
 )
 
 // XunfeiImageConfig holds configuration for the Xunfei Image Understanding WebSocket API.
@@ -143,8 +143,8 @@ type xunfeiWSRespChoiceText struct {
 }
 
 type xunfeiWSRespChoices struct {
-	Status int                       `json:"status"`
-	Seq    int                       `json:"seq"`
+	Status int                      `json:"status"`
+	Seq    int                      `json:"seq"`
 	Text   []xunfeiWSRespChoiceText `json:"text"`
 }
 
@@ -365,7 +365,7 @@ func (m *XunfeiImageModel) buildRequest(cfg XunfeiImageConfig, req model.Request
 		}
 	}
 
-		// Add images first (Xunfei requires first message to be image)
+	// Add images first (Xunfei requires first message to be image)
 	for _, block := range userBlocks {
 		if block.Type == model.ContentBlockImage {
 			data := block.Data
@@ -377,7 +377,7 @@ func (m *XunfeiImageModel) buildRequest(cfg XunfeiImageConfig, req model.Request
 				if idx := strings.Index(data, ","); idx != -1 && strings.HasPrefix(data, "data:") {
 					data = data[idx+1:]
 				}
-				
+
 				// Strip any accidental whitespace or newlines from base64
 				data = strings.TrimSpace(data)
 				data = strings.ReplaceAll(data, "\n", "")
@@ -418,17 +418,20 @@ func (m *XunfeiImageModel) buildRequest(cfg XunfeiImageConfig, req model.Request
 
 // ---- Provider implementation ----
 
-// XunfeiImageProvider implements model.Provider to create XunfeiImageModel instances.
+// XunfeiImageProvider holds config for Xunfei image understanding.
 type XunfeiImageProvider struct {
 	Config XunfeiImageConfig
 }
 
-// Model creates a new XunfeiImageModel.
-func (p *XunfeiImageProvider) Model(ctx context.Context) (model.Model, error) {
-	return &XunfeiImageModel{config: p.Config}, nil
+// ImageConfig returns the provider configuration.
+func (p *XunfeiImageProvider) ImageConfig() XunfeiImageConfig {
+	if p == nil {
+		return XunfeiImageConfig{}
+	}
+	return p.Config
 }
 
-// NewXunfeiImageFactory creates an api.ModelFactory backed by the Xunfei Image Understanding API.
+// NewXunfeiImageFactory creates a provider backed by the Xunfei Image Understanding API.
 // Credentials are resolved from cfg.Env first, then OS environment.
 func NewXunfeiImageFactory(getenv func(string) string) *XunfeiImageProvider {
 	if getenv == nil {

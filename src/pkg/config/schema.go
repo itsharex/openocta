@@ -53,7 +53,49 @@ type OpenOctaConfig struct {
 	Memory      *MemoryConfig      `json:"memory,omitempty"`
 	Mcp         *McpConfig         `json:"mcp,omitempty"`
 	// Security groups sandbox, validator, approval queue and related policies.
-	Security *SecurityConfig `json:"security,omitempty"`
+	Security    *SecurityConfig    `json:"security,omitempty"`
+	CozeLoop    *CozeLoopConfig    `json:"cozeloop,omitempty"`
+	LocalAgents *LocalAgentsConfig `json:"localAgents,omitempty"`
+}
+
+// CozeLoopConfig configures Eino CozeLoop trace export (see cloudwego/eino-ext/callbacks/cozeloop).
+type CozeLoopConfig struct {
+	Enable      *bool   `json:"enable,omitempty"`
+	Enabled     *bool   `json:"enabled,omitempty"`
+	APIBaseURL  *string `json:"apiBaseUrl,omitempty"`
+	WorkspaceID *string `json:"workspaceId,omitempty"`
+	APIToken    *string `json:"apiToken,omitempty"`
+}
+
+// IsEnabled reports whether CozeLoop tracing is active.
+func (c *CozeLoopConfig) IsEnabled() bool {
+	if c == nil {
+		return false
+	}
+	if c.Enable != nil {
+		return *c.Enable
+	}
+	if c.Enabled != nil {
+		return *c.Enabled
+	}
+	return false
+}
+
+// LocalAgentsConfig controls detection and delegation to external CLI agents.
+type LocalAgentsConfig struct {
+	Enabled         *bool             `json:"enabled,omitempty"`
+	RequireApproval *bool             `json:"requireApproval,omitempty"`
+	Allowed         []string          `json:"allowed,omitempty"`
+	TimeoutSeconds  *int              `json:"timeoutSeconds,omitempty"`
+	CustomPaths     map[string]string `json:"customPaths,omitempty"`
+}
+
+// IsEnabled reports whether local agent delegation is active (default true).
+func (c *LocalAgentsConfig) IsEnabled() bool {
+	if c == nil || c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
 }
 
 // SecurityConfig groups sandbox, command policy and approval queue.
@@ -172,16 +214,6 @@ type GatewayConfig struct {
 	Http           *GatewayHttpConfig      `json:"http,omitempty"`
 	Nodes          *GatewayNodesConfig     `json:"nodes,omitempty"`
 	TrustedProxies []string                `json:"trustedProxies,omitempty"`
-	LlmTrace       *GatewayLlmTraceConfig  `json:"llmTrace,omitempty"`
-}
-
-// GatewayLlmTraceConfig holds LLM trace middleware settings.
-type GatewayLlmTraceConfig struct {
-	Enabled *bool `json:"enabled,omitempty"`
-	// HTMLRender when false writes JSONL only (skips HTML viewer regeneration).
-	HTMLRender *bool `json:"htmlRender,omitempty"`
-	// HTMLDebounceMs coalesces HTML regeneration (default 1000ms). 0 = per-event immediate render.
-	HTMLDebounceMs *int `json:"htmlDebounceMs,omitempty"`
 }
 
 // GatewayControlUIConfig holds control UI configuration.

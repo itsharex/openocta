@@ -175,6 +175,7 @@ export function connectGateway(host: GatewayHost) {
       (host as unknown as { chatRunPhase: "idle" | "thinking" | "tool" | "streaming" }).chatRunPhase =
         "idle";
       (host as unknown as { chatStream: string | null }).chatStream = null;
+      (host as unknown as { chatReasoningStream: string | null }).chatReasoningStream = null;
       (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void loadConfigSchema(host as unknown as OpenClawApp);

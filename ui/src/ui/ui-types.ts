@@ -4,7 +4,7 @@ export type ChatAttachment = {
   mimeType: string;
   filename?: string;
   sizeBytes?: number;
-  kind?: "image" | "file";
+  kind?: "image" | "video" | "file";
 };
 
 export type ChatQueueItem = {
@@ -22,21 +22,23 @@ export const CRON_CHANNEL_LAST = "last";
 export type CronFormState = {
   name: string;
   description: string;
-  agentId: string;
   digitalEmployeeId: string;
   enabled: boolean;
   scheduleKind: "at" | "every" | "cron";
   scheduleAt: string;
   everyAmount: string;
   everyUnit: "minutes" | "hours" | "days";
+  atRepeatMode: "daily" | "weekly";
+  atWeekday: string;
+  atHour: string;
+  atMinute: string;
   cronExpr: string;
   cronTz: string;
-  sessionTarget: "main" | "isolated";
-  wakeMode: "next-heartbeat" | "now";
-  payloadKind: "systemEvent" | "agentTurn";
   payloadText: string;
-  deliveryMode: "none" | "announce";
-  deliveryChannel: string;
+  channel: string;
   deliveryTo: string;
-  timeoutSeconds: string;
+  modelRef: string;
+  skillKeys: string[];
+  mcpServers: string[];
+  extraParamsJson: string;
 };

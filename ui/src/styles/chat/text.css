@@ -38,6 +38,11 @@
   min-width: 0;
 }
 
+/* Fallback plain text before markdown/async A2UI resolves */
+.chat-text--preserve-breaks {
+  white-space: pre-wrap;
+}
+
 .chat-text :where(p, ul, ol, pre, blockquote, table) {
   margin: 0;
 }

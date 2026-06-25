@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cronJobSessionKeyFromRunSessionKey, isCronRunSessionKey } from "./session-key-utils.js";
+import { cronJobSessionKeyFromRunSessionKey, cronRunHistorySessionKey, isCronRunSessionKey } from "./session-key-utils.js";
 
 describe("isCronRunSessionKey", () => {
   it("matches current agent:cron:…:run:… keys", () => {
@@ -42,5 +42,25 @@ describe("cronJobSessionKeyFromRunSessionKey", () => {
 
   it("normalizes legacy cron:job:run:…", () => {
     expect(cronJobSessionKeyFromRunSessionKey("cron:j1:run:s1")).toBe("agent:main:cron:j1");
+  });
+});
+
+describe("cronRunHistorySessionKey", () => {
+  it("keeps full agent cron run keys for history navigation", () => {
+    expect(cronRunHistorySessionKey("agent:main:cron:job-1:run:abc")).toBe(
+      "agent:main:cron:job-1:run:abc",
+    );
+  });
+
+  it("keeps persistent cron job keys", () => {
+    expect(cronRunHistorySessionKey("agent:main:cron:job-1")).toBe("agent:main:cron:job-1");
+  });
+
+  it("normalizes legacy cron run keys", () => {
+    expect(cronRunHistorySessionKey("cron:j1:run:s1")).toBe("agent:main:cron:j1:run:s1");
+  });
+
+  it("rejects non-cron keys", () => {
+    expect(cronRunHistorySessionKey("agent:main:oc_abc")).toBeNull();
   });
 });
