@@ -2899,15 +2899,6 @@ export function renderApp(state: AppViewState) {
                 onConversationOnlyChange: (next) => {
                   state.chatConversationOnly = next;
                 },
-                browserPreviewEnabled: !state.isDesktopShell,
-                browserPreviewOpen: state.chatBrowserPreviewOpen,
-                gatewayHost: state.settings.gatewayUrl,
-                gatewayToken: state.settings.token,
-                onBrowserPreviewToggle: () => {
-                  const next = !state.chatBrowserPreviewOpen;
-                  state.chatBrowserPreviewOpen = next;
-                  state.chatBrowserPreviewAutoOpened = false;
-                },
                 // Sidebar props for tool output viewing
                 sidebarOpen: state.sidebarOpen,
                 sidebarContent: state.sidebarContent,

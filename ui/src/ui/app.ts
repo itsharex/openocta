@@ -672,8 +672,6 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   private chatUserNearBottom = true;
   @state() chatNewMessagesBelow = false;
   /** true = only assistant/user in thread; false = show tool rows (I/O still collapsible in UI). */
-  @state() chatBrowserPreviewOpen = false;
-  @state() chatBrowserPreviewAutoOpened = false;
   @state() chatConversationOnly = false;
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;

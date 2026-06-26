@@ -127,8 +127,6 @@ export type AppViewState = {
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
   chatConversationOnly: boolean;
-  chatBrowserPreviewOpen: boolean;
-  chatBrowserPreviewAutoOpened: boolean;
   sidebarOpen: boolean;
   sidebarContent: string | null;
   sidebarError: string | null;

@@ -248,15 +248,15 @@ make clean
 
 ## 五、与 GoReleaser / build.sh 的关系
 
-| 命令 | 说明 |
-|------|------|
-| `./build.sh build` | 完整构建（ui → embed → go），产出 Linux 二进制 `openocta` |
-| `./build.sh wails` | Wails 桌面应用，当前平台 |
-| `./build.sh wails-dmg` | macOS .dmg（不签名/不公证） |
+| 命令                            | 说明 |
+|-------------------------------|------|
+| `./build.sh build`            | 完整构建（ui → embed → go），产出 Linux 二进制 `openocta` |
+| `./build.sh wails`            | Wails 桌面应用，当前平台 |
+| `./build.sh wails-dmg`        | macOS .dmg（不签名/不公证） |
 | `./build.sh wails-dmg-signed` | macOS .dmg（gon 签名/公证 + staple；需 `AC_USERNAME/AC_PASSWORD/AC_TEAM_ID`） |
-| `./build.sh wails-nsis` | Windows NSIS 安装器（仅 Windows） |
-| `./build.sh snapshot` | GoReleaser 快照（Linux deb/rpm/tar.gz） |
-| `./build.sh release` | GoReleaser 正式发布 |
+| `./build.sh wails-nsis`       | Windows NSIS 安装器（仅 Windows） |
+| `./build.sh snapshot`         | GoReleaser 快照（Linux deb/rpm/tar.gz） |
+| `d`                           | GoReleaser 正式发布 |
 
 GoReleaser（`.goreleaser.yaml`）仅构建 **Linux** 服务端二进制；Windows/macOS 桌面版由 Wails 单独构建。
 

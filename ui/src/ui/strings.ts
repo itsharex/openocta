@@ -158,16 +158,6 @@ type Strings = {
   themeSystem: string;
   themeToggle: string;
   chatQueueRemoveConfirm: string;
-  chatBrowserPreviewTitle: string;
-  chatBrowserPreviewToggle: string;
-  chatBrowserPreviewRunning: string;
-  chatBrowserPreviewStopped: string;
-  chatBrowserPreviewRefresh: string;
-  chatBrowserPreviewClose: string;
-  chatBrowserPreviewScreenshot: string;
-  chatBrowserPreviewNoScreenshot: string;
-  chatBrowserPreviewShowSnapshot: string;
-  chatBrowserPreviewHideSnapshot: string;
   cronDeleteConfirm: string;
   employeeDeleteConfirm: string;
   // Channels
@@ -1138,16 +1128,6 @@ const EN: Strings = {
   themeSystem: "System theme",
   themeToggle: "Switch theme (light → dark → system)",
   chatQueueRemoveConfirm: "Remove this queued message?",
-  chatBrowserPreviewTitle: "Server browser",
-  chatBrowserPreviewToggle: "Browser preview",
-  chatBrowserPreviewRunning: "Running",
-  chatBrowserPreviewStopped: "Stopped",
-  chatBrowserPreviewRefresh: "Refresh",
-  chatBrowserPreviewClose: "Close browser preview",
-  chatBrowserPreviewScreenshot: "Browser screenshot",
-  chatBrowserPreviewNoScreenshot: "No screenshot yet (browser may be idle)",
-  chatBrowserPreviewShowSnapshot: "Show accessibility snapshot",
-  chatBrowserPreviewHideSnapshot: "Hide accessibility snapshot",
   cronDeleteConfirm: "Delete this scheduled task?",
   employeeDeleteConfirm: "Delete this digital employee?",
   channelsConfigure: "Configure",
@@ -2129,16 +2109,6 @@ const ZH: Strings = {
   themeSystem: "跟随系统",
   themeToggle: "切换主题（浅色 → 深色 → 跟随系统）",
   chatQueueRemoveConfirm: "确定移除此排队消息？",
-  chatBrowserPreviewTitle: "服务端浏览器",
-  chatBrowserPreviewToggle: "浏览器预览",
-  chatBrowserPreviewRunning: "运行中",
-  chatBrowserPreviewStopped: "未运行",
-  chatBrowserPreviewRefresh: "刷新",
-  chatBrowserPreviewClose: "关闭浏览器预览",
-  chatBrowserPreviewScreenshot: "浏览器截图",
-  chatBrowserPreviewNoScreenshot: "暂无截图（浏览器可能尚未启动）",
-  chatBrowserPreviewShowSnapshot: "显示无障碍快照",
-  chatBrowserPreviewHideSnapshot: "隐藏无障碍快照",
   cronDeleteConfirm: "确定删除此定时任务？",
   employeeDeleteConfirm: "确定删除此数字员工？",
   channelsConfigure: "配置",

@@ -466,7 +466,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("OPTIONS /api/desktop/open-url", s.handleDesktopOpenURLOptions)
 	s.mux.HandleFunc("OPTIONS /api/browser/", s.handleBrowserOptions)
 	s.mux.HandleFunc("POST /api/browser/request", s.requireGatewayToken(s.handleBrowserRequest))
-	s.mux.HandleFunc("GET /api/browser/preview", s.requireGatewayToken(s.handleBrowserPreview))
 	s.mux.HandleFunc("GET /api/browser/install/status", s.requireGatewayToken(s.handleBrowserInstallStatus))
 	s.mux.HandleFunc("POST /api/browser/install", s.requireGatewayToken(s.handleBrowserInstallStart))
 	s.mux.HandleFunc("POST /api/browser/install/cancel", s.requireGatewayToken(s.handleBrowserInstallCancel))

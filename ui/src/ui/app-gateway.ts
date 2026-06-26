@@ -16,7 +16,6 @@ import {
   setLastActiveSessionKey,
 } from "./app-settings.ts";
 import {
-  closeAutoChatBrowserPreview,
   handleAgentEvent,
   resetToolStream,
   type AgentEventPayload,
@@ -275,7 +274,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0], true);
     }
     if (state === "final" || state === "complete" || state === "error" || state === "aborted") {
-      closeAutoChatBrowserPreview(host as unknown as Parameters<typeof closeAutoChatBrowserPreview>[0]);
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void flushChatQueueForEvent(host as unknown as Parameters<typeof flushChatQueueForEvent>[0]);
       const runId = payload?.runId;

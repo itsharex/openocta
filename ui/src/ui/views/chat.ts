@@ -13,7 +13,6 @@ import { t } from "../strings.js";
 import { DEFAULT_CHAT_QUICK_PROMPTS } from "../scenario-templates.ts";
 import "../components/resizable-divider.ts";
 import "../components/chat-file-preview.ts";
-import "../components/chat-browser-preview.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import "../components/openocta-chat-thread.ts";
 import "../components/openocta-chat-input.ts";
@@ -125,12 +124,6 @@ export type ChatProps = {
   onFilePreview?: (req: FilePreviewRequest) => void;
   onCloseFilePreview?: () => void;
   onOpenAttachment?: (path: string) => void;
-  /** Remote service: show server-side browser preview panel */
-  browserPreviewEnabled?: boolean;
-  browserPreviewOpen?: boolean;
-  gatewayHost?: string;
-  gatewayToken?: string;
-  onBrowserPreviewToggle?: () => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -884,11 +877,8 @@ export function renderChat(props: ChatProps) {
         ? "添加消息（也可替换附件）…"
         : "输入消息（回车发送，Shift+回车换行，可粘贴图片或添加文件，文档≤5MB，视频≤50MB）";
 
-  const browserPreviewOpen = Boolean(props.browserPreviewEnabled && props.browserPreviewOpen);
-  const markdownSidebarOpen = Boolean(
-    props.sidebarOpen && props.onCloseSidebar && !browserPreviewOpen,
-  );
-  const splitSidebarOpen = browserPreviewOpen || markdownSidebarOpen;
+  const markdownSidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
+  const splitSidebarOpen = markdownSidebarOpen;
   const isEmptyThread =
     !props.loading &&
     (Array.isArray(props.messages) ? props.messages.length === 0 : true) &&
@@ -1017,43 +1007,29 @@ export function renderChat(props: ChatProps) {
           : nothing
       }
 
-      <div
-        class="chat-split-container ${splitSidebarOpen ? "chat-split-container--open" : ""} ${browserPreviewOpen ? "chat-split-container--browser" : ""}"
-      >
+      <div class="chat-split-container ${splitSidebarOpen ? "chat-split-container--open" : ""}">
         <div class="chat-main">
           ${thread}
         </div>
 
         ${
-          browserPreviewOpen
+          markdownSidebarOpen
             ? html`
-              <div class="chat-sidebar chat-browser-sidebar">
-                <chat-browser-preview
-                  .open=${true}
-                  mode="sidebar"
-                  .gatewayHost=${props.gatewayHost ?? ""}
-                  .gatewayToken=${props.gatewayToken ?? ""}
-                  .onClose=${props.onBrowserPreviewToggle}
-                ></chat-browser-preview>
+              <div class="chat-sidebar">
+                ${renderMarkdownSidebar({
+                  content: props.sidebarContent ?? null,
+                  error: props.sidebarError ?? null,
+                  onClose: props.onCloseSidebar!,
+                  onViewRawText: () => {
+                    if (!props.sidebarContent || !props.onOpenSidebar) {
+                      return;
+                    }
+                    props.onOpenSidebar(`\`\`\`\n${props.sidebarContent}\n\`\`\``);
+                  },
+                })}
               </div>
             `
-            : markdownSidebarOpen
-              ? html`
-                <div class="chat-sidebar">
-                  ${renderMarkdownSidebar({
-                    content: props.sidebarContent ?? null,
-                    error: props.sidebarError ?? null,
-                    onClose: props.onCloseSidebar!,
-                    onViewRawText: () => {
-                      if (!props.sidebarContent || !props.onOpenSidebar) {
-                        return;
-                      }
-                      props.onOpenSidebar(`\`\`\`\n${props.sidebarContent}\n\`\`\``);
-                    },
-                  })}
-                </div>
-              `
-              : nothing
+            : nothing
         }
       </div>
 
@@ -1193,23 +1169,6 @@ export function renderChat(props: ChatProps) {
                         }
                       </button>
                     </div>
-                  `
-                : nothing
-            }
-            ${
-              props.browserPreviewEnabled && props.onBrowserPreviewToggle
-                ? html`
-                    <button
-                      type="button"
-                      class="chat-compose__chip ${props.browserPreviewOpen ? "chat-compose__chip--active" : ""}"
-                      aria-label=${t("chatBrowserPreviewToggle")}
-                      title=${t("chatBrowserPreviewToggle")}
-                      ?disabled=${!props.connected}
-                      @click=${() => props.onBrowserPreviewToggle?.()}
-                    >
-                      <span class="chat-compose__chip-icon" aria-hidden="true">${icons.globe}</span>
-                      <span class="chat-compose__chip-label">${t("chatBrowserPreviewToggle")}</span>
-                    </button>
                   `
                 : nothing
             }

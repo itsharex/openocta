@@ -63,35 +63,6 @@ func (s *Server) handleBrowserRequest(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(browserAPIResponse{OK: true, Payload: payload})
 }
 
-func (s *Server) handleBrowserPreview(w http.ResponseWriter, r *http.Request) {
-	setSiteProxyCORSHeaders(w)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, X-Gateway-Token")
-
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_ = json.NewEncoder(w).Encode(browserAPIResponse{OK: false, Message: "仅支持 GET"})
-		return
-	}
-
-	includeScreenshot := true
-	if raw := strings.TrimSpace(r.URL.Query().Get("screenshot")); raw != "" {
-		includeScreenshot = raw != "0" && !strings.EqualFold(raw, "false")
-	}
-	opts := browser.PreviewOptions{
-		TargetID:          strings.TrimSpace(r.URL.Query().Get("targetId")),
-		IncludeScreenshot: includeScreenshot,
-	}
-	cfg := s.browserConfig()
-	payload, err := browser.PreviewState(r.Context(), cfg, os.Getenv, opts)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(browserAPIResponse{OK: false, Message: err.Error()})
-		return
-	}
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
 func (s *Server) handleDesktopBrowser(w http.ResponseWriter, r *http.Request) {
 	s.handleBrowserRequest(w, r)
 }

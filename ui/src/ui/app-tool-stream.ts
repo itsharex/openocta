@@ -34,27 +34,7 @@ type ToolStreamHost = {
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
   toolStreamSyncTimer: number | null;
-  isDesktopShell?: boolean;
-  chatBrowserPreviewOpen?: boolean;
-  /** Opened automatically when the browser tool runs; closed when the chat run ends. */
-  chatBrowserPreviewAutoOpened?: boolean;
 };
-
-export function openAutoChatBrowserPreview(host: ToolStreamHost) {
-  if (host.isDesktopShell) {
-    return;
-  }
-  host.chatBrowserPreviewOpen = true;
-  host.chatBrowserPreviewAutoOpened = true;
-}
-
-export function closeAutoChatBrowserPreview(host: ToolStreamHost) {
-  if (host.isDesktopShell || !host.chatBrowserPreviewAutoOpened) {
-    return;
-  }
-  host.chatBrowserPreviewOpen = false;
-  host.chatBrowserPreviewAutoOpened = false;
-}
 
 function extractToolOutputText(value: unknown): string | null {
   if (!value || typeof value !== "object") {
@@ -265,9 +245,6 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   }
   const name = typeof data.name === "string" ? data.name : "tool";
   const phase = typeof data.phase === "string" ? data.phase : "";
-  if (name === "browser" && phase === "start") {
-    openAutoChatBrowserPreview(host);
-  }
   const args = phase === "start" ? data.args : undefined;
   const output =
     phase === "update"

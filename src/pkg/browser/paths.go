@@ -187,8 +187,15 @@ func headlessFromConfig(cfg *config.OpenOctaConfig, env func(string) string) boo
 		env = os.Getenv
 	}
 	runMode := paths.ResolveRunMode(env, gatewayMode(cfg))
-	// Local desktop: headed window; remote service: headless + UI preview via API.
+	// Local desktop: headed window; remote service: headless.
 	return runMode != "desktop"
+}
+
+func gatewayMode(cfg *config.OpenOctaConfig) *string {
+	if cfg == nil || cfg.Gateway == nil {
+		return nil
+	}
+	return cfg.Gateway.Mode
 }
 
 func ptrStr(p *string) string {
