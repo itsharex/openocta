@@ -486,15 +486,21 @@
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: 24px;
+  padding-top: calc(var(--shell-topbar-height, 50px) + 16px);
+  box-sizing: border-box;
+  overflow-y: auto;
   z-index: 150;
 }
 
 .modal-overlay .modal {
   width: min(880px, 100%);
-  max-height: calc(100% - 48px);
+  max-height: calc(100dvh - var(--shell-topbar-height, 50px) - 48px);
   overflow-y: auto;
+  flex-shrink: 0;
+  margin: auto;
 }
 
 .modal__title {

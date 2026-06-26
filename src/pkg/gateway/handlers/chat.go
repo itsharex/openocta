@@ -455,11 +455,12 @@ func appendAssistantToolCallBlock(content []map[string]interface{}, evt stream.S
 		"name": toolName,
 	}
 	if evt.ContentBlock != nil && len(evt.ContentBlock.Input) > 0 {
+		normalized := eino.NormalizeToolCallArgumentsRaw(evt.ContentBlock.Input)
 		var args map[string]interface{}
-		if json.Unmarshal(evt.ContentBlock.Input, &args) == nil {
+		if json.Unmarshal(normalized, &args) == nil {
 			tc["arguments"] = args
 		} else {
-			tc["arguments"] = json.RawMessage(evt.ContentBlock.Input)
+			tc["arguments"] = normalized
 		}
 	} else {
 		tc["arguments"] = map[string]interface{}{}
@@ -1737,16 +1738,9 @@ func ChatSendHandler(opts HandlerOpts) error {
 			return nil
 		}
 		env := func(k string) string { return os.Getenv(k) }
-		if sessionFile != "" && storePathForTranscript != "" {
-			sessionsDir := filepath.Dir(storePathForTranscript)
-			joined := filepath.Join(sessionsDir, sessionFile)
-			if !strings.Contains(joined, "..") {
-				transcriptPath = joined
-			}
-		}
-		if transcriptPath == "" {
-			transcriptPath = session.ResolveSessionFilePath(sessionID, nil, env)
-		}
+		cfg := loadConfigFromContext(opts.Context)
+		target := resolveGatewaySessionStoreTarget(cfg, sessionKey, env)
+		transcriptPath = resolveSessionTranscriptPath(sessionID, storePathForTranscript, sessionFile, target.agentID, env)
 	}
 
 	// 若是 cron 会话且还没有显式的 sessionFile，则使用默认规则 <sessionId>.jsonl，
@@ -2061,16 +2055,23 @@ func ChatSendHandler(opts HandlerOpts) error {
 				broadcastChatComplete(ctxForBroadcast, runId, sessionKey)
 			}()
 
-			// Recover from panics and handle them as errors
+			// Recover from panics and flush partial assistant output before recording the error.
+			var flushPartialAssistant func()
 			defer func() {
 				if r := recover(); r != nil {
+					if flushPartialAssistant != nil {
+						flushPartialAssistant()
+					}
 					errMsg := "agent run panic: "
 					if err, ok := r.(error); ok {
 						errMsg += err.Error()
 					} else {
 						errMsg += fmt.Sprintf("%v", r)
 					}
-					appendErrorToTranscript(transcriptPath, errMsg, runId, sessionKey, ctxForBroadcast)
+					chatLog.Error("chat.send agent run panic sessionKey=%s runId=%s err=%s", sessionKey, runId, errMsg)
+					if !strings.Contains(errMsg, "send on closed channel") {
+						appendErrorToTranscript(transcriptPath, errMsg, runId, sessionKey, ctxForBroadcast)
+					}
 				}
 			}()
 
@@ -2308,7 +2309,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 					Env:                   os.Getenv,
 					TokenLimit:            tokenLimit,
 				}
-				pooledRT, newErr := runtime.New(ctx, rtOpts)
+				pooledRT, newErr := runtime.New(context.WithoutCancel(ctx), rtOpts)
 				if newErr != nil {
 					if pooledMCPMgr != nil {
 						pooledMCPMgr.Close()
@@ -2378,21 +2379,40 @@ func ChatSendHandler(opts HandlerOpts) error {
 			}
 
 			req := runtime.Request{
-				Prompt:        prompt,
-				ContentBlocks: contentBlocks,
-				SessionID:     sessionID,
-				RequestID:     runId,
+				Prompt:         prompt,
+				ContentBlocks:  contentBlocks,
+				SessionID:      sessionID,
+				RequestID:      runId,
+				TranscriptPath: transcriptPath,
 			}
-			if !preempt {
-				rt.ClearSessionCheckpoints(sessionID)
+			historyOpts := eino.TranscriptLoadOptions{}
+			if eino.SessionHistoryEnabled(runtimeConfig) {
+				historyOpts = eino.TranscriptLoadOptions{
+					MaxMessages: eino.SessionHistoryMaxMessages(runtimeConfig),
+					Roles:       eino.SessionHistoryRoles(runtimeConfig),
+				}
+				req.SessionHistoryMaxMessages = historyOpts.MaxMessages
+				req.SessionHistoryRoles = historyOpts.Roles
+				env := func(k string) string { return os.Getenv(k) }
+				target := resolveGatewaySessionStoreTarget(runtimeConfig, sessionKey, env)
+				candidates := resolveSessionTranscriptCandidates(sessionID, storePathForTranscript, sessionFile, target.agentID, env)
+				if transcriptPath != "" {
+					candidates = append([]string{transcriptPath}, candidates...)
+				}
+				sessionMsgs, usedPath, histErr := eino.LoadSchemaMessagesFromTranscriptCandidates(candidates, historyOpts)
+				if histErr != nil && len(sessionMsgs) == 0 {
+					chatLog.Warn("chat.send: load transcript history path=%s err=%v", transcriptPath, histErr)
+				} else if len(sessionMsgs) > 0 {
+					req.SessionMessages = sessionMsgs
+					if usedPath != "" {
+						req.TranscriptPath = usedPath
+					}
+					chatLog.Info("chat.send: hydrated model input from transcript path=%s messages=%d sessionKey=%s",
+						req.TranscriptPath, len(sessionMsgs), sessionKey)
+				}
 			}
-			var eventChan <-chan stream.StreamEvent
-			var streamErr error
-			if preempt {
-				eventChan, streamErr = rt.RunStreamTurn(ctx, req, runId, true)
-			} else {
-				eventChan, streamErr = rt.RunStream(ctx, req)
-			}
+			// TurnLoop serializes turns; transcript hydrates multi-turn model input (ADK checkpoint alone does not).
+			eventChan, streamErr := rt.RunStreamTurn(ctx, req, runId, preempt)
 			if streamErr != nil {
 				// Fallback to non-streaming run if RunStream is not supported
 				resp, runErr := rt.Run(ctx, req)
@@ -2509,6 +2529,52 @@ func ChatSendHandler(opts HandlerOpts) error {
 			toolStartTimes := make(map[string]time.Time)
 			turnHasA2UI := false
 
+			flushPartialAssistant = func() {
+				if len(assistantContent) == 0 && textBuf.Len() == 0 {
+					return
+				}
+				if textBuf.Len() > 0 {
+					text := textBuf.String()
+					if !shouldSuppressAssistantTextForA2UI(text, assistantContent, turnHasA2UI) {
+						assistantContent = append(assistantContent, map[string]interface{}{"type": "text", "text": text})
+					}
+				}
+				if stopReason == "" {
+					stopReason = "interrupted"
+				}
+				assistantContent = normalizeAssistantContentForA2UI(
+					assistantContent,
+					stopReason != "tool_use" && stopReason != "interrupt",
+					func(raw json.RawMessage) {
+						broadcastChatA2UI(ctxForBroadcast, runId, sessionKey, raw)
+					},
+				)
+				assistantContent = tools.MergeDeliverableAttachmentBlocks(assistantContent, projectRoot)
+				if snap, ok := publishAssistantSnapshot(assistantSnapshotParams{
+					ctx:               ctxForBroadcast,
+					runId:             runId,
+					sessionKey:        sessionKey,
+					transcriptPath:    transcriptPath,
+					projectRoot:       projectRoot,
+					content:           assistantContent,
+					stopReason:        stopReason,
+					modelRef:          modelRefForRun,
+					runStart:          runStart,
+					firstTokenTime:    firstTokenTime,
+					totalToolDuration: totalToolDurationMs,
+					usage:             usageSnapshot,
+					parentMessageID:   lastMessageID,
+				}); ok {
+					lastMessageID = snap.lastMessageID
+					if t := imPlainFromTurn(snap.messageBody, textBuf.String(), stopReason); t != "" {
+						lastAssistantContent = t
+					}
+				}
+				assistantContent = nil
+				textBuf.Reset()
+				thinkingBuf.Reset()
+			}
+
 		streamLoop:
 			for evt := range eventChan {
 				if ctx.Err() != nil {
@@ -2566,11 +2632,12 @@ func ChatSendHandler(opts HandlerOpts) error {
 								"arguments": map[string]interface{}{},
 							}
 							if len(evt.ContentBlock.Input) > 0 {
+								normalized := eino.NormalizeToolCallArgumentsRaw(evt.ContentBlock.Input)
 								var args map[string]interface{}
-								if json.Unmarshal(evt.ContentBlock.Input, &args) == nil {
+								if json.Unmarshal(normalized, &args) == nil {
 									tc["arguments"] = args
 								} else {
-									tc["arguments"] = json.RawMessage(evt.ContentBlock.Input)
+									tc["arguments"] = normalized
 								}
 							}
 							assistantContent = append(assistantContent, tc)
@@ -2801,14 +2868,17 @@ func ChatSendHandler(opts HandlerOpts) error {
 						})
 					}
 				case stream.EventError:
-					outMsg := ""
-					if evt.Output != nil {
+					outMsg := strings.TrimSpace(evt.Name)
+					if outMsg == "" && evt.Output != nil {
 						if s, ok := evt.Output.(string); ok {
-							outMsg = s
+							outMsg = strings.TrimSpace(s)
 						} else {
 							b, _ := json.Marshal(evt.Output)
-							outMsg = string(b)
+							outMsg = strings.TrimSpace(string(b))
 						}
+					}
+					if outMsg == "" {
+						outMsg = "模型执行失败"
 					}
 					appendErrorToTranscript(transcriptPath, outMsg, runId, sessionKey, ctxForBroadcast)
 					// 将最终文本内容写入 cron 会话结果文件（若是 cron 会话）
@@ -2842,6 +2912,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 
 			// Context cancelled or stream closed — flush partial assistant content before reporting cancel.
 			if ctx.Err() != nil {
+				flushedOnCancel := false
 				if len(assistantContent) > 0 || textBuf.Len() > 0 {
 					if textBuf.Len() > 0 {
 						text := textBuf.String()
@@ -2867,6 +2938,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 						usage:             usageSnapshot,
 						parentMessageID:   lastMessageID,
 					}); ok {
+						flushedOnCancel = true
 						lastMessageID = snap.lastMessageID
 					}
 					assistantContent = nil
@@ -2878,7 +2950,9 @@ func ChatSendHandler(opts HandlerOpts) error {
 				} else if ctx.Err() == context.Canceled {
 					reason = "已中止"
 				}
-				appendErrorToTranscript(transcriptPath, fmt.Sprintf("对话%s", reason), runId, sessionKey, ctxForBroadcast)
+				if !flushedOnCancel {
+					appendErrorToTranscript(transcriptPath, fmt.Sprintf("对话%s", reason), runId, sessionKey, ctxForBroadcast)
+				}
 				if ctx.Err() == context.Canceled {
 					broadcastChatAborted(ctxForBroadcast, runId, sessionKey)
 				} else {

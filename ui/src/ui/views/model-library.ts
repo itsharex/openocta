@@ -3,6 +3,7 @@ import { icons } from "../icons.js";
 import type { BuiltInProvider } from "./models-builtin.ts";
 import { BUILTIN_PROVIDERS, parseModelRef } from "./models-builtin.ts";
 import {
+  canDeleteModelProvider,
   getModelsForProvider,
   getProviderDisplayName,
   providerMatchesSearch,
@@ -191,12 +192,16 @@ function categoryLabel(category: Exclude<ModelLibraryCategory, "__all__">) {
 function renderModelCard(
   entry: ModelLibraryProviderEntry,
   selectedProvider: string | null,
+  providers: Record<string, ModelProvider>,
   onSelect: (key: string) => void,
   onUseModelClick: (provider: string) => void,
   onCancelUse: (provider: string) => void,
+  onDeleteProvider: (providerKey: string) => void,
 ) {
   const displayBaseUrl = entry.baseUrl || "未配置 Base URL";
   const hasModels = entry.modelCount > 0;
+  const isSelected = selectedProvider === entry.key;
+  const deletable = canDeleteModelProvider(entry.key, providers);
   // 解析 logo
   const logoUrl = resolveModelProviderLogo(
     entry.key,
@@ -207,7 +212,7 @@ function renderModelCard(
   const logoComponent = logoUrl !== null;
 
   return html`
-    <div class="emp-card-wrap ${selectedProvider === entry.key ? "active" : ""}">
+    <div class="emp-card-wrap ${isSelected ? "active" : ""}">
       <div class="emp-card emp-card-btn" @click=${() => onSelect(entry.key)}>
         <div class="emp-card__icon emp-card__icon--default" aria-hidden="true">
           ${logoComponent
@@ -215,6 +220,24 @@ function renderModelCard(
             : icons.modelCube}
         </div>
         <div class="emp-card__actions models-provider-actions">
+          <button
+            class="btn btn--sm"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              onSelect(isSelected ? null : entry.key);
+            }}
+          >${isSelected ? "关闭配置" : "配置"}</button>
+          ${deletable
+            ? html`
+                <button
+                  class="btn btn--sm btn--danger"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    onDeleteProvider(entry.key);
+                  }}
+                >删除</button>
+              `
+            : nothing}
           ${hasModels
             ? entry.isDefault
               ? html`
@@ -313,9 +336,14 @@ export function renderModelLibrary(props: ModelLibraryProps) {
                                 </div>
                                 <div class="emp-grid">
                                   ${section.items.map((entry) =>
-                                    renderModelCard(entry, props.selectedProvider, (key) =>
-                                      props.onSelect(props.selectedProvider === key ? null : key),
-                                      props.onUseModelClick, props.onCancelUse,
+                                    renderModelCard(
+                                      entry,
+                                      props.selectedProvider,
+                                      props.providers,
+                                      (key) => props.onSelect(props.selectedProvider === key ? null : key),
+                                      props.onUseModelClick,
+                                      props.onCancelUse,
+                                      (key) => props.onDeleteProvider(key),
                                     ),
                                   )}
                                 </div>

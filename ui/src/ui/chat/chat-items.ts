@@ -135,11 +135,19 @@ export function buildChatItems(props: ChatItemsInput): Array<ChatItem | MessageG
 
   if (runActive) {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
+    const phase =
+      props.runPhase === "tool"
+        ? "tool"
+        : props.runPhase === "streaming"
+          ? "streaming"
+          : "thinking";
     if (liveA2UI.length > 0) {
       items.push({
         kind: "a2ui",
         key: `${key}:a2ui`,
         messages: liveA2UI,
+        runPhase: phase,
+        reasoningText: reasoningText || undefined,
       });
     } else if (streamText.length > 0) {
       items.push({
@@ -149,13 +157,9 @@ export function buildChatItems(props: ChatItemsInput): Array<ChatItem | MessageG
         reasoningText: reasoningText || undefined,
         startedAt: props.streamStartedAt ?? Date.now(),
       });
-    } else {
-      const phase =
-        props.runPhase === "tool"
-          ? "tool"
-          : props.runPhase === "streaming"
-            ? "streaming"
-            : "thinking";
+    }
+    // Keep a live status row while the run is in-flight (tool/thinking between turns).
+    if (liveA2UI.length === 0 && streamText.length === 0) {
       items.push({
         kind: "reading-indicator",
         key,

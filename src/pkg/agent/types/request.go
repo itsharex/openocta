@@ -2,6 +2,8 @@
 package types
 
 import (
+	"github.com/cloudwego/eino/schema"
+
 	"github.com/openocta/openocta/pkg/agent/model"
 	"github.com/openocta/openocta/pkg/agent/stream"
 )
@@ -9,8 +11,16 @@ import (
 type Request struct {
 	Prompt        string
 	ContentBlocks []model.ContentBlock
-	SessionID     string
-	RequestID     string
+	// SessionMessages, when set, is the full model input history (typically from session transcript).
+	SessionMessages []*schema.Message
+	// TranscriptPath is the session jsonl used to hydrate SessionMessages when empty at turn execution.
+	TranscriptPath string
+	// SessionHistoryMaxMessages limits transcript turns loaded into SessionMessages (0 = unlimited).
+	SessionHistoryMaxMessages int
+	// SessionHistoryRoles filters transcript roles when hydrating history (empty = default roles).
+	SessionHistoryRoles []string
+	SessionID           string
+	RequestID           string
 }
 
 type Result struct {

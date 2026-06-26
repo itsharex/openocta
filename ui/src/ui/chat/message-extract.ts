@@ -98,6 +98,9 @@ function stripPlaceholderAssistantText(
 }
 
 export function extractText(message: unknown): string | null {
+  if (message == null || typeof message !== "object") {
+    return null;
+  }
   const m = message as Record<string, unknown>;
   const role = typeof m.role === "string" ? m.role : "";
   const content = m.content;

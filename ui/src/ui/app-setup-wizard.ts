@@ -41,7 +41,6 @@ import {
   handleModelsAddProviderFormChange,
   handleModelsAddProviderModalClose,
   handleModelsAddProviderSubmit,
-  handleModelsCancel,
   handleModelsCancelUse,
   handleModelsDeleteProvider,
   handleModelsPatch,
@@ -300,6 +299,7 @@ export function buildSetupWizardModelsProps(state: AppViewState): ModelsProps {
     useModelModalOpen: state.modelsUseModelModalOpen,
     useModelModalProvider: state.modelsUseModelModalProvider,
     saveError: state.modelsSaveError,
+    overlayClass: "setup-wizard__overlay",
     onRefresh: () => undefined,
     onAddProvider: () => handleModelsAddProvider(state),
     onAddProviderModalClose: () => handleModelsAddProviderModalClose(state),
@@ -346,7 +346,12 @@ export function buildSetupWizardModelsProps(state: AppViewState): ModelsProps {
       handleModelsSave(state);
       syncSetupWizardModelsSession(state);
     },
-    onCancel: () => handleModelsCancel(state),
+    onCancel: () => {
+      state.modelsAddModelModalOpen = false;
+      state.modelsUseModelModalOpen = false;
+      handleModelsSelect(state, null);
+      state.modelsSaveError = null;
+    },
     onUseModelClick: (provider) => handleModelsUseModelClick(state, provider),
     onUseModelModalClose: () => handleModelsUseModelModalClose(state),
     onUseModel: (provider, modelId) => {
@@ -357,8 +362,8 @@ export function buildSetupWizardModelsProps(state: AppViewState): ModelsProps {
       handleModelsCancelUse(state, provider);
       syncSetupWizardModelsSession(state);
     },
-    onDeleteProvider: () => {
-      void handleModelsDeleteProvider(state);
+    onDeleteProvider: (providerKey) => {
+      void handleModelsDeleteProvider(state, providerKey);
       syncSetupWizardModelsSession(state);
     },
   };
@@ -900,7 +905,11 @@ export function buildSetupWizardProps(state: AppViewState): SetupWizardProps {
     onModelProviderToggle: (key, enabled) => handleSetupWizardModelToggle(state, key, enabled),
     onModelBaseUrlChange: (key, baseUrl) => handleSetupWizardModelBaseUrlChange(state, key, baseUrl),
     onModelApiKeyChange: (key, apiKey) => handleSetupWizardModelApiKeyChange(state, key, apiKey),
-    onModelConfigure: (key) => handleModelsSelect(state, key),
+    onModelConfigure: (key) => {
+      ensureWizardProviderConfig(state, key);
+      state.modelsAddModelModalOpen = false;
+      handleModelsSelect(state, key);
+    },
     onSkillQueryChange: (query) => {
       state.setupWizardSkillQuery = query;
     },

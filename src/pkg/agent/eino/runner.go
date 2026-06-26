@@ -18,7 +18,7 @@ func (e *Engine) Run(ctx context.Context, req types.Request) (*types.Response, e
 		return nil, ErrRuntimeClosed
 	}
 	ctx = wrapRunContext(ctx, e.agentRunBudget)
-	msgs, err := BuildUserMessages(req)
+	msgs, err := BuildAgentMessages(req)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (e *Engine) RunStream(ctx context.Context, req types.Request) (<-chan strea
 	if e == nil || e.runner == nil {
 		return nil, ErrRuntimeClosed
 	}
-	msgs, err := BuildUserMessages(req)
+	msgs, err := BuildAgentMessages(req)
 	if err != nil {
 		return nil, err
 	}

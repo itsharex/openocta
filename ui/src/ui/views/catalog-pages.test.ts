@@ -32,6 +32,7 @@ import {
   renderModelLibrary,
   type ModelLibraryProps,
 } from "./model-library.ts";
+import { canDeleteModelProvider } from "./models.ts";
 
 function renderIntoContainer(result: unknown, container: HTMLElement) {
   render(result as never, container);
@@ -737,7 +738,9 @@ describe("catalog pages", () => {
     expect(container.textContent).not.toContain("已安装");
     expect(container.textContent).toContain("公有模型");
     expect(container.textContent).toContain("本地模型");
-    expect(container.querySelectorAll(".emp-card__actions button")).toHaveLength(0);
+    expect(container.querySelectorAll(".emp-card__actions button").length).toBeGreaterThan(0);
+    expect(container.textContent).toContain("配置");
+    expect(container.textContent).toContain("删除");
     expect(container.querySelector(".market-card-chip--state")?.textContent).toContain("默认模型");
 
     const firstCard = container.querySelector(".emp-card-btn");
@@ -763,6 +766,13 @@ describe("catalog pages", () => {
     expect(counts.counts.get("__all__")).toBe(1);
     expect(counts.counts.get("public")).toBe(1);
     expect(counts.counts.get("local")).toBe(0);
+  });
+
+  it("allows deleting custom providers and configured built-in providers", () => {
+    const props = modelLibraryProps();
+    expect(canDeleteModelProvider("custom-public", props.providers)).toBe(true);
+    expect(canDeleteModelProvider("openai", props.providers)).toBe(true);
+    expect(canDeleteModelProvider("anthropic", {})).toBe(false);
   });
 
   it("reuses the shared model settings panel from the library page", () => {

@@ -147,9 +147,13 @@ export function handleModelsPatchModel(
   host: AppViewState,
   providerKey: string,
   modelId: string,
-  patch: Partial<{ contextWindow: number | null; maxTokens: number | null }>,
+  patch: Partial<{ id: string; name: string; contextWindow: number | null; maxTokens: number | null }>,
 ) {
-  const base = cloneConfigObject(host.configForm ?? host.configSnapshot?.config ?? {});
+  const base = cloneConfigObject(host.configForm ?? host.configSnapshot?.config ?? {}) as {
+    models?: { providers?: Record<string, ModelProvider> };
+    agents?: { defaults?: { model?: { primary?: string } } };
+    env?: { modelEnv?: Record<string, Record<string, string>> };
+  };
   if (!base.models) {
     base.models = { mode: "merge", providers: {} };
   }
@@ -159,9 +163,39 @@ export function handleModelsPatchModel(
   }
   const prov = models.providers[providerKey];
   if (!prov?.models?.length) return;
+
+  let nextModelId = modelId;
+  if ("id" in patch) {
+    const trimmed = patch.id?.trim() ?? "";
+    if (!trimmed || trimmed === modelId) {
+      // no-op
+    } else if (prov.models.some((m) => m.id === trimmed)) {
+      return;
+    } else {
+      nextModelId = trimmed;
+      const oldRef = `${providerKey}/${modelId}`;
+      const newRef = `${providerKey}/${nextModelId}`;
+      const currentDefaultRef = base.agents?.defaults?.model?.primary;
+      if (currentDefaultRef === oldRef) {
+        if (!base.agents) base.agents = { defaults: { model: {} } };
+        if (!base.agents.defaults) base.agents.defaults = { model: {} };
+        if (!base.agents.defaults.model) base.agents.defaults.model = {};
+        base.agents.defaults.model.primary = newRef;
+      }
+      const envEntry = base.env?.modelEnv?.[oldRef];
+      if (envEntry && base.env?.modelEnv) {
+        base.env.modelEnv[newRef] = envEntry;
+        delete base.env.modelEnv[oldRef];
+      }
+    }
+  }
+
   const nextModels = prov.models.map((m) => {
     if (m.id !== modelId) return m;
-    const u = { ...m };
+    const u = { ...m, id: nextModelId };
+    if ("name" in patch) {
+      u.name = patch.name?.trim() || u.id;
+    }
     if ("contextWindow" in patch) {
       if (patch.contextWindow == null) delete u.contextWindow;
       else u.contextWindow = patch.contextWindow;
@@ -381,27 +415,18 @@ export function handleModelsCancelUse(host: AppViewState, provider: string) {
   saveConfigPatch(host, patch);
 }
 
-// 删除自定义厂商相关处理函数
-export async function handleModelsDeleteProvider(host: AppViewState) {
-  const providerKey = host.modelsSelectedProvider;
-  if (!providerKey) return;
-  if (!host.client || !host.connected) return;
-
-  // 使用 nativeConfirm 进行确认
-  const ok = await nativeConfirm(t("modelsProviderDeleteConfirm"));
-  if (!ok) return;
-
-  const currentConfig = (host.configForm ?? host.configSnapshot?.config ?? {}) as {
+function buildModelsDeleteProviderPatch(
+  config: {
     models?: { providers?: Record<string, ModelProvider> };
     env?: { modelEnv?: Record<string, Record<string, string>> };
     agents?: { defaults?: { model?: { primary?: string } } };
-  };
-  const currentProviders = currentConfig.models?.providers ?? {};
+  },
+  providerKey: string,
+): Record<string, unknown> {
+  const currentProviders = config.models?.providers ?? {};
   const providerModels = currentProviders[providerKey]?.models ?? [];
-  const currentModelEnv = currentConfig.env?.modelEnv ?? {};
-
-  // 检查是否有模型使用该厂商作为默认模型
-  const currentDefaultRef = currentConfig.agents?.defaults?.model?.primary;
+  const currentModelEnv = config.env?.modelEnv ?? {};
+  const currentDefaultRef = config.agents?.defaults?.model?.primary;
 
   const providerPatch: Record<string, ModelProvider | null> = {
     [providerKey]: null,
@@ -412,12 +437,11 @@ export async function handleModelsDeleteProvider(host: AppViewState) {
     modelEnvPatch[`${providerKey}/${model.id}`] = null;
   }
   for (const modelRef of Object.keys(currentModelEnv)) {
-    if (modelRef.startsWith(providerKey + "/")) {
+    if (modelRef.startsWith(`${providerKey}/`)) {
       modelEnvPatch[modelRef] = null;
     }
   }
 
-  // 构建 patch。config.patch 是 merge patch，删除必须显式传 null。
   const patch: Record<string, unknown> = {
     models: {
       providers: providerPatch,
@@ -428,9 +452,7 @@ export async function handleModelsDeleteProvider(host: AppViewState) {
       modelEnv: modelEnvPatch,
     };
   }
-
-  // 如果当前默认模型是被删除的厂商，清除默认模型
-  if (currentDefaultRef && currentDefaultRef.startsWith(providerKey + "/")) {
+  if (currentDefaultRef && currentDefaultRef.startsWith(`${providerKey}/`)) {
     patch.agents = {
       defaults: {
         model: {
@@ -439,12 +461,59 @@ export async function handleModelsDeleteProvider(host: AppViewState) {
       },
     };
   }
+  return patch;
+}
 
-  // 保存配置
-  await saveConfigPatch(host, patch);
-  if (host.lastError) {
-    return;
+function applyModelsDeleteProviderToForm(host: AppViewState, providerKey: string) {
+  const base = cloneConfigObject(host.configForm ?? host.configSnapshot?.config ?? {}) as {
+    models?: { providers?: Record<string, ModelProvider> };
+    env?: { modelEnv?: Record<string, Record<string, string>> };
+    agents?: { defaults?: { model?: { primary?: string } } };
+  };
+  if (base.models?.providers) {
+    delete base.models.providers[providerKey];
+  }
+  const modelEnv = base.env?.modelEnv;
+  if (modelEnv) {
+    for (const modelRef of Object.keys(modelEnv)) {
+      if (modelRef.startsWith(`${providerKey}/`)) {
+        delete modelEnv[modelRef];
+      }
+    }
+  }
+  const currentDefaultRef = base.agents?.defaults?.model?.primary;
+  if (currentDefaultRef && currentDefaultRef.startsWith(`${providerKey}/`)) {
+    delete base.agents?.defaults?.model?.primary;
+  }
+  host.configForm = base;
+  host.configFormDirty = true;
+  host.modelsFormDirty = true;
+}
+
+export async function handleModelsDeleteProvider(host: AppViewState, providerKey?: string) {
+  const key = providerKey?.trim() || host.modelLibrarySelectedProvider || host.modelsSelectedProvider;
+  if (!key) return;
+
+  const ok = await nativeConfirm(t("modelsProviderDeleteConfirm"));
+  if (!ok) return;
+
+  const currentConfig = (host.configForm ?? host.configSnapshot?.config ?? {}) as {
+    models?: { providers?: Record<string, ModelProvider> };
+    env?: { modelEnv?: Record<string, Record<string, string>> };
+    agents?: { defaults?: { model?: { primary?: string } } };
+  };
+  const patch = buildModelsDeleteProviderPatch(currentConfig, key);
+
+  if (host.client && host.connected) {
+    await saveConfigPatch(host, patch);
+    if (host.lastError) {
+      return;
+    }
+  } else {
+    applyModelsDeleteProviderToForm(host, key);
   }
 
-  setSelectedProvider(host, null);
+  if (host.modelLibrarySelectedProvider === key || host.modelsSelectedProvider === key) {
+    setSelectedProvider(host, null);
+  }
 }

@@ -7,6 +7,11 @@ import {
 } from "./message-extract.ts";
 
 describe("extractTextCached", () => {
+  it("returns null for undefined message", () => {
+    expect(extractText(undefined)).toBeNull();
+    expect(extractText(null)).toBeNull();
+  });
+
   it("matches extractText output", () => {
     const message = {
       role: "assistant",

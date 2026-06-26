@@ -10,6 +10,53 @@ import (
 	"github.com/openocta/openocta/pkg/agent/types"
 )
 
+func TestBuildAgentMessagesUsesTranscriptHistory(t *testing.T) {
+	t.Parallel()
+
+	msgs, err := BuildAgentMessages(types.Request{
+		Prompt: "继续",
+		SessionMessages: []*schema.Message{
+			schema.UserMessage("你好"),
+			schema.AssistantMessage("你好，有什么可以帮你？", nil),
+			schema.UserMessage("继续"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildAgentMessages: %v", err)
+	}
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(msgs))
+	}
+}
+
+func TestBuildAgentMessagesMergesAttachmentIntoHistory(t *testing.T) {
+	t.Parallel()
+
+	msgs, err := BuildAgentMessages(types.Request{
+		Prompt: "describe",
+		ContentBlocks: []model.ContentBlock{{
+			Type:      model.ContentBlockImage,
+			MediaType: "image/jpeg",
+			Data:      "abc",
+		}},
+		SessionMessages: []*schema.Message{
+			schema.UserMessage("hello"),
+			schema.AssistantMessage("hi", nil),
+			schema.UserMessage("describe"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildAgentMessages: %v", err)
+	}
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(msgs))
+	}
+	last := msgs[2]
+	if len(last.MultiContent) < 2 {
+		t.Fatalf("expected merged multimodal user message, got %+v", last)
+	}
+}
+
 func TestBuildUserMessagesVideoBlock(t *testing.T) {
 	t.Parallel()
 

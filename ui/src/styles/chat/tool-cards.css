@@ -203,12 +203,12 @@
   word-break: break-word;
 }
 
-/* Reading Indicator */
+/* Reading Indicator (legacy dots — reused by chat-agent-activity) */
 .chat-reading-indicator {
   background: transparent;
-  border: 1px solid var(--border);
-  padding: 12px;
-  display: inline-flex;
+  border: none;
+  padding: 0;
+  display: block;
 }
 
 .chat-reading-indicator__dots {

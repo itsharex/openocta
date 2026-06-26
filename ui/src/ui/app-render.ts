@@ -3621,7 +3621,7 @@ export function renderApp(state: AppViewState) {
                 onUseModelModalClose: () => handleModelsUseModelModalClose(state),
                 onUseModel: (provider, modelId) => handleModelsUseModel(state, provider, modelId),
                 onCancelUse: (provider) => handleModelsCancelUse(state, provider),
-                onDeleteProvider: () => handleModelsDeleteProvider(state),
+                onDeleteProvider: (providerKey) => void handleModelsDeleteProvider(state, providerKey),
               })
             : nothing
         }
@@ -3669,7 +3669,7 @@ export function renderApp(state: AppViewState) {
                 onUseModelModalClose: () => handleModelsUseModelModalClose(state),
                 onUseModel: (provider, modelId) => handleModelsUseModel(state, provider, modelId),
                 onCancelUse: (provider) => handleModelsCancelUse(state, provider),
-                onDeleteProvider: () => handleModelsDeleteProvider(state),
+                onDeleteProvider: (providerKey) => void handleModelsDeleteProvider(state, providerKey),
               })
             : nothing
         }

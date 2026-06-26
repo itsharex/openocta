@@ -284,6 +284,7 @@ export function applyBackgroundChatEvent(sessionKey: string, payload: ChatEventP
       ...snap,
       runId: snap.runId ?? (runId || null),
       reasoningStream: turnThinking ? null : snap.reasoningStream,
+      a2uiMessages: [],
       runPhase: "tool",
     });
     return;

@@ -20,6 +20,22 @@ func TestLooksLikeLocalResource(t *testing.T) {
 	}
 }
 
+func TestAttachmentBlocksFromWriteFileToolOutput(t *testing.T) {
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "report.csv")
+	if err := os.WriteFile(csvPath, []byte("a,b\n1,2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := "Updated file report.csv"
+	blocks := AttachmentBlocksFromWriteToolOutput("write_file", output, dir)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if fn, _ := blocks[0]["filename"].(string); fn != "report.csv" {
+		t.Fatalf("filename: got %q want report.csv", fn)
+	}
+}
+
 func TestAttachmentBlocksFromReferencedPaths(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "attachments", "report.html")
@@ -49,6 +65,48 @@ func TestAttachmentBlocksFromReferencedMarkdownPath(t *testing.T) {
 	}
 	if fn, _ := blocks[0]["filename"].(string); fn != "README.md" {
 		t.Fatalf("filename: got %q want README.md", fn)
+	}
+}
+
+func TestAttachmentBlocksFromReferencedAbsolutePath(t *testing.T) {
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "sample_data.csv")
+	if err := os.WriteFile(csvPath, []byte("a,b\n1,2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	text := "把这个文件：" + csvPath + " 返回给我"
+	blocks := AttachmentBlocksFromReferencedPaths(text, dir)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if fn, _ := blocks[0]["filename"].(string); fn != "sample_data.csv" {
+		t.Fatalf("filename: got %q want sample_data.csv", fn)
+	}
+}
+
+func TestMergeDeliverableAttachmentBlocksFromA2UI(t *testing.T) {
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "sample_data.csv")
+	if err := os.WriteFile(csvPath, []byte("a,b\n1,2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content := []map[string]interface{}{
+		{
+			"type": "a2ui",
+			"a2ui": map[string]interface{}{
+				"updateDataModel": map[string]interface{}{
+					"path":  "/content",
+					"value": "文件 `" + csvPath + "` 已返回",
+				},
+			},
+		},
+	}
+	merged := MergeDeliverableAttachmentBlocks(content, dir)
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(merged))
+	}
+	if fn, _ := merged[1]["filename"].(string); fn != "sample_data.csv" {
+		t.Fatalf("filename: got %q want sample_data.csv", fn)
 	}
 }
 

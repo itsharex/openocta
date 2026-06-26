@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractFileBlocks, extractFileBlocksFromA2UIBlocks } from "./file-blocks.ts";
+import { decodeFileText, extractFileBlocks, extractFileBlocksFromA2UIBlocks } from "./file-blocks.ts";
+import { parseCsvTable, resolveTextFilePreviewKind } from "./file-preview-content.ts";
 
 describe("extractFileBlocksFromA2UIBlocks", () => {
   it("parses @@OPENOCTA_ATTACHMENTS@@ from A2UI Text components", () => {
@@ -81,5 +82,37 @@ describe("extractFileBlocksFromA2UIBlocks", () => {
     const files = extractFileBlocks(message);
     expect(files).toHaveLength(1);
     expect(files[0]?.filename).toBe("notes.txt");
+  });
+});
+
+describe("decodeFileText", () => {
+  it("decodes UTF-8 CSV with CJK characters from base64 data URLs", () => {
+    const csv = "姓名,年龄\n张伟,28\n";
+    const bytes = new TextEncoder().encode(csv);
+    let binary = "";
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte);
+    }
+    const base64 = btoa(binary);
+    const url = `data:text/plain; charset=utf-8;base64,${base64}`;
+    expect(decodeFileText(url)).toBe(csv);
+  });
+});
+
+describe("file preview content", () => {
+  it("resolves preview kinds by extension", () => {
+    expect(resolveTextFilePreviewKind("data.csv", "text/plain")).toBe("csv");
+    expect(resolveTextFilePreviewKind("readme.md", "text/plain")).toBe("markdown");
+    expect(resolveTextFilePreviewKind("config.json", "application/json")).toBe("json");
+    expect(resolveTextFilePreviewKind("notes.txt", "text/plain")).toBe("text");
+  });
+
+  it("parses CSV with quoted commas", () => {
+    const table = parseCsvTable('name,note\nAlice,"hello, world"\nBob,ok');
+    expect(table.headers).toEqual(["name", "note"]);
+    expect(table.rows).toEqual([
+      ["Alice", "hello, world"],
+      ["Bob", "ok"],
+    ]);
   });
 });

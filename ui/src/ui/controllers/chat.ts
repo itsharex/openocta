@@ -566,7 +566,11 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       state.chatRunPhase = "thinking";
     }
     const chunk =
-      typeof payload.text === "string" ? payload.text : extractText(payload.message);
+      typeof payload.text === "string"
+        ? payload.text
+        : payload.message != null
+          ? extractText(payload.message)
+          : null;
     if (typeof chunk === "string" && chunk.length > 0) {
       const current = state.chatStream ?? "";
       // Backward compat: older gateways sent full accumulated text each delta.
@@ -582,6 +586,8 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       state.chatMessages = [...state.chatMessages, payload.message];
     }
     state.chatStream = null;
+    state.chatA2UIMessages = [];
+    resetChatA2UISurfaces();
     const turnThinking = extractThinking(payload.message)?.trim() ?? "";
     if (turnThinking) {
       state.chatReasoningStream = null;

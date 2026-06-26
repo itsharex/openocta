@@ -181,6 +181,14 @@ func (e *Engine) CheckPointStore() adk.CheckPointStore {
 	return e.checkpoints
 }
 
+// AgentRunBudget returns default per-turn timeout when request context has no deadline.
+func (e *Engine) AgentRunBudget() time.Duration {
+	if e == nil {
+		return 0
+	}
+	return e.agentRunBudget
+}
+
 // Close releases engine resources.
 func (e *Engine) Close() error {
 	if e == nil {

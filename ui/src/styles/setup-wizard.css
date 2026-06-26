@@ -21,6 +21,12 @@
   z-index: 310;
 }
 
+/* 引导内二级弹框（添加模型、选择默认模型）需高于厂商配置侧栏 */
+.setup-wizard .channel-panel-overlay.models-overlay--add-model,
+.setup-wizard .channel-panel-overlay.models-overlay--use-model {
+  z-index: 320;
+}
+
 .setup-wizard .setup-wizard__overlay--centered {
   justify-content: center;
   align-items: center;

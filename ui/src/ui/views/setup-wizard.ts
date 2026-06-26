@@ -521,7 +521,6 @@ function renderModelStep(props: SetupWizardProps) {
               </div>
             `}
     </div>
-    ${renderModelsOverlays(props.modelsProps)}
   `;
 }
 
@@ -1267,6 +1266,7 @@ export function renderSetupWizard(props: SetupWizardProps) {
           </div>
         </footer>
       </div>
+      ${step === "models" ? renderModelsOverlays(props.modelsProps) : nothing}
     </div>
   `;
 }

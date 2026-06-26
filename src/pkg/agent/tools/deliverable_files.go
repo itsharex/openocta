@@ -11,8 +11,23 @@ import (
 
 var referencedAttachmentPathPattern = regexp.MustCompile(`(?i)attachments/[A-Za-z0-9._/-]+\.(?:html?|htm)`)
 
+const previewableFileExtensions = `md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm`
+
+// referencedPathDelimiters matches whitespace, quotes, brackets, backtick, ASCII/Chinese colon.
+var referencedPathDelimiters = `(?:^|[\s"'(\[` + "`" + `:：])`
+
 // Matches sandbox-relative previewable files mentioned in assistant text (README.md, docs/guide.md, etc.).
-var referencedPreviewablePathPattern = regexp.MustCompile(`(?i)(?:^|[\s"'(\[])([A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm))`)
+var referencedPreviewablePathPattern = regexp.MustCompile(
+	`(?i)` + referencedPathDelimiters + `([A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:` + previewableFileExtensions + `))`,
+)
+
+var referencedAbsolutePreviewablePathPattern = regexp.MustCompile(
+	`(?i)` + referencedPathDelimiters + `(/(?:[A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*)\.(?:` + previewableFileExtensions + `))`,
+)
+
+var referencedHomePreviewablePathPattern = regexp.MustCompile(
+	`(?i)` + referencedPathDelimiters + `(~(?:[A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*)\.(?:` + previewableFileExtensions + `))`,
+)
 
 const maxDeliverableHTMLBytes = 2 << 20
 const maxDeliverableImageBytes = 5 << 20
@@ -50,24 +65,44 @@ func AttachmentBlocksFromDeliverableToolOutput(toolName, output, projectRoot str
 	return nil
 }
 
-// AttachmentBlocksFromWriteToolOutput reads HTML files written by the write/file_write tool
+// AttachmentBlocksFromWriteToolOutput reads previewable files written by filesystem write tools
 // and returns chat content blocks the UI can preview and download.
 func AttachmentBlocksFromWriteToolOutput(toolName, output, projectRoot string) []map[string]interface{} {
 	normalized := strings.ToLower(strings.TrimSpace(toolName))
-	if normalized != "write" && normalized != "file_write" {
+	switch normalized {
+	case "write", "file_write", "write_file", "edit_file":
+	default:
 		return nil
 	}
-	lower := strings.ToLower(output)
-	idx := strings.LastIndex(lower, " to ")
-	if idx < 0 {
+	rawPath := extractPathFromWriteToolOutput(output)
+	if rawPath == "" {
 		return nil
 	}
-	rawPath := strings.TrimSpace(output[idx+4:])
-	rawPath = strings.Trim(rawPath, `"'`)
 	if blocks := attachmentBlocksFromLocalHTMLFile(projectRoot, rawPath); len(blocks) > 0 {
 		return blocks
 	}
 	return attachmentBlocksFromLocalPreviewableFile(projectRoot, rawPath)
+}
+
+func extractPathFromWriteToolOutput(output string) string {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return ""
+	}
+	lower := strings.ToLower(output)
+	if idx := strings.LastIndex(lower, " to "); idx >= 0 {
+		return strings.Trim(strings.TrimSpace(output[idx+4:]), `"'`)
+	}
+	const updatedPrefix = "updated file "
+	if strings.HasPrefix(lower, updatedPrefix) {
+		return strings.TrimSpace(output[len(updatedPrefix):])
+	}
+	const replacedPrefix = "successfully replaced the string in "
+	if strings.HasPrefix(lower, replacedPrefix) {
+		path := strings.TrimSpace(output[len(replacedPrefix):])
+		return strings.Trim(path, `"'`)
+	}
+	return ""
 }
 
 func extractLocalPathFromWebFetchOutput(output string) string {
@@ -366,6 +401,92 @@ func readLocalFile(projectRoot, rawURL string) ([]byte, string, string, error) {
 	return data, contentType, displayPath, nil
 }
 
+func normalizeReferencedPath(raw string) string {
+	return strings.TrimSpace(strings.Trim(raw, `"'`))
+}
+
+func referencedPreviewablePathPatterns() []*regexp.Regexp {
+	return []*regexp.Regexp{
+		referencedPreviewablePathPattern,
+		referencedAbsolutePreviewablePathPattern,
+		referencedHomePreviewablePathPattern,
+	}
+}
+
+func referencedPreviewablePathsFromText(text string) []string {
+	seen := map[string]bool{}
+	var paths []string
+	for _, pattern := range referencedPreviewablePathPatterns() {
+		for _, groups := range pattern.FindAllStringSubmatch(text, -1) {
+			if len(groups) < 2 {
+				continue
+			}
+			path := normalizeReferencedPath(groups[1])
+			if path == "" || seen[path] {
+				continue
+			}
+			seen[path] = true
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+func a2uiUpdateDataModelStringValue(raw interface{}) string {
+	msg, ok := raw.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	udm, ok := msg["updateDataModel"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	value, ok := udm["value"].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func extractA2UITextFromContentBlock(block map[string]interface{}) string {
+	a2uiRaw, ok := block["a2ui"]
+	if !ok || a2uiRaw == nil {
+		return ""
+	}
+	switch v := a2uiRaw.(type) {
+	case map[string]interface{}:
+		return a2uiUpdateDataModelStringValue(v)
+	case []interface{}:
+		var parts []string
+		for _, item := range v {
+			if text := a2uiUpdateDataModelStringValue(item); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.Join(parts, "\n")
+	default:
+		return ""
+	}
+}
+
+func collectAssistantTextForAttachments(content []map[string]interface{}) string {
+	var parts []string
+	for _, block := range content {
+		typ, _ := block["type"].(string)
+		switch strings.ToLower(strings.TrimSpace(typ)) {
+		case "text":
+			if t, _ := block["text"].(string); strings.TrimSpace(t) != "" {
+				parts = append(parts, t)
+			}
+		case "a2ui":
+			if t := extractA2UITextFromContentBlock(block); t != "" {
+				parts = append(parts, t)
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
 // AttachmentBlocksFromReferencedPaths loads HTML deliverables mentioned in assistant text.
 func AttachmentBlocksFromReferencedPaths(text, projectRoot string) []map[string]interface{} {
 	text = strings.TrimSpace(text)
@@ -384,12 +505,8 @@ func AttachmentBlocksFromReferencedPaths(text, projectRoot string) []map[string]
 			blocks = append(blocks, chunk...)
 		}
 	}
-	for _, groups := range referencedPreviewablePathPattern.FindAllStringSubmatch(text, -1) {
-		if len(groups) < 2 {
-			continue
-		}
-		path := strings.TrimSpace(strings.Trim(groups[1], `"'`))
-		if path == "" || seen[path] {
+	for _, path := range referencedPreviewablePathsFromText(text) {
+		if seen[path] {
 			continue
 		}
 		seen[path] = true
@@ -415,20 +532,14 @@ func MergeDeliverableAttachmentBlocks(content []map[string]interface{}, projectR
 	if len(content) == 0 {
 		return content
 	}
-	var textParts []string
 	existing := map[string]bool{}
 	for _, block := range content {
-		typ, _ := block["type"].(string)
-		if strings.EqualFold(typ, "text") {
-			if t, _ := block["text"].(string); strings.TrimSpace(t) != "" {
-				textParts = append(textParts, t)
-			}
-		}
 		if fn, _ := block["filename"].(string); fn != "" {
 			existing[strings.ToLower(fn)] = true
 		}
 	}
-	for _, block := range AttachmentBlocksFromReferencedPaths(strings.Join(textParts, "\n"), projectRoot) {
+	textPartsStr := collectAssistantTextForAttachments(content)
+	for _, block := range AttachmentBlocksFromReferencedPaths(textPartsStr, projectRoot) {
 		fn, _ := block["filename"].(string)
 		if fn != "" && existing[strings.ToLower(fn)] {
 			continue

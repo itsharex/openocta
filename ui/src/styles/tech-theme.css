@@ -30,10 +30,11 @@
   z-index: 0;
 }
 
-.content > * {
+/* 不用 transform 入场：translateY(0) 也会成为 fixed 定位的 containing block，导致弹层落在页面底部 */
+.content > *:not(.modal-overlay):not(.channel-panel-overlay) {
   position: relative;
   z-index: 1;
-  animation: tech-slide-up var(--duration-slow) var(--ease-out) both;
+  animation: fade-in var(--duration-slow) var(--ease-out) both;
 }
 
 .content > *:nth-child(1) { animation-delay: 0ms; }

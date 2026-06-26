@@ -1,9 +1,8 @@
 import { customElement, property, state } from "lit/decorators.js";
 import { LitElement, css, html, nothing } from "lit";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { icons } from "../icons.ts";
 import { decodeFileText, type FilePreviewRequest } from "../chat/file-blocks.ts";
-import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { renderTextFilePreviewBody } from "../chat/file-preview-content.ts";
 
 @customElement("chat-file-preview")
 export class ChatFilePreview extends LitElement {
@@ -134,6 +133,62 @@ export class ChatFilePreview extends LitElement {
       color: var(--danger, #c62828);
       font-size: 13px;
     }
+    .file-preview-table-wrap {
+      overflow: auto;
+      max-height: min(70vh, 720px);
+      border: 1px solid var(--border, rgba(127, 127, 127, 0.2));
+      border-radius: 8px;
+    }
+    .file-preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .file-preview-table th,
+    .file-preview-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.18));
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .file-preview-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg, #f5f5f5);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .file-preview-table tbody tr:hover {
+      background: color-mix(in srgb, var(--accent, #4f8cff) 6%, transparent);
+    }
+    .file-preview-code,
+    .file-preview-plain {
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--bg, #f8f8f8);
+      border: 1px solid var(--border, rgba(127, 127, 127, 0.18));
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow: auto;
+      max-height: min(70vh, 720px);
+    }
+    .file-preview-markdown {
+      font-size: 14px;
+      line-height: 1.6;
+      overflow: auto;
+      max-height: min(70vh, 720px);
+    }
+    .file-preview-table-more {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-top: 1px solid var(--border, rgba(127, 127, 127, 0.18));
+    }
   `;
 
   protected updated(changed: Map<string, unknown>): void {
@@ -185,18 +240,7 @@ export class ChatFilePreview extends LitElement {
     if (text == null) {
       return html`<div class="callout danger">无法解码文件内容</div>`;
     }
-    if (ext === "md" || ext === "markdown") {
-      return html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(text))}</div>`;
-    }
-    if (ext === "json") {
-      try {
-        const pretty = JSON.stringify(JSON.parse(text), null, 2);
-        return html`<pre>${pretty}</pre>`;
-      } catch {
-        return html`<pre>${text}</pre>`;
-      }
-    }
-    return html`<pre>${text}</pre>`;
+    return renderTextFilePreviewBody(text, req.filename, req.mimeType, "modal");
   }
 
   render() {

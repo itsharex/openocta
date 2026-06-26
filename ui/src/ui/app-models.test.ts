@@ -272,12 +272,30 @@ describe("handleModelsDeleteProvider", () => {
     expect(state.modelLibrarySelectedProvider).toBeNull();
   });
 
-  it("does nothing when provider deletion starts while disconnected", async () => {
+  it("updates local config when provider deletion starts while disconnected", async () => {
     nativeConfirmMock.mockResolvedValue(true);
 
     const state = {
       modelsSelectedProvider: "custom-provider",
       modelLibrarySelectedProvider: "custom-provider",
+      configForm: {
+        models: {
+          providers: {
+            "custom-provider": {
+              displayName: "Custom Provider",
+              models: [{ id: "alpha", name: "Alpha" }],
+            },
+          },
+        },
+        env: {
+          modelEnv: {
+            "custom-provider/alpha": { API_KEY: "$ALPHA_KEY" },
+          },
+        },
+      },
+      configSnapshot: null,
+      configFormDirty: false,
+      modelsFormDirty: false,
       client: null,
       connected: false,
       lastError: null,
@@ -286,7 +304,54 @@ describe("handleModelsDeleteProvider", () => {
     await handleModelsDeleteProvider(state);
 
     expect(saveConfigPatchMock).not.toHaveBeenCalled();
-    expect(nativeConfirmMock).not.toHaveBeenCalled();
-    expect(state.modelsSelectedProvider).toBe("custom-provider");
+    expect(nativeConfirmMock).toHaveBeenCalledTimes(1);
+    expect((state.configForm as Record<string, unknown>).models).toEqual({ providers: {} });
+    expect((state.configForm as Record<string, any>).env.modelEnv).toEqual({});
+    expect(state.modelsSelectedProvider).toBeNull();
+    expect(state.modelLibrarySelectedProvider).toBeNull();
+    expect(state.configFormDirty).toBe(true);
+    expect(state.modelsFormDirty).toBe(true);
+  });
+
+  it("deletes provider using model library selection when models tab selection is empty", async () => {
+    nativeConfirmMock.mockResolvedValue(true);
+    saveConfigPatchMock.mockResolvedValue(true);
+
+    const state = {
+      modelsSelectedProvider: null,
+      modelLibrarySelectedProvider: "custom-provider",
+      configForm: {
+        models: {
+          providers: {
+            "custom-provider": {
+              displayName: "Custom Provider",
+              models: [{ id: "alpha", name: "Alpha" }],
+            },
+          },
+        },
+      },
+      configSnapshot: null,
+      configFormDirty: false,
+      modelsFormDirty: false,
+      client: {} as AppViewState["client"],
+      connected: true,
+      lastError: null,
+    } as unknown as AppViewState;
+
+    await handleModelsDeleteProvider(state);
+
+    expect(saveConfigPatchMock).toHaveBeenCalledWith(state, {
+      models: {
+        providers: {
+          "custom-provider": null,
+        },
+      },
+      env: {
+        modelEnv: {
+          "custom-provider/alpha": null,
+        },
+      },
+    });
+    expect(state.modelLibrarySelectedProvider).toBeNull();
   });
 });

@@ -57,10 +57,10 @@
     }
   },
   "cozeloop": {
-    "enable": false,
-    "apiBaseUrl": "http://192.168.50.253:8888",
-    "workspaceId": "YOUR_WORKSPACE_ID",
-    "apiToken": "YOUR_API_TOKEN"
+    "enable": true,
+    "apiBaseUrl": "",
+    "workspaceId": "7631578048566919169",
+    "apiToken": "79a3aa5e0522fc865bb67233a8bca9b4b9cf641cb384cceba25ffb7776e76602"
   },
   "agents": {
     "defaults": {

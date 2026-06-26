@@ -13,7 +13,13 @@ export type ChatItem =
       phase?: "thinking" | "tool" | "streaming";
       reasoningText?: string;
     }
-  | { kind: "a2ui"; key: string; messages: unknown[] };
+  | {
+      kind: "a2ui";
+      key: string;
+      messages: unknown[];
+      runPhase?: "thinking" | "tool" | "streaming";
+      reasoningText?: string;
+    };
 
 /** A group of consecutive messages from the same role (Slack-style layout) */
 export type MessageGroup = {

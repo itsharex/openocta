@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
@@ -38,6 +39,27 @@ type TurnItem struct {
 
 type turnSink struct {
 	events chan stream.StreamEvent
+	once   sync.Once
+}
+
+func (s *turnSink) close() {
+	if s == nil {
+		return
+	}
+	s.once.Do(func() {
+		close(s.events)
+	})
+}
+
+func (s *turnSink) send(ctx context.Context, evt stream.StreamEvent) {
+	defer func() { recover() }()
+	if s == nil {
+		return
+	}
+	select {
+	case s.events <- evt:
+	case <-ctx.Done():
+	}
 }
 
 var turnSinks sync.Map // runID -> *turnSink
@@ -52,12 +74,21 @@ func registerTurnSink(runID string) (*turnSink, chan stream.StreamEvent) {
 	return s, out
 }
 
-func unregisterTurnSink(runID string) {
+// finishTurnSink removes and closes the per-run event channel.
+func finishTurnSink(runID string) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return
 	}
-	turnSinks.Delete(runID)
+	if v, ok := turnSinks.LoadAndDelete(runID); ok {
+		if s, ok := v.(*turnSink); ok && s != nil {
+			s.close()
+		}
+	}
+}
+
+func unregisterTurnSink(runID string) {
+	finishTurnSink(runID)
 }
 
 func sinkForRunID(runID string) *turnSink {
@@ -102,6 +133,8 @@ type TurnSession struct {
 	loop            *adk.TurnLoop[TurnItem, *schema.Message]
 	loopCtx         context.Context
 	loopCancel      context.CancelFunc
+	pushCtxMu       sync.Mutex
+	pushCtx         context.Context
 	running         bool
 	lastInterrupt   *stream.InterruptPayload
 	needsResumeLoop bool
@@ -161,7 +194,8 @@ func (ts *TurnSession) ensureLoop(ctx context.Context, forceNew bool) *adk.TurnL
 		if ts.loopCancel != nil {
 			ts.loopCancel()
 		}
-		loopCtx, cancel := context.WithCancel(ctx)
+		// TurnLoop lifetime is session-scoped; per-turn timeouts come from GenInput RunCtx.
+		loopCtx, cancel := context.WithCancel(context.Background())
 		ts.loopCtx = loopCtx
 		ts.loopCancel = cancel
 		ts.loop = adk.NewTurnLoop(ts.newLoopConfig())
@@ -188,6 +222,7 @@ func (ts *TurnSession) PushMessage(ctx context.Context, req types.Request, runID
 	if ts == nil || ts.engine == nil {
 		return nil, ErrRuntimeClosed
 	}
+	ts.setPushContext(ctx)
 	reqJSON, err := encodeTurnRequest(req)
 	if err != nil {
 		return nil, err
@@ -218,6 +253,7 @@ func (ts *TurnSession) PushApproval(ctx context.Context, runID string, approval 
 	if ts == nil || ts.engine == nil {
 		return nil, ErrRuntimeClosed
 	}
+	ts.setPushContext(ctx)
 	_, out := registerTurnSink(runID)
 	item := TurnItem{Kind: turnItemApproval, RunID: runID, Approval: &approval}
 
@@ -270,13 +306,14 @@ func (ts *TurnSession) genInput(_ context.Context, _ *adk.TurnLoop[TurnItem, *sc
 		if err != nil {
 			return nil, err
 		}
-		msgs, err := BuildUserMessages(req)
+		msgs, err := BuildAgentMessages(req)
 		if err != nil {
 			return nil, err
 		}
 		remaining := append([]TurnItem(nil), items[:i]...)
 		remaining = append(remaining, items[i+1:]...)
 		return &adk.GenInputResult[TurnItem, *schema.Message]{
+			RunCtx: ts.turnRunContext(),
 			Input: &adk.TypedAgentInput[*schema.Message]{
 				Messages:        msgs,
 				EnableStreaming: true,
@@ -326,6 +363,7 @@ func (ts *TurnSession) genResume(_ context.Context, _ *adk.TurnLoop[TurnItem, *s
 		return nil, fmt.Errorf("no resume targets")
 	}
 	return &adk.GenResumeResult[TurnItem, *schema.Message]{
+		RunCtx:       ts.turnRunContext(),
 		ResumeParams: &adk.ResumeParams{Targets: targets},
 		Consumed:     consumed,
 		Remaining:    remaining,
@@ -354,7 +392,7 @@ func (ts *TurnSession) onAgentEvents(ctx context.Context, tc *adk.TurnContext[Tu
 		drainAgentEvents(events)
 		return nil
 	}
-	defer unregisterTurnSink(runID)
+	defer finishTurnSink(runID)
 
 	eventCh := StreamEventsFromIterator(ctx, ts.sessionID, runID, events)
 	for {
@@ -362,18 +400,18 @@ func (ts *TurnSession) onAgentEvents(ctx context.Context, tc *adk.TurnContext[Tu
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-tc.Preempted:
-			sink.events <- stream.StreamEvent{
+			sink.send(ctx, stream.StreamEvent{
 				Type:      stream.EventMessageStop,
 				SessionID: ts.sessionID,
 				Delta:     &stream.Delta{StopReason: "preempted"},
-			}
+			})
 			return nil
 		case <-tc.Stopped:
-			sink.events <- stream.StreamEvent{
+			sink.send(ctx, stream.StreamEvent{
 				Type:      stream.EventMessageStop,
 				SessionID: ts.sessionID,
 				Delta:     &stream.Delta{StopReason: "aborted"},
-			}
+			})
 			return nil
 		case evt, ok := <-eventCh:
 			if !ok {
@@ -386,15 +424,32 @@ func (ts *TurnSession) onAgentEvents(ctx context.Context, tc *adk.TurnContext[Tu
 				ts.needsResumeLoop = true
 				ts.mu.Unlock()
 			}
-			select {
-			case sink.events <- evt:
-			case <-ctx.Done():
-				return ctx.Err()
+			sink.send(ctx, evt)
+			if evt.Type == stream.EventError {
+				return nil
 			}
-			if evt.Type == stream.EventMessageStop || evt.Type == stream.EventError {
+			if evt.Type == stream.EventMessageStop && messageStopEndsAgentEventStream(evt) {
 				return nil
 			}
 		}
+	}
+}
+
+// messageStopEndsAgentEventStream reports whether a message_stop ends the agent event stream.
+// tool_use stops mark a model turn boundary; the same agent run continues with tool execution.
+func messageStopEndsAgentEventStream(evt stream.StreamEvent) bool {
+	if evt.Type != stream.EventMessageStop {
+		return false
+	}
+	reason := ""
+	if evt.Delta != nil {
+		reason = strings.TrimSpace(evt.Delta.StopReason)
+	}
+	switch reason {
+	case "tool_use", "":
+		return false
+	default:
+		return true
 	}
 }
 
@@ -404,4 +459,24 @@ func drainAgentEvents(events *adk.AsyncIterator[*adk.AgentEvent]) {
 			return
 		}
 	}
+}
+
+func (ts *TurnSession) setPushContext(ctx context.Context) {
+	ts.pushCtxMu.Lock()
+	ts.pushCtx = ctx
+	ts.pushCtxMu.Unlock()
+}
+
+func (ts *TurnSession) turnRunContext() context.Context {
+	ts.pushCtxMu.Lock()
+	push := ts.pushCtx
+	ts.pushCtxMu.Unlock()
+	if push == nil {
+		push = context.Background()
+	}
+	var budget time.Duration
+	if ts.engine != nil {
+		budget = ts.engine.AgentRunBudget()
+	}
+	return wrapRunContext(push, budget)
 }

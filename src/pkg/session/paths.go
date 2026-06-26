@@ -70,8 +70,12 @@ func ResolveSessionTranscriptsDir(env func(string) string) string {
 // ResolveSessionFilePath returns the transcript file path for a session.
 func ResolveSessionFilePath(sessionID string, opts *SessionPathOptions, env func(string) string) string {
 	sessionsDir := ResolveSessionTranscriptsDir(env)
-	if opts != nil && opts.SessionsDir != "" {
-		sessionsDir = opts.SessionsDir
+	if opts != nil {
+		if opts.SessionsDir != "" {
+			sessionsDir = opts.SessionsDir
+		} else if opts.AgentID != "" {
+			sessionsDir = ResolveAgentSessionsDir(opts.AgentID, env)
+		}
 	}
 	// Session files are stored as <sessionId>.jsonl in sessions dir
 	return filepath.Join(sessionsDir, sessionID+".jsonl")

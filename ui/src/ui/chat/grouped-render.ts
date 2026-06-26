@@ -248,22 +248,63 @@ function nonImageFileBlocks(files: FileBlock[]): FileBlock[] {
 
 function runPhaseLabel(phase?: "thinking" | "tool" | "streaming"): string {
   if (phase === "tool") {
-    return "正在调用工具…";
+    return "正在调用工具";
   }
   if (phase === "streaming") {
-    return "正在生成回复…";
+    return "正在生成回复";
   }
-  return "思考中…";
+  return "深度思考中";
 }
 
-function renderAssistantAvatar(
-  assistant?: AssistantIdentity,
-  opts?: { busy?: boolean },
+function renderThinkingPanel(
+  reasoningMarkdown: string,
+  opts?: { live?: boolean; open?: boolean },
 ) {
+  const live = opts?.live ?? false;
+  const open = opts?.open ?? live;
   return html`
-    <div class="chat-avatar-wrap ${opts?.busy ? "chat-avatar-wrap--busy" : ""}">
+    <details class="chat-thinking ${live ? "chat-thinking--live" : "chat-thinking--archive"}" ?open=${open}>
+      <summary class="chat-thinking__summary">
+        <span class="chat-thinking__summary-icon" aria-hidden="true">${icons.brain}</span>
+        <span class="chat-thinking__summary-label">${live ? "推理过程" : "思考过程"}</span>
+        ${live ? html`<span class="chat-thinking__live-tag">LIVE</span>` : nothing}
+      </summary>
+      <div class="chat-thinking__content">
+        ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
+      </div>
+    </details>
+  `;
+}
+
+function renderAgentActivityStatus(
+  phase: "thinking" | "tool" | "streaming" = "thinking",
+  opts?: { reasoningText?: string; compact?: boolean },
+) {
+  const reasoningMarkdown = opts?.reasoningText?.trim()
+    ? formatReasoningMarkdown(opts.reasoningText.trim())
+    : null;
+  const compact = opts?.compact ?? false;
+  return html`
+    <div
+      class="chat-agent-activity chat-agent-activity--${phase} ${compact ? "chat-agent-activity--compact" : ""}"
+      aria-live="polite"
+    >
+      <div class="chat-agent-activity__header">
+        <span class="chat-agent-activity__orb" aria-hidden="true"></span>
+        <span class="chat-agent-activity__label">${runPhaseLabel(phase)}</span>
+        <span class="chat-agent-activity__dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </div>
+      ${reasoningMarkdown ? renderThinkingPanel(reasoningMarkdown, { live: true, open: true }) : nothing}
+    </div>
+  `;
+}
+
+function renderAssistantAvatar(assistant?: AssistantIdentity) {
+  return html`
+    <div class="chat-avatar-wrap">
       ${renderAvatar("assistant", assistant)}
-      ${opts?.busy ? html`<span class="chat-avatar-spinner" aria-hidden="true">${icons.loader2}</span>` : nothing}
     </div>
   `;
 }
@@ -274,26 +315,13 @@ export function renderReadingIndicatorGroup(
   phase?: "thinking" | "tool" | "streaming",
   reasoningText?: string,
 ) {
-  const reasoningMarkdown = reasoningText?.trim()
-    ? formatReasoningMarkdown(reasoningText.trim())
-    : null;
+  void startedAt;
   return html`
     <div class="chat-group assistant">
-      ${renderAssistantAvatar(assistant, { busy: true })}
+      ${renderAssistantAvatar(assistant)}
       <div class="chat-group-messages">
-        <div class="chat-bubble chat-reading-indicator" aria-live="polite">
-          ${
-            reasoningMarkdown
-              ? html`
-                  <details class="chat-thinking" open>
-                    <summary class="chat-thinking__summary">思考过程</summary>
-                    <div class="chat-thinking__content">
-                      ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
-                    </div>
-                  </details>
-                `
-              : html`<span class="chat-reading-indicator__label">${runPhaseLabel(phase)}</span>`
-          }
+        <div class="chat-bubble chat-reading-indicator fade-in">
+          ${renderAgentActivityStatus(phase ?? "thinking", { reasoningText })}
         </div>
       </div>
     </div>
@@ -307,17 +335,32 @@ export function renderA2UIGroup(
   sessionKey?: string,
   onA2UIAction?: (action: import("@a2ui/web_core/v0_9").A2uiClientAction) => Promise<void> | void,
   onFilePreview?: (req: FilePreviewRequest) => void,
+  opts?: {
+    runPhase?: "thinking" | "tool" | "streaming";
+    reasoningText?: string;
+  },
 ) {
+  const runPhase = opts?.runPhase;
   return html`
     <div class="chat-group assistant">
-      ${renderAvatar("assistant", assistant)}
-      <div class="chat-group-messages">${renderA2UIContent(messages, {
-        client,
-        sessionKey,
-        onA2UIAction,
-        onFilePreview,
-        inline: true,
-      })}</div>
+      ${renderAssistantAvatar(assistant)}
+      <div class="chat-group-messages">
+        ${
+          runPhase
+            ? renderAgentActivityStatus(runPhase, {
+                reasoningText: opts?.reasoningText,
+                compact: true,
+              })
+            : nothing
+        }
+        ${renderA2UIContent(messages, {
+          client,
+          sessionKey,
+          onA2UIAction,
+          onFilePreview,
+          inline: true,
+        })}
+      </div>
     </div>
   `;
 }
@@ -334,28 +377,15 @@ export function renderStreamingGroup(
     minute: "2-digit",
   });
   const name = assistant?.name ?? "Assistant";
-  const reasoningMarkdown = reasoningText?.trim()
-    ? formatReasoningMarkdown(reasoningText.trim())
-    : null;
 
   return html`
     <div class="chat-group assistant">
-      ${renderAssistantAvatar(assistant, { busy: true })}
+      ${renderAssistantAvatar(assistant)}
       <div class="chat-group-messages">
-        ${
-          reasoningMarkdown
-            ? html`
-                <div class="chat-bubble streaming fade-in">
-                  <details class="chat-thinking" open>
-                    <summary class="chat-thinking__summary">思考过程</summary>
-                    <div class="chat-thinking__content">
-                      ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
-                    </div>
-                  </details>
-                </div>
-              `
-            : nothing
-        }
+        ${renderAgentActivityStatus("streaming", {
+          reasoningText: text.trim() ? undefined : reasoningText,
+          compact: Boolean(text.trim()),
+        })}
         ${renderGroupedMessage(
           {
             role: "assistant",
@@ -457,10 +487,10 @@ export function renderMessageGroup(
     <div class="chat-group ${roleClass}">
       ${
         normalizedRole === "assistant"
-          ? renderAssistantAvatar(
-              { name: assistantName, avatar: opts.assistantAvatar ?? null },
-              { busy: group.isStreaming },
-            )
+          ? renderAssistantAvatar({
+              name: assistantName,
+              avatar: opts.assistantAvatar ?? null,
+            })
           : renderAvatar(group.role, {
               name: assistantName,
               avatar: opts.assistantAvatar ?? null,
@@ -1099,15 +1129,15 @@ function renderAssistantTurnMessages(
   return html`
     ${showProcessPanel
       ? html`
-          <details class="chat-process-details" ?open=${!!group.isStreaming || processSegments.some((s) => s.type === "tools")}>
+          <details class="chat-process-details chat-process-details--tech" ?open=${!!group.isStreaming || processSegments.some((s) => s.type === "tools")}>
             <summary class="chat-process-summary">
-              <span class="chat-process-summary__icon">
-                ${group.isStreaming ? icons.loader2 : icons.wrench}
+              <span class="chat-process-summary__icon chat-process-summary__icon--pulse">
+                ${group.isStreaming ? icons.zap : icons.wrench}
               </span>
               <span class="chat-process-summary__title">思考及工具运行过程</span>
               ${
                 group.isStreaming
-                  ? html`<span class="chat-process-summary__status">运行中</span>`
+                  ? html`<span class="chat-process-summary__status">${runPhaseLabel("thinking")}</span>`
                   : nothing
               }
               <span class="chat-process-summary__chevron">${icons.chevronRight}</span>
@@ -1210,14 +1240,7 @@ function renderCollapsedToolResult(
         }
         ${
           opts.showReasoning && reasoningMarkdown
-            ? html`
-                <details class="chat-thinking" open>
-                  <summary class="chat-thinking__summary">思考过程</summary>
-                  <div class="chat-thinking__content">
-                    ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
-                  </div>
-                </details>
-              `
+            ? renderThinkingPanel(reasoningMarkdown, { live: false, open: opts.isStreaming })
             : nothing
         }
         ${renderMessageImages(images, { client: opts.client, sessionKey: opts.sessionKey })}
@@ -1371,16 +1394,10 @@ function renderGroupedMessage(
       ${opts.hideFileAttachments ? nothing : renderImageFileBlocks(fileBlocks, opts.onFilePreview)}
       ${
         reasoningMarkdown
-          ? html`
-              <details class="chat-thinking">
-                <summary class="chat-thinking__summary">
-                  思考过程
-                </summary>
-                <div class="chat-thinking__content">
-                  ${unsafeHTML(toSanitizedMarkdownHtml(reasoningMarkdown))}
-                </div>
-              </details>
-            `
+          ? renderThinkingPanel(reasoningMarkdown, {
+              live: opts.isStreaming,
+              open: opts.isStreaming,
+            })
           : nothing
       }
       ${

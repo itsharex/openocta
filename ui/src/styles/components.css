@@ -1251,6 +1251,36 @@
   animation: fade-in 0.15s ease-out;
 }
 
+/* catalog / 配置页内挂载的弹层：避免 .content > * 的 relative 覆盖 fixed */
+.content > :is(.modal-overlay, .channel-panel-overlay) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  z-index: 150;
+  animation: none;
+}
+
+/* shell 顶层弹层（数字员工编辑、工具库 MCP 编辑等）：避免 grid 自动排布到页面底部 */
+.shell > :is(.modal-overlay, .channel-panel-overlay, .exec-approval-overlay) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  z-index: 150;
+}
+
+/* 叠在厂商配置侧栏之上的二级弹框（添加模型、选择默认模型） */
+.channel-panel-overlay.models-overlay--add-model {
+  z-index: 160;
+}
+
+.channel-panel-overlay.models-overlay--use-model {
+  z-index: 165;
+}
+
 .channel-panel-overlay .channel-panel {
   width: min(420px, 100%);
   max-height: 100vh;

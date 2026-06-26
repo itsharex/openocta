@@ -155,12 +155,13 @@ func buildAgentMiddlewares(
 	}
 
 	if strings.TrimSpace(skillsDir) != "" {
-		skillBackend, sbErr := skill.NewBackendFromFilesystem(ctx, &skill.BackendFromFilesystemConfig{
+		initCtx := context.WithoutCancel(ctx)
+		skillBackend, sbErr := skill.NewBackendFromFilesystem(initCtx, &skill.BackendFromFilesystemConfig{
 			Backend: fsBackend,
 			BaseDir: skillsDir,
 		})
 		if sbErr == nil {
-			skillMW, smErr := skill.NewMiddleware(ctx, &skill.Config{Backend: skillBackend})
+			skillMW, smErr := skill.NewMiddleware(initCtx, &skill.Config{Backend: stableSkillBackend{inner: skillBackend}})
 			if smErr == nil {
 				handlers = append(handlers, skillMW)
 			}

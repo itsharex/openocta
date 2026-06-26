@@ -191,6 +191,31 @@ describe("chat view", () => {
     expect(container.textContent).toContain("不支持压缩包或可执行文件");
   });
 
+  it("shows a live activity indicator while a run is waiting between tool turns", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          canAbort: true,
+          runPhase: "tool",
+          stream: null,
+          a2uiMessages: [],
+          messages: [
+            {
+              role: "assistant",
+              stopReason: "tool_use",
+              content: [{ type: "toolCall", name: "ls", id: "ls:0" }],
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".chat-agent-activity--tool")).not.toBeNull();
+    expect(container.querySelector(".chat-avatar-spinner")).toBeNull();
+  });
+
   it("does not show a reading indicator after run ends with empty stream placeholder", () => {
     const container = document.createElement("div");
     render(

@@ -83,7 +83,7 @@ export type ModelsProps = {
   onPatchModel: (
     providerKey: string,
     modelId: string,
-    patch: Partial<{ contextWindow: number | null; maxTokens: number | null }>,
+    patch: Partial<{ id: string; name: string; contextWindow: number | null; maxTokens: number | null }>,
   ) => void;
   onPatchModelEnv: (providerKey: string, modelId: string, envVars: Record<string, string>) => void;
   onSave: () => void;
@@ -92,13 +92,38 @@ export type ModelsProps = {
   onUseModelModalClose: () => void;
   onUseModel: (provider: string, modelId: string) => void;
   onCancelUse: (provider: string) => void;
-  onDeleteProvider: () => void;
+  onDeleteProvider: (providerKey?: string) => void;
+  /** Extra class on overlay roots (e.g. setup-wizard__overlay in install wizard). */
+  overlayClass?: string;
 };
+
+function modelOverlayClass(props: ModelsProps, extra?: string): string {
+  const parts = ["channel-panel-overlay"];
+  const overlayClass = props.overlayClass?.trim();
+  if (overlayClass) {
+    parts.push(overlayClass);
+  }
+  if (extra?.trim()) {
+    parts.push(extra.trim());
+  }
+  return parts.join(" ");
+}
 
 export function getProviderDisplayName(providerKey: string, provider?: ModelProvider): string {
   const builtin = BUILTIN_PROVIDERS.find((p) => p.id === providerKey);
   if (builtin) return builtin.label;
   return provider?.displayName ?? providerKey;
+}
+
+/** 自定义厂商始终可删；内置厂商仅当已在配置中写入时可删（移除配置，不删内置模板）。 */
+export function canDeleteModelProvider(
+  providerKey: string,
+  providers?: Record<string, ModelProvider>,
+): boolean {
+  if (!BUILTIN_PROVIDERS.some((p) => p.id === providerKey)) {
+    return true;
+  }
+  return Boolean(providers?.[providerKey]);
 }
 
 export function providerMatchesSearch(
@@ -501,7 +526,7 @@ export function renderModelsOverlays(props: ModelsProps) {
   return html`
     ${props.addProviderModalOpen
       ? html`
-          <div class="channel-panel-overlay" @click=${props.onAddProviderModalClose}>
+          <div class=${modelOverlayClass(props)} @click=${props.onAddProviderModalClose}>
             <div class="channel-panel card" style="max-width: 480px;" @click=${(e: Event) => e.stopPropagation()}>
               <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
                 <div class="card-title">${t("modelsAddCustomProvider")}</div>
@@ -586,7 +611,7 @@ export function renderModelsOverlays(props: ModelsProps) {
 
     ${props.useModelModalOpen && props.useModelModalProvider
       ? html`
-          <div class="channel-panel-overlay" style="z-index: 165;" @click=${props.onUseModelModalClose}>
+          <div class=${modelOverlayClass(props, "models-overlay--use-model")} @click=${props.onUseModelModalClose}>
             <div class="channel-panel card" style="max-width: 400px;" @click=${(e: Event) => e.stopPropagation()}>
               <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
                 <div class="card-title">${getProviderDisplayName(props.useModelModalProvider!, providers?.[props.useModelModalProvider!])} - ${t("modelsSelectModelToUse")}</div>
@@ -622,7 +647,7 @@ export function renderModelsOverlays(props: ModelsProps) {
 
     ${props.addModelModalOpen && props.selectedProvider
       ? html`
-          <div class="channel-panel-overlay" style="z-index: 160;" @click=${props.onAddModelModalClose}>
+          <div class=${modelOverlayClass(props, "models-overlay--add-model")} @click=${props.onAddModelModalClose}>
             <div class="channel-panel card" style="max-width: 400px;" @click=${(e: Event) => e.stopPropagation()}>
               <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
                 <div class="card-title">${getProviderDisplayName(props.selectedProvider, providers?.[props.selectedProvider])} - ${t("modelsAddModel")}</div>
@@ -715,11 +740,14 @@ export function renderModelsOverlays(props: ModelsProps) {
     ${
       props.selectedProvider && (providers?.[props.selectedProvider] ?? BUILTIN_PROVIDERS.find((p) => p.id === props.selectedProvider))
         ? html`
-            <div class="channel-panel-overlay" @click=${(e: Event) => {
+            <div
+              class=${modelOverlayClass(props)}
+              @click=${(e: Event) => {
               if ((e.target as HTMLElement).classList.contains("channel-panel-overlay")) {
                 props.onCancel();
               }
-            }}>
+            }}
+            >
               <div class="channel-panel card" @click=${(e: Event) => e.stopPropagation()}>
                 <div class="channel-panel-header row" style="justify-content: space-between; align-items: center;">
                   <div class="row" style="gap: 10px; align-items: center; min-width: 0;">
@@ -831,8 +859,36 @@ export function renderModelsOverlays(props: ModelsProps) {
                                 const mEnvEntries = Object.entries(mEnv);
                                 return html`
                                 <li style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee);">
-                                  <div class="row" style="justify-content: space-between; align-items: center;">
-                                    <span><code>${m.id}</code> ${m.name ? `- ${m.name}` : ""}</span>
+                                  <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 8px;">
+                                    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                                      <div class="field" style="margin: 0;">
+                                        <span style="font-size: 11px;">${t("modelsModelId")}</span>
+                                        <span class="input"><input
+                                          type="text"
+                                          style="font-size: 12px; padding: 6px 8px;"
+                                          .value=${m.id}
+                                          @change=${(e: Event) => {
+                                            const nextId = (e.target as HTMLInputElement).value.trim();
+                                            if (nextId && nextId !== m.id) {
+                                              props.onPatchModel(props.selectedProvider!, m.id, { id: nextId });
+                                            }
+                                          }}
+                                        /></span>
+                                      </div>
+                                      <div class="field" style="margin: 0;">
+                                        <span style="font-size: 11px;">${t("modelsModelName")}</span>
+                                        <span class="input"><input
+                                          type="text"
+                                          style="font-size: 12px; padding: 6px 8px;"
+                                          .value=${m.name ?? ""}
+                                          placeholder=${m.id}
+                                          @input=${(e: Event) =>
+                                            props.onPatchModel(props.selectedProvider!, m.id, {
+                                              name: (e.target as HTMLInputElement).value,
+                                            })}
+                                        /></span>
+                                      </div>
+                                    </div>
                                     <button
                                       class="btn btn--sm"
                                       ?disabled=${props.saving}
@@ -979,15 +1035,15 @@ export function renderModelsOverlays(props: ModelsProps) {
                     >
                       ${props.saving ? t("commonSaving") : t("commonSave")}
                     </button>
-                    ${!BUILTIN_PROVIDERS.some((p) => p.id === props.selectedProvider)
+                    ${canDeleteModelProvider(props.selectedProvider!, providers)
                       ? html`
                           <button
                             class="btn btn--danger"
                             type="button"
                             ?disabled=${props.saving}
-                            @click=${props.onDeleteProvider}
+                            @click=${() => props.onDeleteProvider(props.selectedProvider!)}
                           >
-                            ${t("commonDelete")}
+                            ${t("modelsDeleteProvider")}
                           </button>
                         `
                       : nothing}

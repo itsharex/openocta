@@ -148,6 +148,10 @@ export class OpenOctaChatThread extends LitElement {
         this.sessionKey,
         (action) => this.#onA2UIAction(action),
         (req) => this.#onFilePreview(req),
+        {
+          runPhase: item.runPhase,
+          reasoningText: item.reasoningText,
+        },
       );
     }
     if (item.kind === "group") {

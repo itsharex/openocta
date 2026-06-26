@@ -1,11 +1,12 @@
 import { html, nothing } from "lit";
 import { icons } from "../icons.ts";
-import { normalizeA2UIMessages } from "./a2ui-bridge.ts";
+import { extractA2UIDisplayTextFromBlocks, normalizeA2UIMessages } from "./a2ui-bridge.ts";
 import {
   componentsArrayFromRaw,
   normalizeComponentMap,
   type ComponentRecord,
 } from "./a2ui-components.ts";
+import { renderTextFilePreviewBody } from "./file-preview-content.ts";
 import { parseOpenOctaFileAttachmentsFromText } from "./openocta-attachments.ts";
 import { extractReferencedImagePaths } from "./attachment-images.ts";
 
@@ -314,35 +315,51 @@ export function extractFileBlocks(message: unknown): FileBlock[] {
 }
 
 const referencedAttachmentPathPattern = /attachments\/[\w./-]+\.html?/gi;
-const referencedPreviewablePathPattern =
-  /(?:^|[\s"'([`])([A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm))/gi;
+const PREVIEWABLE_FILE_EXTENSIONS = "md|markdown|txt|json|ya?ml|csv|log|xml|pdf|html?|htm";
+const referencedPathDelimiter = String.raw`[\s"'(\[\x60\uFF1A:]`;
+const referencedPreviewablePathPattern = new RegExp(
+  `(?:^|${referencedPathDelimiter})([A-Za-z0-9._-]+(?:[\\\\/][A-Za-z0-9._-]+)*\\.(?:${PREVIEWABLE_FILE_EXTENSIONS}))`,
+  "gi",
+);
+const referencedAbsolutePreviewablePathPattern = new RegExp(
+  `(?:^|${referencedPathDelimiter})(/(?:[A-Za-z0-9._-]+(?:[\\\\/][A-Za-z0-9._-]+)*)\\.(?:${PREVIEWABLE_FILE_EXTENSIONS}))`,
+  "gi",
+);
+const referencedHomePreviewablePathPattern = new RegExp(
+  `(?:^|${referencedPathDelimiter})(~(?:[A-Za-z0-9._-]+(?:[\\\\/][A-Za-z0-9._-]+)*)\\.(?:${PREVIEWABLE_FILE_EXTENSIONS}))`,
+  "gi",
+);
+
+function normalizeReferencedPath(raw: string): string {
+  return raw.trim().replace(/^[`'"]+|[`'"]+$/g, "");
+}
+
+function pushReferencedPath(paths: string[], seen: Set<string>, raw: string) {
+  const path = normalizeReferencedPath(raw);
+  if (!path || seen.has(path)) {
+    return;
+  }
+  seen.add(path);
+  paths.push(path);
+}
 
 export function extractReferencedAttachmentPaths(text: string): string[] {
-  const matches = text.match(referencedAttachmentPathPattern) ?? [];
   const seen = new Set<string>();
   const paths: string[] = [];
-  for (const raw of matches) {
-    const path = raw.trim();
-    if (!path || seen.has(path)) {
-      continue;
-    }
-    seen.add(path);
-    paths.push(path);
+  for (const raw of text.match(referencedAttachmentPathPattern) ?? []) {
+    pushReferencedPath(paths, seen, raw);
   }
   for (const match of text.matchAll(referencedPreviewablePathPattern)) {
-    const path = (match[1] ?? "").trim().replace(/^[`'"]+|[`'"]+$/g, "");
-    if (!path || seen.has(path)) {
-      continue;
-    }
-    seen.add(path);
-    paths.push(path);
+    pushReferencedPath(paths, seen, match[1] ?? "");
+  }
+  for (const match of text.matchAll(referencedAbsolutePreviewablePathPattern)) {
+    pushReferencedPath(paths, seen, match[1] ?? "");
+  }
+  for (const match of text.matchAll(referencedHomePreviewablePathPattern)) {
+    pushReferencedPath(paths, seen, match[1] ?? "");
   }
   for (const path of extractReferencedImagePaths(text)) {
-    if (seen.has(path)) {
-      continue;
-    }
-    seen.add(path);
-    paths.push(path);
+    pushReferencedPath(paths, seen, path);
   }
   return paths;
 }
@@ -444,6 +461,10 @@ export function extractReferencedPathsFromGroup(messages: Array<{ message: unkno
           paths.push(file.filename);
         }
         const repaired = normalizeA2UIMessages([block.a2ui]);
+        const displayText = extractA2UIDisplayTextFromBlocks(repaired);
+        if (displayText) {
+          paths.push(...extractReferencedAttachmentPaths(displayText));
+        }
         for (const msg of repaired) {
           const rawComponents = msg.updateComponents?.components;
           if (rawComponents == null) {
@@ -488,6 +509,24 @@ export type FilePreviewRequest = {
   url: string;
 };
 
+function charsetFromDataUrlMeta(meta: string): string {
+  const match = /;\s*charset=([^;]+)/i.exec(meta);
+  if (match?.[1]?.trim()) {
+    return match[1].trim();
+  }
+  return "utf-8";
+}
+
+function decodeBase64Text(payload: string, charset: string): string {
+  const binary = atob(payload);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+}
+
 export function decodeFileText(url: string): string | null {
   if (!url.startsWith("data:")) {
     return null;
@@ -500,7 +539,7 @@ export function decodeFileText(url: string): string | null {
   const payload = url.slice(comma + 1);
   try {
     if (meta.includes(";base64")) {
-      return atob(payload);
+      return decodeBase64Text(payload, charsetFromDataUrlMeta(meta));
     }
     return decodeURIComponent(payload);
   } catch {
@@ -597,8 +636,7 @@ function renderFileEmbed(file: FileBlock, mode: "html" | "pdf" | "text") {
   if (!text) {
     return nothing;
   }
-  const snippet = text.length > 480 ? `${text.slice(0, 480)}…` : text;
-  return html`<pre class="chat-file-snippet">${snippet}</pre>`;
+  return renderTextFilePreviewBody(text, file.filename, file.mimeType, "inline");
 }
 
 function renderFileIconCompact(filename: string, mimeType: string) {

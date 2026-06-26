@@ -15,6 +15,65 @@ import (
 	"github.com/openocta/openocta/pkg/agent/types"
 )
 
+// BuildAgentMessages returns the full model input for a chat turn.
+// When SessionMessages is populated (e.g. from transcript), it is used as-is.
+func BuildAgentMessages(req types.Request) ([]*schema.Message, error) {
+	msgs := req.SessionMessages
+	if len(msgs) == 0 && strings.TrimSpace(req.TranscriptPath) != "" {
+		loaded, _, err := LoadSchemaMessagesFromTranscriptCandidates(
+			[]string{req.TranscriptPath},
+			TranscriptLoadOptions{
+				MaxMessages: req.SessionHistoryMaxMessages,
+				Roles:       req.SessionHistoryRoles,
+			},
+		)
+		if err != nil && len(loaded) == 0 {
+			return nil, err
+		}
+		msgs = loaded
+	}
+	if len(msgs) > 0 {
+		var out []*schema.Message
+		if merged, err := mergeCurrentRequestIntoHistory(msgs, req); err != nil {
+			return nil, err
+		} else if merged != nil {
+			out = merged
+		} else {
+			out = msgs
+		}
+		sanitizeSchemaMessagesToolCalls(out)
+		return out, nil
+	}
+	return BuildUserMessages(req)
+}
+
+func mergeCurrentRequestIntoHistory(history []*schema.Message, req types.Request) ([]*schema.Message, error) {
+	if len(history) == 0 || len(req.ContentBlocks) == 0 {
+		return history, nil
+	}
+	current, err := BuildUserMessages(req)
+	if err != nil || len(current) == 0 {
+		return history, err
+	}
+	out := append([]*schema.Message(nil), history...)
+	last := out[len(out)-1]
+	cur := current[0]
+	if last.Role == schema.User && cur.Role == schema.User {
+		if len(cur.MultiContent) > 0 {
+			last.MultiContent = append(append([]schema.ChatMessagePart(nil), last.MultiContent...), cur.MultiContent...)
+			last.Content = ""
+		} else if strings.TrimSpace(cur.Content) != "" {
+			if strings.TrimSpace(last.Content) != "" {
+				last.Content = strings.TrimSpace(last.Content) + "\n" + strings.TrimSpace(cur.Content)
+			} else {
+				last.Content = cur.Content
+			}
+		}
+		return out, nil
+	}
+	return append(out, cur), nil
+}
+
 // BuildUserMessages converts an OpenOcta request into Eino user messages.
 func BuildUserMessages(req types.Request) ([]*schema.Message, error) {
 	if len(req.ContentBlocks) == 0 {
@@ -160,7 +219,7 @@ func emitAssistantMessageEvents(out chan<- stream.StreamEvent, sessionID string,
 		}
 	}
 	for _, tc := range msg.ToolCalls {
-		input, _ := json.Marshal(tc.Function.Arguments)
+		input := json.RawMessage(NormalizeToolCallArgumentsJSON(tc.Function.Arguments))
 		out <- stream.StreamEvent{
 			Type:      stream.EventToolExecutionStart,
 			SessionID: sessionID,
@@ -260,7 +319,7 @@ func StreamEventsFromIterator(ctx context.Context, sessionID, runID string, iter
 							}
 						}
 						for _, tc := range chunk.ToolCalls {
-							input, _ := json.Marshal(tc.Function.Arguments)
+							input := json.RawMessage(NormalizeToolCallArgumentsJSON(tc.Function.Arguments))
 							out <- stream.StreamEvent{
 								Type:      stream.EventToolExecutionStart,
 								SessionID: sessionID,

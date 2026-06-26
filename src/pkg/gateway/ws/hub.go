@@ -345,23 +345,16 @@ func (c *Client) handleMessage(data []byte) {
 				},
 			}
 			if errorBytes, err := json.Marshal(errorRes); err == nil {
-				select {
-				case c.Send <- errorBytes:
-					atomic.AddInt64(&c.queuedBytes, int64(len(errorBytes)))
-					// Successfully sent
-				default:
-					wsLog.Warn("response channel full, dropping message connId=%s id=%s", c.ConnID, id)
+				if !c.trySend(errorBytes) {
+					wsLog.Warn("response channel full or closed, dropping message connId=%s id=%s", c.ConnID, id)
 				}
 			}
 			return
 		}
-		select {
-		case c.Send <- b:
-			atomic.AddInt64(&c.queuedBytes, int64(len(b)))
-			// Successfully sent
+		if !c.trySend(b) {
+			wsLog.Warn("response channel full or closed, dropping message connId=%s id=%s method=%s", c.ConnID, id, method)
+		} else {
 			wsLog.Debug("response sent connId=%s id=%s method=%s ok=%v", c.ConnID, id, method, ok)
-		default:
-			wsLog.Warn("response channel full, dropping message connId=%s id=%s method=%s", c.ConnID, id, method)
 		}
 	}
 	opts := handlers.HandlerOpts{
@@ -474,12 +467,8 @@ func (c *Client) handleConnect(id string, params interface{}) {
 		wsLog.Error("failed to marshal hello-ok connId=%s id=%s err=%v", c.ConnID, id, err)
 		return
 	}
-	select {
-	case c.Send <- msg:
-		atomic.AddInt64(&c.queuedBytes, int64(len(msg)))
-		// Successfully sent
-	default:
-		wsLog.Warn("hello-ok channel full, dropping message connId=%s id=%s", c.ConnID, id)
+	if !c.trySend(msg) {
+		wsLog.Warn("hello-ok channel full or closed, dropping message connId=%s id=%s", c.ConnID, id)
 	}
 }
 
@@ -495,18 +484,20 @@ func (c *Client) sendError(id string, code string, msg string) {
 		wsLog.Error("failed to marshal error response connId=%s id=%s err=%v", c.ConnID, id, err)
 		return
 	}
-	select {
-	case c.Send <- b:
-		atomic.AddInt64(&c.queuedBytes, int64(len(b)))
-		// Successfully sent
-	default:
-		wsLog.Warn("error response channel full, dropping message connId=%s id=%s", c.ConnID, id)
+	if !c.trySend(b) {
+		wsLog.Warn("error response channel full or closed, dropping message connId=%s id=%s", c.ConnID, id)
 	}
 }
 
 // enqueue pushes msg into Send. If dropOldest is true, it will drop queued messages
 // (oldest first) until it can enqueue the newest message.
-func (c *Client) enqueue(msg []byte, dropOldest bool) bool {
+// Returns false when the client is gone or the queue is full (and dropOldest is false).
+func (c *Client) enqueue(msg []byte, dropOldest bool) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
 	for {
 		select {
 		case c.Send <- msg:
@@ -526,6 +517,19 @@ func (c *Client) enqueue(msg []byte, dropOldest bool) bool {
 				return false
 			}
 		}
+	}
+}
+
+func (c *Client) trySend(msg []byte) bool {
+	defer func() {
+		recover()
+	}()
+	select {
+	case c.Send <- msg:
+		atomic.AddInt64(&c.queuedBytes, int64(len(msg)))
+		return true
+	default:
+		return false
 	}
 }
 
