@@ -471,13 +471,16 @@ type ModelsConfig struct {
 
 // ModelProvider holds provider config.
 type ModelProvider struct {
-	BaseURL    string            `json:"baseUrl"`
-	APIKey     string            `json:"apiKey,omitempty"`
-	Auth       *string           `json:"auth,omitempty"` // "api-key" | "aws-sdk" | "oauth" | "token"
-	API        *string           `json:"api,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	AuthHeader *bool             `json:"authHeader,omitempty"`
-	Models     []ModelDefinition `json:"models"`
+	BaseURL       string            `json:"baseUrl"`
+	APIKey        string            `json:"apiKey,omitempty"`
+	APIKeyPrefix  string            `json:"apiKeyPrefix,omitempty"`
+	Auth          *string           `json:"auth,omitempty"` // "api-key" | "aws-sdk" | "oauth" | "token"
+	API           *string           `json:"api,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	AuthHeader    *bool             `json:"authHeader,omitempty"`
+	DisplayName   string            `json:"displayName,omitempty"`
+	EnvVars       map[string]string `json:"envVars,omitempty"`
+	Models        []ModelDefinition `json:"models"`
 }
 
 // ModelDefinition holds a single model.
