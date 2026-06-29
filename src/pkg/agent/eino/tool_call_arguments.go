@@ -45,3 +45,47 @@ func sanitizeSchemaMessagesToolCalls(msgs []*schema.Message) {
 		}
 	}
 }
+
+const interruptedToolResultText = "[工具执行未完成或被中断]"
+
+// repairIncompleteToolCallMessages inserts placeholder tool messages when an assistant
+// tool_calls turn was interrupted (e.g. preempt) before all tool results were persisted.
+func repairIncompleteToolCallMessages(msgs []*schema.Message) []*schema.Message {
+	if len(msgs) == 0 {
+		return msgs
+	}
+	out := make([]*schema.Message, 0, len(msgs)+4)
+	for i := 0; i < len(msgs); i++ {
+		msg := msgs[i]
+		out = append(out, msg)
+		if msg == nil || msg.Role != schema.Assistant || len(msg.ToolCalls) == 0 {
+			continue
+		}
+		pending := make(map[string]schema.ToolCall)
+		for _, tc := range msg.ToolCalls {
+			if id := strings.TrimSpace(tc.ID); id != "" {
+				pending[id] = tc
+			}
+		}
+		if len(pending) == 0 {
+			continue
+		}
+		i++
+		for len(pending) > 0 && i < len(msgs) && msgs[i] != nil && msgs[i].Role == schema.Tool {
+			if id := strings.TrimSpace(msgs[i].ToolCallID); id != "" {
+				delete(pending, id)
+			}
+			out = append(out, msgs[i])
+			i++
+		}
+		for id, tc := range pending {
+			opts := []schema.ToolMessageOption{}
+			if name := strings.TrimSpace(tc.Function.Name); name != "" {
+				opts = append(opts, schema.WithToolName(name))
+			}
+			out = append(out, schema.ToolMessage(interruptedToolResultText, id, opts...))
+		}
+		i--
+	}
+	return out
+}

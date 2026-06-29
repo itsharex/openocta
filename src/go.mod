@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/larksuite/oapi-sdk-go/v3 v3.9.7
 	github.com/modelcontextprotocol/go-sdk v1.1.0
-	github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.1
+	github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.0
 	github.com/openilink/openilink-sdk-go v0.5.1
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/robfig/cron/v3 v3.0.1

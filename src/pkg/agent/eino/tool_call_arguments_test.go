@@ -60,10 +60,63 @@ func TestSchemaMessagesFromTranscriptEmptyToolArguments(t *testing.T) {
 	}
 }
 
+func TestRepairIncompleteToolCallMessages(t *testing.T) {
+	t.Parallel()
+	msgs := []*schema.Message{
+		schema.UserMessage("今天天气怎么样"),
+		schema.AssistantMessage("", []schema.ToolCall{{
+			ID:   "call_00_sc59kLV9nO5z1oa2XuCU3366",
+			Type: "function",
+			Function: schema.FunctionCall{
+				Name:      "memory_search",
+				Arguments: "{}",
+			},
+		}}),
+		schema.UserMessage("我在杭州"),
+	}
+	out := repairIncompleteToolCallMessages(msgs)
+	if len(out) != 4 {
+		t.Fatalf("expected 4 messages, got %d: %#v", len(out), out)
+	}
+	if out[2].Role != schema.Tool || out[2].ToolCallID != "call_00_sc59kLV9nO5z1oa2XuCU3366" {
+		t.Fatalf("expected placeholder tool message, got %#v", out[2])
+	}
+	if out[3].Role != schema.User || out[3].Content != "我在杭州" {
+		t.Fatalf("expected user message last, got %#v", out[3])
+	}
+}
+
+func TestBuildAgentMessagesRepairsInterruptedToolTurn(t *testing.T) {
+	t.Parallel()
+	msgs, err := BuildAgentMessages(types.Request{
+		Prompt: "我在杭州",
+		SessionMessages: []*schema.Message{
+			schema.UserMessage("今天天气怎么样"),
+			schema.AssistantMessage("", []schema.ToolCall{{
+				ID:   "call_1",
+				Type: "function",
+				Function: schema.FunctionCall{
+					Name:      "memory_search",
+					Arguments: "{}",
+				},
+			}}),
+			schema.UserMessage("我在杭州"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildAgentMessages: %v", err)
+	}
+	if len(msgs) != 4 {
+		t.Fatalf("expected 4 messages, got %d: %#v", len(msgs), msgs)
+	}
+	if msgs[2].Role != schema.Tool {
+		t.Fatalf("expected repaired tool message at index 2, got %#v", msgs[2])
+	}
+}
+
 func TestBuildAgentMessagesSanitizesToolCallArguments(t *testing.T) {
 	t.Parallel()
 	msgs, err := BuildAgentMessages(types.Request{
-		Prompt: "继续",
 		SessionMessages: []*schema.Message{
 			schema.AssistantMessage("ok", []schema.ToolCall{{
 				ID:   "call_1",
@@ -73,12 +126,13 @@ func TestBuildAgentMessagesSanitizesToolCallArguments(t *testing.T) {
 					Arguments: `""`,
 				},
 			}}),
+			schema.ToolMessage("done", "call_1"),
 		},
 	})
 	if err != nil {
 		t.Fatalf("BuildAgentMessages: %v", err)
 	}
-	if len(msgs) != 1 || len(msgs[0].ToolCalls) != 1 {
+	if len(msgs) != 2 || len(msgs[0].ToolCalls) != 1 {
 		t.Fatalf("unexpected messages: %#v", msgs)
 	}
 	if msgs[0].ToolCalls[0].Function.Arguments != "{}" {

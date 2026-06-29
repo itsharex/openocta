@@ -84,6 +84,8 @@ import {
   titleForTab,
 } from "./navigation.ts";
 import { renderSetupWizard } from "./views/setup-wizard.ts";
+import "./components/openocta-mascot.ts";
+import { isChatRunActive } from "./views/chat.ts";
 import { nativeAlert, nativeConfirm, nativePrompt } from "./native-dialog-bridge.ts";
 import { t } from "./strings.js";
 
@@ -567,6 +569,9 @@ export function renderApp(state: AppViewState) {
   const isScheduledTasks =
     state.tab === "scheduledTasks" || state.tab === "cronHistory" || state.tab === "cron";
   const isMessagePage = state.tab === "message";
+  const mascotBusy =
+    isChatRunActive({ canAbort: Boolean(state.chatRunId), sending: state.chatSending }) ||
+    state.chatRunPhase !== "idle";
   const isAgentSwarmPage = state.tab === "agentSwarm";
   const isConfigCatalogTab =
     state.tab === "skillLibrary" ||
@@ -3938,6 +3943,11 @@ export function renderApp(state: AppViewState) {
           : nothing
       }
     </div>
+    ${
+      isMessagePage && !state.setupWizardActive
+        ? html`<openocta-mascot .busy=${mascotBusy} asset-base=${basePath}></openocta-mascot>`
+        : nothing
+    }
     ${renderSetupWizard(buildSetupWizardProps(state))}
     ${state.apiKeysFormModalOpen ? renderApiKeysFormModal(apiKeysProps) : nothing}
     ${state.apiKeysViewSecret ? renderApiKeysSecretModal(apiKeysProps) : nothing}

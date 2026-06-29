@@ -317,8 +317,8 @@ github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1y
 github.com/onsi/gomega v1.16.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
 github.com/onsi/gomega v1.40.0 h1:Vtol0e1MghCD2ZVIilPDIg44XSL9l2QAn8ZNaljWcJc=
 github.com/onsi/gomega v1.40.0/go.mod h1:M/Uqpu/8qTjtzCLUA2zJHX9Iilrau25x1PdoSRbWh5A=
-github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.1 h1:Lb/Uzkiw2Ugt2Xf03J5wmv81PdkYOiWbI8CNBi1boC8=
-github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.1/go.mod h1:ln3IqPYYocZbYvl9TAOrG/cxGR9xcn4pnZRLdCTEGEU=
+github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.0 h1:DL64ORGMk6AUB8q5LbRp8KRFn4oHhdrSepBmbMrtmNo=
+github.com/open-dingtalk/dingtalk-stream-sdk-go v0.9.0/go.mod h1:ln3IqPYYocZbYvl9TAOrG/cxGR9xcn4pnZRLdCTEGEU=
 github.com/openilink/openilink-sdk-go v0.5.1 h1:CPDexezlEnP5R+Ok28KoCXZBVMFfLMcb9fJhaIrJdTI=
 github.com/openilink/openilink-sdk-go v0.5.1/go.mod h1:Z+B/V/3gQgqY2OIg9fYO5k0UoqdOzix8AnK6OjyM4Yg=
 github.com/pelletier/go-toml/v2 v2.0.9 h1:uH2qQXheeefCCkuBBSLi7jCiSmj3VRh2+Goq2N7Xxu0=
