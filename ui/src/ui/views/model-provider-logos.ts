@@ -191,7 +191,7 @@ const HOSTNAME_ALIAS_MAP: Record<string, ProviderLogoKey> = {
   // 讯飞星火
   "spark-api-open.xf-yun.com": "xunfei",
   "xf-yun.com": "xunfei",
-  // 火山引擎方舟
+  // 火山方舟
   "ark.cn-beijing.volces.com": "volces",
   "volces.com": "volces",
 };
@@ -253,7 +253,7 @@ const NAME_ALIAS_MAP: Record<string, ProviderLogoKey> = {
   火山: "volces",
   火山引擎: "volces",
   方舟: "volces",
-  火山引擎方舟: "volces",
+  火山方舟: "volces",
 };
 
 /**
