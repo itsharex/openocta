@@ -14,6 +14,7 @@ import (
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 
+	"github.com/openocta/openocta/pkg/agent/eino/localbackend"
 	"github.com/openocta/openocta/pkg/config"
 
 	octool "github.com/openocta/openocta/pkg/agent/tool"
@@ -72,7 +73,7 @@ func NewEngine(ctx context.Context, cfg BuildConfig) (*Engine, error) {
 		return nil, fmt.Errorf("chat model: %w", err)
 	}
 
-	fsBackend, err := localbk.NewBackend(ctx, &localbk.Config{
+	fsBackend, err := localbackend.NewBackend(ctx, &localbk.Config{
 		ValidateCommand: cfg.ValidateCommand,
 	})
 	if err != nil {
