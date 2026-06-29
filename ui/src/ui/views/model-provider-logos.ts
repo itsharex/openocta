@@ -37,7 +37,8 @@ export type ProviderLogoKey =
   | "venice"
   | "synthetic"
   | "opencode"
-  | "xunfei";
+  | "xunfei"
+  | "volces";
 
 function providerLogoUrl(filename: string) {
   return `${import.meta.env.BASE_URL}provider/${filename}`;
@@ -70,6 +71,7 @@ const LOGO_REGISTRY: Record<ProviderLogoKey, string> = {
   synthetic: providerLogoUrl("synthetic.png"),
   opencode: providerLogoUrl("opencode.png"),
   xunfei: providerLogoUrl("xunfei.png"),
+  volces: providerLogoUrl("huoshan.png"),
 };
 
 // 内置厂商 ID -> LogoKey 映射
@@ -100,6 +102,7 @@ export const BUILTIN_LOGO_KEY_MAP: Record<string, ProviderLogoKey> = {
   synthetic: "synthetic",
   opencode: "opencode",
   xunfei: "xunfei",
+  "volces_ark": "volces",
 };
 
 // Hostname 别名 -> LogoKey 映射（用于自定义厂商通过 baseUrl 识别）
@@ -188,6 +191,9 @@ const HOSTNAME_ALIAS_MAP: Record<string, ProviderLogoKey> = {
   // 讯飞星火
   "spark-api-open.xf-yun.com": "xunfei",
   "xf-yun.com": "xunfei",
+  // 火山引擎方舟
+  "ark.cn-beijing.volces.com": "volces",
+  "volces.com": "volces",
 };
 
 // ProviderKey / DisplayName 别名 -> LogoKey 映射（用于自定义厂商通过名称识别）
@@ -244,6 +250,10 @@ const NAME_ALIAS_MAP: Record<string, ProviderLogoKey> = {
   mimo: "mimo",
   讯飞: "xunfei",
   星火: "xunfei",
+  火山: "volces",
+  火山引擎: "volces",
+  方舟: "volces",
+  火山引擎方舟: "volces",
 };
 
 /**

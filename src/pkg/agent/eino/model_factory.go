@@ -45,6 +45,7 @@ var builtInProviders = map[string]builtInProvider{
 	"vllm":              {"http://127.0.0.1:8000/v1", false, "VLLM_API_KEY", ""},
 	"vercel-ai-gateway": {"https://api.vercel.ai/v1", false, "AI_GATEWAY_API_KEY", ""},
 	"xunfei":            {"https://spark-api-open.xf-yun.com/v1", false, "XUNFEI_API_KEY", "spark-lite"},
+	"volces_ark":        {"https://ark.cn-beijing.volces.com/api/coding/v3", false, "VOLCES_ARK_API_KEY", "ark-code-latest"},
 }
 
 func getEnvVar(cfg *config.OpenOctaConfig, key, modelRef string) string {
