@@ -13,7 +13,7 @@ import {
 import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normalizer.ts";
 import { extractToolCards } from "./tool-cards.ts";
 import { resolveToolDisplay } from "../tool-display.ts";
-import { extractA2UIBlocks, dedupeA2UIMessages, extractA2UIDisplayText, isTextOnlyA2UIDisplay } from "./a2ui-bridge.ts";
+import { extractA2UIBlocks, dedupeA2UIMessages, extractA2UIDisplayText, extractRawA2UIDisplayText, isTextOnlyA2UIDisplay, isToolLikeDisplayText, sanitizeA2UIDisplayText } from "./a2ui-bridge.ts";
 import {
   extractFileBlocks,
   extractFileBlocksFromA2UIBlocks,
@@ -793,6 +793,52 @@ type Segment =
   | { type: "text"; message: unknown; isStreaming: boolean }
   | { type: "tools"; runs: ToolRunEntry[] };
 
+function getToolResultMeta(message: unknown): { output: string; toolName: string } {
+  const m = message as Record<string, unknown>;
+  const text = extractTextCached(message)?.trim() ?? "";
+  const toolName =
+    (typeof m.toolName === "string" && m.toolName.trim()) ||
+    (typeof m.tool_name === "string" && m.tool_name.trim()) ||
+    "tool";
+  return {
+    output: text ? extractToolOutputText(text) : "",
+    toolName,
+  };
+}
+
+function findUnmatchedToolRun(runs: ToolRunEntry[], toolName?: string): ToolRunEntry | undefined {
+  const normalized = toolName?.trim().toLowerCase();
+  if (normalized) {
+    const byName = runs.find((r) => r.output === "" && r.tool.toLowerCase() === normalized);
+    if (byName) {
+      return byName;
+    }
+  }
+  return runs.find((r) => r.output === "");
+}
+
+function enrichToolRunsWithEmbeddedA2UI(segments: Segment[], messages: Array<{ message: unknown }>) {
+  const runs = collectToolRunsFromSegments(segments);
+  if (runs.length === 0) {
+    return;
+  }
+  for (const item of messages) {
+    if (isToolResultLikeMessage(item.message)) {
+      continue;
+    }
+    const rawA2ui = extractRawA2UIDisplayText(item.message)?.trim();
+    if (!rawA2ui || !isToolLikeDisplayText(rawA2ui)) {
+      continue;
+    }
+    const run = findUnmatchedToolRun(runs);
+    if (!run) {
+      continue;
+    }
+    run.output = extractToolOutputText(rawA2ui);
+    run.success = inferToolSuccess(run.output);
+  }
+}
+
 function segmentAssistantTurn(
   messages: Array<{ message: unknown; key: string }>,
   groupIsStreaming: boolean
@@ -843,13 +889,13 @@ function segmentAssistantTurn(
     }
 
     if (isToolResult) {
-      const output = text ? extractToolOutputText(text) : "";
+      const { output, toolName } = getToolResultMeta(message);
       const durationMs = extractDurationMs(message) ?? undefined;
       if (!currentToolSegment) {
         currentToolSegment = { type: "tools", runs: [] };
         segments.push(currentToolSegment);
       }
-      const unmatchedRun = currentToolSegment.runs.find((r) => r.output === "");
+      const unmatchedRun = findUnmatchedToolRun(currentToolSegment.runs, toolName);
       if (unmatchedRun) {
         unmatchedRun.output = output;
         unmatchedRun.success = inferToolSuccess(output);
@@ -859,8 +905,8 @@ function segmentAssistantTurn(
         currentRun = unmatchedRun;
       } else {
         const newRun = {
-          command: "command",
-          tool: cards[0]?.name || "tool",
+          command: toolName,
+          tool: toolName,
           input: "",
           output,
           success: inferToolSuccess(output),
@@ -1037,6 +1083,76 @@ function collectToolRunsFromSegments(segments: Segment[]): ToolRunEntry[] {
   return runs;
 }
 
+type TextSegment = Extract<Segment, { type: "text" }>;
+type ToolsSegment = Extract<Segment, { type: "tools" }>;
+
+function isTextSegmentWithThinking(seg: Segment): seg is TextSegment {
+  return seg.type === "text" && Boolean(extractThinkingCached(seg.message)?.trim());
+}
+
+function renderThinkingProcessPanel(
+  textSegments: TextSegment[],
+  opts: { isStreaming: boolean; open: boolean },
+) {
+  if (textSegments.length === 0) {
+    return nothing;
+  }
+  return html`
+    <details
+      class="chat-process-details chat-process-details--thinking"
+      ?open=${opts.open}
+    >
+      <summary class="chat-process-summary">
+        <span class="chat-process-summary__icon">${icons.brain}</span>
+        <span class="chat-process-summary__title">思考过程</span>
+        ${
+          opts.isStreaming
+            ? html`<span class="chat-process-summary__status">${runPhaseLabel("thinking")}</span>`
+            : nothing
+        }
+        <span class="chat-process-summary__chevron">${icons.chevronRight}</span>
+      </summary>
+      <div class="chat-process-content chat-process-content--thinking">
+        ${textSegments.map((seg) => {
+          const thinking = extractThinkingCached(seg.message)?.trim();
+          if (!thinking) {
+            return nothing;
+          }
+          return renderThinkingPanel(formatReasoningMarkdown(thinking), {
+            live: seg.isStreaming,
+            open: false,
+          });
+        })}
+      </div>
+    </details>
+  `;
+}
+
+function renderToolProcessPanel(runsSegments: ToolsSegment[], isStreaming: boolean, open: boolean) {
+  if (runsSegments.length === 0) {
+    return nothing;
+  }
+  return html`
+    <details class="chat-process-details chat-process-details--tools" ?open=${open}>
+      <summary class="chat-process-summary">
+        <span class="chat-process-summary__icon chat-process-summary__icon--pulse">
+          ${isStreaming ? icons.loader : icons.wrench}
+        </span>
+        <span class="chat-process-summary__title">工具运行</span>
+        ${
+          isStreaming
+            ? html`<span class="chat-process-summary__status">${runPhaseLabel("tool")}</span>`
+            : nothing
+        }
+        <span class="chat-process-summary__chevron">${icons.chevronRight}</span>
+      </summary>
+      <div class="chat-process-content chat-process-content--tools">
+        ${runsSegments.map((seg) => renderToolSegment(seg.runs, isStreaming))}
+      </div>
+    </details>
+  `;
+}
+
 function renderToolOutputBubble(runs: ToolRunEntry[]) {
   const last = [...runs].reverse().find((run) => run.output.trim().length > 0);
   if (!last) {
@@ -1065,6 +1181,7 @@ function renderAssistantTurnMessages(
   },
 ) {
   const segments = segmentAssistantTurn(group.messages, !!group.isStreaming);
+  enrichToolRunsWithEmbeddedA2UI(segments, group.messages);
   if (segments.length === 0) {
     return nothing;
   }
@@ -1086,6 +1203,7 @@ function renderAssistantTurnMessages(
       const images = extractImages(seg.message);
       const files = extractFileBlocks(seg.message);
       const a2uiBlocks = extractA2UIBlocks(seg.message);
+      const a2uiDisplay = sanitizeA2UIDisplayText(extractRawA2UIDisplayText(seg.message));
       const thinking = extractThinkingCached(seg.message)?.trim() ?? "";
       const hasOnlyThinking =
         Boolean(thinking) &&
@@ -1094,7 +1212,7 @@ function renderAssistantTurnMessages(
         files.length === 0 &&
         a2uiBlocks.length === 0;
       const hasVisibleResponse =
-        text || images.length > 0 || files.length > 0 || a2uiBlocks.length > 0;
+        text || images.length > 0 || files.length > 0 || Boolean(a2uiDisplay);
       if (hasVisibleResponse && !hasOnlyThinking) {
         finalResponseIdx = i;
         break;
@@ -1120,54 +1238,48 @@ function renderAssistantTurnMessages(
     }
   }
 
-  const showProcessPanel =
-    processSegments.length > 0 &&
-    (processSegments.some((s) => s.type === "tools") ||
-      processSegments.some((s) => s.type === "text") ||
-      !!group.isStreaming);
+  const thinkingTextSegments = processSegments.filter(isTextSegmentWithThinking);
+  const toolSegments = processSegments.filter(
+    (seg): seg is ToolsSegment => seg.type === "tools",
+  );
+
+  const otherTextSegments = processSegments.filter(
+    (seg): seg is TextSegment =>
+      seg.type === "text" && !extractThinkingCached(seg.message)?.trim(),
+  );
+
+  // Thinking on the final response belongs in the process panel, not the answer bubble.
+  if (
+    finalResponseSegment?.type === "text" &&
+    extractThinkingCached(finalResponseSegment.message)?.trim()
+  ) {
+    thinkingTextSegments.push(finalResponseSegment);
+  }
+
+  const isStreaming = !!group.isStreaming;
 
   return html`
-    ${showProcessPanel
-      ? html`
-          <details class="chat-process-details chat-process-details--tech" ?open=${!!group.isStreaming || processSegments.some((s) => s.type === "tools")}>
-            <summary class="chat-process-summary">
-              <span class="chat-process-summary__icon chat-process-summary__icon--pulse">
-                ${group.isStreaming ? icons.zap : icons.wrench}
-              </span>
-              <span class="chat-process-summary__title">思考及工具运行过程</span>
-              ${
-                group.isStreaming
-                  ? html`<span class="chat-process-summary__status">${runPhaseLabel("thinking")}</span>`
-                  : nothing
-              }
-              <span class="chat-process-summary__chevron">${icons.chevronRight}</span>
-            </summary>
-            <div class="chat-process-content">
-              ${processSegments.map((seg) => {
-                if (seg.type === "text") {
-                  const hasThinking = Boolean(extractThinkingCached(seg.message)?.trim());
-                  return renderGroupedMessage(
-                    seg.message,
-                    {
-                      isStreaming: seg.isStreaming,
-                      showReasoning: opts.showReasoning || hasThinking,
-                      showToolTrace: false,
-                      hideFileAttachments: true,
-                      client: opts.client,
-                      sessionKey: opts.sessionKey,
-                      onFilePreview: opts.onFilePreview,
-                      onA2UIAction: opts.onA2UIAction,
-                    },
-                    opts.onOpenSidebar,
-                  );
-                } else {
-                  return renderToolSegment(seg.runs, !!group.isStreaming);
-                }
-              })}
-            </div>
-          </details>
-        `
-      : nothing}
+    ${renderThinkingProcessPanel(thinkingTextSegments, {
+      isStreaming,
+      open: isStreaming,
+    })}
+    ${renderToolProcessPanel(toolSegments, isStreaming, isStreaming || toolSegments.length > 0)}
+    ${otherTextSegments.map((seg) =>
+      renderGroupedMessage(
+        seg.message,
+        {
+          isStreaming: seg.isStreaming,
+          showReasoning: opts.showReasoning,
+          showToolTrace: false,
+          hideFileAttachments: true,
+          client: opts.client,
+          sessionKey: opts.sessionKey,
+          onFilePreview: opts.onFilePreview,
+          onA2UIAction: opts.onA2UIAction,
+        },
+        opts.onOpenSidebar,
+      ),
+    )}
 
     ${visibleToolRuns ? renderToolOutputBubble(visibleToolRuns) : nothing}
     ${finalResponseSegment?.type === "text"
@@ -1177,6 +1289,7 @@ function renderAssistantTurnMessages(
             isStreaming: finalResponseSegment.isStreaming,
             showReasoning: opts.showReasoning,
             showToolTrace: false,
+            hideThinking: true,
             hideFileAttachments: true,
             client: opts.client,
             sessionKey: opts.sessionKey,
@@ -1227,6 +1340,11 @@ function renderCollapsedToolResult(
 
   return html`
     <div class="chat-tool-result-block">
+      ${
+        opts.showReasoning && reasoningMarkdown
+          ? renderThinkingPanel(reasoningMarkdown, { live: false, open: opts.isStreaming })
+          : nothing
+      }
       <details class="chat-tool-run">
         <summary class="chat-tool-run__summary">
           <span class="chat-tool-run__icon">${icons.wrench}</span>
@@ -1236,11 +1354,6 @@ function renderCollapsedToolResult(
         ${
           primaryCommand
             ? html`<div class="chat-tool-run__command muted">已运行 ${primaryCommand}</div>`
-            : nothing
-        }
-        ${
-          opts.showReasoning && reasoningMarkdown
-            ? renderThinkingPanel(reasoningMarkdown, { live: false, open: opts.isStreaming })
             : nothing
         }
         ${renderMessageImages(images, { client: opts.client, sessionKey: opts.sessionKey })}
@@ -1317,6 +1430,7 @@ function renderGroupedMessage(
     isStreaming: boolean;
     showReasoning: boolean;
     showToolTrace: boolean;
+    hideThinking?: boolean;
     hideFileAttachments?: boolean;
     client?: GatewayBrowserClient | null;
     sessionKey?: string;
@@ -1343,8 +1457,12 @@ function renderGroupedMessage(
   const images = extractImages(message);
   const hasImages = images.length > 0;
   const a2uiBlocks = extractA2UIBlocks(message);
-  const a2uiDisplayText = a2uiBlocks.length > 0 ? extractA2UIDisplayText(message) : null;
-  const showA2UIPanel = a2uiBlocks.length > 0 && !isTextOnlyA2UIDisplay(a2uiBlocks);
+  const rawA2uiText = a2uiBlocks.length > 0 ? extractRawA2UIDisplayText(message) : null;
+  const a2uiDisplayText = sanitizeA2UIDisplayText(rawA2uiText);
+  const showA2UIPanel =
+    a2uiBlocks.length > 0 &&
+    Boolean(a2uiDisplayText) &&
+    !isTextOnlyA2UIDisplay(a2uiBlocks);
   const hasA2UI = showA2UIPanel;
   const fileBlocks = extractFileBlocks(message);
   const hasFiles = fileBlocks.length > 0;
@@ -1382,7 +1500,16 @@ function renderGroupedMessage(
     );
   }
 
-  if (!markdown && !hasToolCards && !hasImages && !hasA2UI && !hasFiles && !reasoningMarkdown) {
+  const showThinkingInBubble = !opts.hideThinking && Boolean(reasoningMarkdown);
+
+  if (
+    !markdown &&
+    !hasToolCards &&
+    !hasImages &&
+    !hasA2UI &&
+    !hasFiles &&
+    !showThinkingInBubble
+  ) {
     return nothing;
   }
 
@@ -1393,8 +1520,8 @@ function renderGroupedMessage(
       ${opts.hideFileAttachments ? nothing : renderFileAttachments(nonImageFileBlocks(fileBlocks), opts.onFilePreview)}
       ${opts.hideFileAttachments ? nothing : renderImageFileBlocks(fileBlocks, opts.onFilePreview)}
       ${
-        reasoningMarkdown
-          ? renderThinkingPanel(reasoningMarkdown, {
+        showThinkingInBubble
+          ? renderThinkingPanel(reasoningMarkdown!, {
               live: opts.isStreaming,
               open: opts.isStreaming,
             })

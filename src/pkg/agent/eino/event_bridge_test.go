@@ -113,7 +113,7 @@ func TestEmitTurnStopFromResponseMeta(t *testing.T) {
 
 	out := make(chan stream.StreamEvent, 4)
 	meta := &schema.ResponseMeta{FinishReason: "tool_calls"}
-	if !emitTurnStopFromResponseMeta(out, "sess-1", meta) {
+	if !emitTurnStopFromResponseMeta(out, "sess-1", meta, nil) {
 		t.Fatal("expected turn stop to be emitted for tool_calls")
 	}
 	close(out)
@@ -133,7 +133,7 @@ func TestEmitTurnStopFromResponseMeta(t *testing.T) {
 	}
 
 	out2 := make(chan stream.StreamEvent, 1)
-	if emitTurnStopFromResponseMeta(out2, "sess-1", &schema.ResponseMeta{FinishReason: ""}) {
+	if emitTurnStopFromResponseMeta(out2, "sess-1", &schema.ResponseMeta{FinishReason: ""}, nil) {
 		t.Fatal("expected no turn stop for empty finish reason")
 	}
 	if len(out2) != 0 {

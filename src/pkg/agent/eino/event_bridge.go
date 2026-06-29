@@ -180,7 +180,7 @@ func emitUsageFromResponseMeta(out chan<- stream.StreamEvent, sessionID string, 
 
 // emitTurnStopFromResponseMeta emits EventMessageStop when FinishReason marks a model turn boundary.
 // Returns true when a turn-ending stop was emitted (so Action.Exit can avoid duplicating end_turn).
-func emitTurnStopFromResponseMeta(out chan<- stream.StreamEvent, sessionID string, meta *schema.ResponseMeta) bool {
+func emitTurnStopFromResponseMeta(out chan<- stream.StreamEvent, sessionID string, meta *schema.ResponseMeta, textStream *a2ui.AssistantTextStream) bool {
 	if meta == nil {
 		return false
 	}
@@ -194,10 +194,60 @@ func emitTurnStopFromResponseMeta(out chan<- stream.StreamEvent, sessionID strin
 		SessionID: sessionID,
 		Delta:     &stream.Delta{StopReason: stop},
 	}
+	if textStream != nil {
+		textStream.Reset()
+	}
 	return true
 }
 
-func emitAssistantMessageEvents(out chan<- stream.StreamEvent, sessionID string, msg *schema.Message, textStream *a2ui.AssistantTextStream) bool {
+type pendingToolCall struct {
+	id   string
+	name string
+}
+
+func emitToolOutputAsResult(out chan<- stream.StreamEvent, sessionID string, pending pendingToolCall, output string) {
+	name := strings.TrimSpace(pending.name)
+	if name == "" {
+		name = "execute"
+	}
+	out <- stream.StreamEvent{
+		Type:      stream.EventToolExecutionResult,
+		SessionID: sessionID,
+		ToolUseID: strings.TrimSpace(pending.id),
+		Name:      name,
+		Output:    output,
+	}
+}
+
+func emitAssistantTextOrToolResult(
+	out chan<- stream.StreamEvent,
+	sessionID string,
+	textStream *a2ui.AssistantTextStream,
+	pending pendingToolCall,
+	text string,
+) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	if IsLeakedToolOutputText(text) {
+		emitToolOutputAsResult(out, sessionID, pending, text)
+		return
+	}
+	emitAssistantTextDelta(out, sessionID, textStream, text)
+	out <- stream.StreamEvent{
+		Type:      stream.EventContentBlockDelta,
+		SessionID: sessionID,
+		Delta:     &stream.Delta{Type: "text_delta", Text: text},
+	}
+}
+
+func emitAssistantMessageEvents(
+	out chan<- stream.StreamEvent,
+	sessionID string,
+	msg *schema.Message,
+	textStream *a2ui.AssistantTextStream,
+	pending *pendingToolCall,
+) bool {
 	if msg == nil {
 		return false
 	}
@@ -212,15 +262,14 @@ func emitAssistantMessageEvents(out chan<- stream.StreamEvent, sessionID string,
 		}
 	}
 	if text := visibleAssistantText(msg); text != "" {
-		emitAssistantTextDelta(out, sessionID, textStream, text)
-		out <- stream.StreamEvent{
-			Type:      stream.EventContentBlockDelta,
-			SessionID: sessionID,
-			Delta:     &stream.Delta{Type: "text_delta", Text: text},
-		}
+		emitAssistantTextOrToolResult(out, sessionID, textStream, *pending, text)
 	}
 	for _, tc := range msg.ToolCalls {
 		input := json.RawMessage(NormalizeToolCallArgumentsJSON(tc.Function.Arguments))
+		if pending != nil {
+			pending.id = tc.ID
+			pending.name = tc.Function.Name
+		}
 		out <- stream.StreamEvent{
 			Type:      stream.EventToolExecutionStart,
 			SessionID: sessionID,
@@ -234,7 +283,7 @@ func emitAssistantMessageEvents(out chan<- stream.StreamEvent, sessionID string,
 			},
 		}
 	}
-	return emitTurnStopFromResponseMeta(out, sessionID, msg.ResponseMeta)
+	return emitTurnStopFromResponseMeta(out, sessionID, msg.ResponseMeta, textStream)
 }
 
 // StreamEventsFromIterator converts Eino agent events into OpenOcta stream events.
@@ -243,6 +292,7 @@ func StreamEventsFromIterator(ctx context.Context, sessionID, runID string, iter
 	go func() {
 		defer close(out)
 		textStream := a2ui.NewAssistantTextStream(sessionID)
+		var pending pendingToolCall
 		turnStopEmitted := false
 		for {
 			evt, ok := iter.Next()
@@ -312,15 +362,12 @@ func StreamEventsFromIterator(ctx context.Context, sessionID, runID string, iter
 							}
 						}
 						if text := visibleStreamingText(chunk); text != "" {
-							emitAssistantTextDelta(out, sessionID, textStream, text)
-							out <- stream.StreamEvent{
-								Type:      stream.EventContentBlockDelta,
-								SessionID: sessionID,
-								Delta:     &stream.Delta{Type: "text_delta", Text: text},
-							}
+							emitAssistantTextOrToolResult(out, sessionID, textStream, pending, text)
 						}
 						for _, tc := range chunk.ToolCalls {
 							input := json.RawMessage(NormalizeToolCallArgumentsJSON(tc.Function.Arguments))
+							pending.id = tc.ID
+							pending.name = tc.Function.Name
 							out <- stream.StreamEvent{
 								Type:      stream.EventToolExecutionStart,
 								SessionID: sessionID,
@@ -335,13 +382,13 @@ func StreamEventsFromIterator(ctx context.Context, sessionID, runID string, iter
 							}
 						}
 					}
-					if lastChunk != nil && emitTurnStopFromResponseMeta(out, sessionID, lastChunk.ResponseMeta) {
+					if lastChunk != nil && emitTurnStopFromResponseMeta(out, sessionID, lastChunk.ResponseMeta, textStream) {
 						turnStopEmitted = true
 					}
 				} else if mo.Message != nil {
 					switch mo.Role {
 					case schema.Assistant:
-						if emitAssistantMessageEvents(out, sessionID, mo.Message, textStream) {
+						if emitAssistantMessageEvents(out, sessionID, mo.Message, textStream, &pending) {
 							turnStopEmitted = true
 						}
 					case schema.Tool:
@@ -350,12 +397,24 @@ func StreamEventsFromIterator(ctx context.Context, sessionID, runID string, iter
 						if content != nil {
 							output = content.Content
 						}
+						toolID := ""
+						toolName := ""
+						if mo.Message != nil {
+							toolID = strings.TrimSpace(mo.Message.ToolCallID)
+							toolName = strings.TrimSpace(mo.Message.ToolName)
+						}
+						if toolName == "" {
+							toolName = pending.name
+						}
 						out <- stream.StreamEvent{
 							Type:      stream.EventToolExecutionResult,
 							SessionID: sessionID,
-							Name:      mo.ToolName,
+							ToolUseID: toolID,
+							Name:      toolName,
 							Output:    output,
 						}
+						pending.id = ""
+						pending.name = ""
 					}
 				}
 			}

@@ -204,7 +204,64 @@ export function extractA2UIDisplayTextFromBlocks(blocks: unknown[]): string | nu
   return latest;
 }
 
+const PERSISTED_OUTPUT_RE = /<persisted-output>[\s\S]*?<\/persisted-output>/gi;
+
+/** Remove large tool stdout embedded in assistant A2UI payloads. */
+export function stripPersistedOutputBlocks(text: string): string {
+  return text.replace(PERSISTED_OUTPUT_RE, "").trim();
+}
+
+/** True when A2UI text is shell/tool output rather than a user-facing reply. */
+export function isToolLikeDisplayText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (PERSISTED_OUTPUT_RE.test(trimmed)) {
+    PERSISTED_OUTPUT_RE.lastIndex = 0;
+    const without = stripPersistedOutputBlocks(trimmed);
+    if (!without) {
+      return true;
+    }
+    return isToolLikeDisplayText(without);
+  }
+  const lower = trimmed.toLowerCase();
+  const prefixes = [
+    "command exited with non-zero code",
+    "[stderr]:",
+    "[command failed with exit code",
+    "output too large (",
+    "full output saved to:",
+    "launching skill:",
+    "launch chromium:",
+  ];
+  if (prefixes.some((p) => lower.startsWith(p))) {
+    return true;
+  }
+  if (trimmed.startsWith('{"matches":')) {
+    return true;
+  }
+  return false;
+}
+
+/** User-visible A2UI markdown after stripping tool noise. */
+export function sanitizeA2UIDisplayText(text: string | null | undefined): string | null {
+  if (text == null) {
+    return null;
+  }
+  const cleaned = stripPersistedOutputBlocks(text.trim());
+  if (!cleaned || isToolLikeDisplayText(cleaned)) {
+    return null;
+  }
+  return cleaned;
+}
+
 export function extractA2UIDisplayText(message: unknown): string | null {
+  return sanitizeA2UIDisplayText(extractA2UIDisplayTextFromBlocks(extractA2UIBlocks(message)));
+}
+
+/** Raw A2UI payload text (includes tool output) for tool trace panels. */
+export function extractRawA2UIDisplayText(message: unknown): string | null {
   return extractA2UIDisplayTextFromBlocks(extractA2UIBlocks(message));
 }
 
@@ -212,7 +269,7 @@ const TEXT_ONLY_A2UI_COMPONENTS = new Set(["Text", "Column", "Row"]);
 
 /** True when A2UI blocks only render static text (no buttons, inputs, etc.). */
 export function isTextOnlyA2UIDisplay(blocks: unknown[]): boolean {
-  if (!extractA2UIDisplayTextFromBlocks(blocks)) {
+  if (!sanitizeA2UIDisplayText(extractA2UIDisplayTextFromBlocks(blocks))) {
     return false;
   }
   const normalized = dedupeA2UIMessages(blocks);

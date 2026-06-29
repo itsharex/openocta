@@ -468,6 +468,45 @@ func appendAssistantToolCallBlock(content []map[string]interface{}, evt stream.S
 	return append(content, tc)
 }
 
+func findPendingToolCallID(content []map[string]interface{}, toolName string) string {
+	toolName = strings.TrimSpace(toolName)
+	for i := len(content) - 1; i >= 0; i-- {
+		block := content[i]
+		typ, _ := block["type"].(string)
+		if typ != "toolCall" && typ != "tool_call" && typ != "toolUse" && typ != "tool_use" {
+			continue
+		}
+		id, _ := block["id"].(string)
+		name, _ := block["name"].(string)
+		if toolName != "" && !strings.EqualFold(strings.TrimSpace(name), toolName) {
+			continue
+		}
+		if strings.TrimSpace(id) != "" {
+			return strings.TrimSpace(id)
+		}
+	}
+	return ""
+}
+
+func findToolCallName(content []map[string]interface{}, toolCallID string) string {
+	toolCallID = strings.TrimSpace(toolCallID)
+	for i := len(content) - 1; i >= 0; i-- {
+		block := content[i]
+		typ, _ := block["type"].(string)
+		if typ != "toolCall" && typ != "tool_call" && typ != "toolUse" && typ != "tool_use" {
+			continue
+		}
+		id, _ := block["id"].(string)
+		if toolCallID != "" && strings.TrimSpace(id) != toolCallID {
+			continue
+		}
+		if name, ok := block["name"].(string); ok && strings.TrimSpace(name) != "" {
+			return strings.TrimSpace(name)
+		}
+	}
+	return ""
+}
+
 func contentBlockToClientFormat(b session.ContentBlock) map[string]interface{} {
 	typ := strings.ToLower(strings.TrimSpace(b.Type))
 	switch typ {
@@ -2594,6 +2633,9 @@ func ChatSendHandler(opts HandlerOpts) error {
 					}
 					if evt.Delta != nil && evt.Delta.Text != "" && !stream.IsLeakedAssistantText(evt.Delta.Text) {
 						delta := evt.Delta.Text
+						if eino.IsLeakedToolOutputText(delta) {
+							break
+						}
 						textBuf.WriteString(delta)
 						visible := textBuf.String()
 						if !shouldSuppressAssistantTextForA2UI(visible, assistantContent, turnHasA2UI) {
@@ -2688,9 +2730,17 @@ func ChatSendHandler(opts HandlerOpts) error {
 					}
 					isErr := evt.IsError != nil && *evt.IsError
 					outputStr := formatStreamToolResultOutput(evt.Output)
+					toolUseID := strings.TrimSpace(evt.ToolUseID)
+					toolName := strings.TrimSpace(evt.Name)
+					if toolUseID == "" {
+						toolUseID = findPendingToolCallID(assistantContent, toolName)
+					}
+					if toolName == "" {
+						toolName = findToolCallName(assistantContent, toolUseID)
+					}
 					broadcastAgentEvent(ctxForBroadcast, runId, sessionKey, "tool_result", map[string]interface{}{
-						"toolCallId": evt.ToolUseID,
-						"toolName":   evt.Name,
+						"toolCallId": toolUseID,
+						"toolName":   toolName,
 						"content":    outputStr,
 						"isError":    isErr,
 					})
@@ -2719,8 +2769,8 @@ func ChatSendHandler(opts HandlerOpts) error {
 						"timestamp": ts,
 						"message": map[string]interface{}{
 							"role":       "toolResult",
-							"toolCallId": evt.ToolUseID,
-							"toolName":   evt.Name,
+							"toolCallId": toolUseID,
+							"toolName":   toolName,
 							"content":    toolResultContent,
 							"isError":    isErr,
 							"timestamp":  tsMs,

@@ -147,6 +147,44 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
       white-space: pre-wrap;
       word-break: break-word;
     }
+    a2ui-basic-text :where(.chat-md-table-wrap) {
+      margin-top: 0.75em;
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+      border-radius: var(--radius-md, 8px);
+      background: var(--bg-content, rgba(127, 127, 127, 0.08));
+    }
+    a2ui-basic-text :where(.chat-md-table-wrap table) {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      display: table;
+    }
+    a2ui-basic-text :where(.chat-md-table-wrap tbody tr:nth-child(even)) {
+      background: color-mix(in srgb, var(--text-regular, #ccc) 4%, transparent);
+    }
+    a2ui-basic-text :where(table) {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+    a2ui-basic-text :where(th, td) {
+      border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+      padding: 8px 12px;
+      vertical-align: top;
+      text-align: left;
+      line-height: 1.45;
+      white-space: normal;
+      min-width: 72px;
+      max-width: 280px;
+    }
+    a2ui-basic-text :where(th) {
+      font-weight: 600;
+      color: var(--text-regular, inherit);
+      background: color-mix(in srgb, var(--accent, #888) 6%, var(--bg-content, transparent));
+    }
     a2ui-basic-text :where(.no-markdown-renderer) {
       display: block;
       white-space: pre-wrap;
@@ -228,7 +266,7 @@ export class ChatA2UIPanel extends SignalWatcher(LitElement) {
       }
       return html`
         <div class="${panelClass}">
-          <div class="chat-text chat-text--preserve-breaks">
+          <div class="chat-text">
             ${unsafeHTML(toSanitizedMarkdownHtml(fallbackText))}
           </div>
         </div>

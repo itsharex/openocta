@@ -75,3 +75,13 @@ func (s *AssistantTextStream) AppendDelta(delta string) []*ServerMessage {
 func (s *AssistantTextStream) Started() bool {
 	return s.started
 }
+
+// Reset clears accumulated text so the next model turn starts a fresh surface payload.
+func (s *AssistantTextStream) Reset() {
+	if s == nil {
+		return
+	}
+	s.started = false
+	s.layout = false
+	s.content.Reset()
+}

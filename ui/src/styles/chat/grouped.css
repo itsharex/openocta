@@ -1175,13 +1175,22 @@ img.chat-avatar {
   color: var(--accent);
 }
 
-.chat-process-details--tech {
+.chat-process-details--thinking {
+  border-color: color-mix(in srgb, var(--text-secondary) 22%, var(--border));
+}
+
+.chat-process-details--tools {
   border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--accent) 3%, transparent),
     transparent 48px
   );
+}
+
+.chat-process-content--thinking,
+.chat-process-content--tools {
+  gap: 8px;
 }
 
 .chat-process-summary__icon--pulse svg {
