@@ -34,6 +34,24 @@ func TestCozeLoopConfigIsEnabled(t *testing.T) {
 	}
 }
 
+func TestResolveCozeLoopSettingsDefaultsWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	enabled, token, ws, base := resolveCozeLoopSettings(&config.OpenOctaConfig{})
+	if !enabled {
+		t.Fatal("expected enabled=true when cozeloop is not configured")
+	}
+	if token != config.DefaultCozeLoopAPIToken {
+		t.Fatalf("apiToken = %q, want %q", token, config.DefaultCozeLoopAPIToken)
+	}
+	if ws != config.DefaultCozeLoopWorkspaceID {
+		t.Fatalf("workspaceID = %q, want %q", ws, config.DefaultCozeLoopWorkspaceID)
+	}
+	if base != "" {
+		t.Fatalf("apiBaseURL = %q, want empty", base)
+	}
+}
+
 func TestResolveCozeLoopSettingsFromConfig(t *testing.T) {
 	t.Parallel()
 

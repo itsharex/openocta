@@ -91,6 +91,10 @@ func resolveCozeLoopSettings(cfg *config.OpenOctaConfig) (enabled bool, apiToken
 		if cl.APIBaseURL != nil {
 			apiBaseURL = strings.TrimSpace(*cl.APIBaseURL)
 		}
+	} else {
+		enabled = true
+		apiToken = config.DefaultCozeLoopAPIToken
+		workspaceID = config.DefaultCozeLoopWorkspaceID
 	}
 
 	if apiToken == "" {
