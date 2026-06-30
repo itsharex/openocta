@@ -761,7 +761,7 @@ export function renderApp(state: AppViewState) {
               title="打开 OpenOcta 企业版"
               class="topbar-link topbar__no-drag"
               @click=${() =>
-                void openExternalUrl("https://openocta.com/amc", {
+                void openExternalUrl("https://demo.openocta.com", {
                   gatewayHost: state.settings.gatewayUrl,
                   gatewayToken: state.settings.token,
                 })}
