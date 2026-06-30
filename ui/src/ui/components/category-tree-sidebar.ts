@@ -29,6 +29,10 @@ export class CategoryTreeSidebar extends LitElement {
     :host {
       display: block;
     }
+    :host-context(.nav--catalog) .tree-row {
+      padding-left: 0;
+      padding-right: 0;
+    }
     .tree-row {
       display: grid;
       align-items: center;
