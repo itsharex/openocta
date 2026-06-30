@@ -84,8 +84,6 @@ import {
   titleForTab,
 } from "./navigation.ts";
 import { renderSetupWizard } from "./views/setup-wizard.ts";
-import "./components/openocta-mascot.ts";
-import { isChatRunActive } from "./views/chat.ts";
 import { nativeAlert, nativeConfirm, nativePrompt } from "./native-dialog-bridge.ts";
 import { t } from "./strings.js";
 
@@ -378,8 +376,14 @@ import { renderEnvVars } from "./views/env-vars.ts";
 import { renderCronConfig, renderCronHistory } from "./views/cron.ts";
 import { buildCronMcpOptions, buildCronModelOptions } from "./cron/cron-form-options.ts";
 import { renderDebug } from "./views/debug.ts";
-import { installFromSite } from "./controllers/remote-market.ts";
+import { installFromSite, fetchEduCategories } from "./controllers/remote-market.ts";
 import { renderEmployeeMarket } from "./views/employee-market.ts";
+import {
+  renderEmployeeCategoryNav,
+  renderModelCategoryNav,
+  renderSkillCategoryNav,
+  renderToolCategoryNav,
+} from "./views/catalog-category-aside.ts";
 import "./components/category-tree-sidebar.ts";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
@@ -400,6 +404,8 @@ import {
 } from "./controllers/vault.ts";
 import { buildSkillCreateModalProps, openSkillCreateChoice } from "./skill-create-handlers.ts";
 import { renderToolLibrary } from "./views/tool-library.ts";
+import { renderTutorials } from "./views/tutorials.ts";
+import { ONLINE_DOCUMENTATION_URL } from "./views/documentation.ts";
 import { requestDesktopClearWorkspace, requestDesktopUninstall } from "./controllers/desktop-uninstall.ts";
 import { openExternalUrl } from "./open-external-url.ts";
 import { renderAbout } from "./views/about.ts";
@@ -569,17 +575,20 @@ export function renderApp(state: AppViewState) {
   const isScheduledTasks =
     state.tab === "scheduledTasks" || state.tab === "cronHistory" || state.tab === "cron";
   const isMessagePage = state.tab === "message";
-  const mascotBusy =
-    isChatRunActive({ canAbort: Boolean(state.chatRunId), sending: state.chatSending }) ||
-    state.chatRunPhase !== "idle";
   const isAgentSwarmPage = state.tab === "agentSwarm";
   const isConfigCatalogTab =
     state.tab === "skillLibrary" ||
     state.tab === "toolLibrary" ||
     state.tab === "modelLibrary";
-  const isCatalogArea = state.tab === "employeeMarket" || isConfigCatalogTab;
-  const isConfigArea =
+  const isCatalogArea =
+    state.tab === "employeeMarket" ||
     isConfigCatalogTab ||
+    state.tab === "tutorials";
+  const hideNavAside =
+    state.tab === "tutorials" ||
+    state.tab === "knowledgeVault" ||
+    isAgentSwarmPage;
+  const isConfigArea =
     state.tab === "envVars" ||
     state.tab === "apiKeys" ||
     state.tab === "overview" ||
@@ -617,6 +626,8 @@ export function renderApp(state: AppViewState) {
     "shell",
     isChat ? "shell--chat" : "",
     isCatalogArea ? "shell--catalog" : "",
+    hideNavAside ? "shell--no-side-nav" : "",
+    state.tab === "tutorials" ? "shell--tutorials" : "",
     state.tab === "knowledgeVault" ? "shell--knowledge-vault" : "",
     isAgentSwarmPage ? "shell--agent-swarm" : "",
     chatFocus ? "shell--chat-focus" : "",
@@ -676,9 +687,13 @@ export function renderApp(state: AppViewState) {
         <nav class="top-tabs" aria-label="Primary navigation">
           ${[
             { tab: "message", label: "消息" },
-            { tab: "employeeMarket", label: "员工市场" },
-            { tab: "knowledgeVault", label: "知识库" },
             { tab: "scheduledTasks", label: "定时任务" },
+            { tab: "employeeMarket", label: "员工市场" },
+            { tab: "skillLibrary", label: "技能库" },
+            { tab: "knowledgeVault", label: "知识库" },
+            { tab: "toolLibrary", label: "工具库" },
+            { tab: "modelLibrary", label: "模型" },
+            { tab: "tutorials", label: "教程" },
             { tab: "config", label: "配置" },
           ].map((item) => {
             const tab = (item as any).tab;
@@ -774,7 +789,7 @@ export function renderApp(state: AppViewState) {
                 height="16"
                 aria-hidden="true"
               />
-              <span class="topbar-link__label">企业版</span>
+              <span class="topbar-link__label">企业版演示</span>
             </button>
           </div>
           <div class="pill pill--link topbar__no-drag">
@@ -830,10 +845,10 @@ export function renderApp(state: AppViewState) {
         }
         </div>
       </header>
-      ${state.tab === "knowledgeVault" || isAgentSwarmPage
+      ${hideNavAside
         ? nothing
         : html`<aside
-            class="nav ${isCatalogArea && !isConfigArea ? "nav--catalog" : ""} ${isConfigArea ? "nav--grouped nav--config" : ""} ${isMessagePage ? "nav--massage" : ""} ${isScheduledTasks ? "nav--grouped" : ""} ${isSideNavCollapsed ? "nav--collapsed" : ""}"
+            class="nav ${isCatalogArea && !isConfigArea ? "nav--catalog" : ""} ${isConfigArea ? "nav--config" : ""} ${isMessagePage ? "nav--massage" : ""} ${isScheduledTasks ? "nav--grouped" : ""} ${isSideNavCollapsed ? "nav--collapsed" : ""}"
             @scroll=${() => {
               if (state.sessionOverflow) {
                 state.sessionOverflow = null;
@@ -1109,12 +1124,9 @@ export function renderApp(state: AppViewState) {
                         <div class="nav-group__items nav-group__items--flat">
                           ${renderTab(state, "overview")}
                           ${renderTab(state, "channels")}
-                          ${renderTab(state, "skillLibrary")}
-                          ${renderTab(state, "toolLibrary")}
-                          ${renderTab(state, "modelLibrary")}
+                          ${renderTab(state, "sandbox")}
                           ${renderTab(state, "envVars")}
                           ${renderTab(state, "apiKeys")}
-                          ${renderTab(state, "sandbox")}
                           ${renderTab(state, "aboutUs")}
                         </div>
                       </div>
@@ -1122,27 +1134,61 @@ export function renderApp(state: AppViewState) {
                     ${renderNavCollapseFooter}
                   `
               : state.tab === "employeeMarket"
-                ? html`
-                    <div class="nav-group">
-                      <div class="nav-group__items">
-                        <category-tree-sidebar
-                          scope="employee"
-                          .items=${state.employeeMarketItems}
-                          .selectedCategory=${state.employeeMarketCategory || "__all__"}
-                          .keyword=${state.employeeMarketQuery}
-                          .gatewayHost=${state.settings?.gatewayUrl?.trim()}
-                          .token=${state.settings?.token?.trim()}
-                          .reloadVersion=${state.employeeMarketReloadVersion}
-                          ?disabled=${state.employeeMarketLoading}
-                          @category-select=${(e: CustomEvent) => { state.employeeMarketCategory = e.detail.name; state.employeeMarketCategoryDescendants = e.detail.descendantNames ?? []; }}
-                        ></category-tree-sidebar>
-                      </div>
-                    </div>
-                  `
-                : html`<div class="nav-empty"></div>`
+                ? renderEmployeeCategoryNav({
+                    items: state.employeeMarketItems,
+                    selectedCategory: state.employeeMarketCategory || "__all__",
+                    keyword: state.employeeMarketQuery,
+                    gatewayHost: state.settings?.gatewayUrl?.trim(),
+                    token: state.settings?.token?.trim(),
+                    reloadVersion: state.employeeMarketReloadVersion,
+                    disabled: state.employeeMarketLoading,
+                    onSelect: (name, descendantNames) => {
+                      state.employeeMarketCategory = name;
+                      state.employeeMarketCategoryDescendants = descendantNames;
+                    },
+                  })
+                : state.tab === "skillLibrary"
+                  ? renderSkillCategoryNav({
+                      items: state.skillLibraryItems,
+                      selectedCategory: state.skillLibraryCategory || "__all__",
+                      keyword: state.skillLibraryQuery,
+                      gatewayHost: state.settings?.gatewayUrl?.trim(),
+                      token: state.settings?.token?.trim(),
+                      reloadVersion: state.skillLibraryReloadVersion,
+                      disabled: state.skillLibraryLoading,
+                      onSelect: (name, descendantNames) => {
+                        state.skillLibraryCategory = name;
+                        state.skillLibraryCategoryDescendants = descendantNames;
+                      },
+                    })
+                  : state.tab === "toolLibrary"
+                    ? renderToolCategoryNav({
+                        items: state.toolLibraryItems ?? [],
+                        selectedCategory: state.toolLibraryCategory || "__all__",
+                        keyword: state.toolLibraryQuery,
+                        gatewayHost: state.settings?.gatewayUrl?.trim(),
+                        token: state.settings?.token?.trim(),
+                        reloadVersion: state.toolLibraryReloadVersion,
+                        disabled: state.toolLibraryLoading,
+                        onSelect: (name, descendantNames) => {
+                          state.toolLibraryCategory = name;
+                          state.toolLibraryCategoryDescendants = descendantNames;
+                        },
+                      })
+                    : state.tab === "modelLibrary"
+                      ? renderModelCategoryNav({
+                          providers: state.providers,
+                          providerSearchQuery: state.modelsProviderSearchQuery,
+                          selectedCategory: state.modelLibraryCategory,
+                          disabled: state.configLoading,
+                          onCategoryChange: (category) => {
+                            state.modelLibraryCategory = category;
+                          },
+                        })
+                      : html`<div class="nav-empty"></div>`
         }
       </aside>`}
-      <main class="content ${isChat ? "content--chat" : ""} ${isCatalogArea ? "content--catalog" : ""} ${isAgentSwarmPage ? "content--agent-swarm" : ""} ${state.tab === "knowledgeVault" ? "content--knowledge-vault" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""} ${isCatalogArea ? "content--catalog" : ""} ${isAgentSwarmPage ? "content--agent-swarm" : ""} ${state.tab === "tutorials" ? "content--tutorials" : ""} ${state.tab === "knowledgeVault" ? "content--knowledge-vault" : ""} ${state.tab === "tutorials" && state.tutorialsActiveTab === "documentation" ? "content--documentation" : ""}">
         ${isCatalogArea || isMessagePage || isAgentSwarmPage || state.tab === "knowledgeVault"
           ? nothing
           : html`
@@ -2020,6 +2066,82 @@ export function renderApp(state: AppViewState) {
                     }, 2000);
                   }
                 },
+                });
+              })()
+            : nothing
+        }
+
+        ${
+          state.tab === "tutorials"
+            ? (() => {
+                const onRefresh = async () => {
+                  state.tutorialsLoading = true;
+                  state.tutorialsError = null;
+                  try {
+                    state.tutorialCategories = await fetchEduCategories({
+                      gatewayHost: state.settings?.gatewayUrl?.trim(),
+                      token: state.settings?.token?.trim(),
+                    });
+                    if (!state.tutorialsSelectedCategoryId && state.tutorialCategories.length) {
+                      state.tutorialsSelectedCategoryId = state.tutorialCategories[0]?.id ?? null;
+                    } else if (state.tutorialsSelectedCategoryId) {
+                      const exists = state.tutorialCategories.some(
+                        (c) => c.id === state.tutorialsSelectedCategoryId,
+                      );
+                      if (!exists) {
+                        state.tutorialsSelectedCategoryId = state.tutorialCategories[0]?.id ?? null;
+                      }
+                    }
+                  } catch (err) {
+                    state.tutorialsError = (err as Error)?.message
+                      ? String((err as Error).message)
+                      : String(err);
+                  } finally {
+                    state.tutorialsLoading = false;
+                  }
+                };
+
+                if (!state.tutorialsLoadedOnce && !state.tutorialsLoading) {
+                  state.tutorialsLoadedOnce = true;
+                  queueMicrotask(() => void onRefresh());
+                }
+
+                return renderTutorials({
+                  activeTab: state.tutorialsActiveTab,
+                  loading: state.tutorialsLoading,
+                  error: state.tutorialsError,
+                  categories: state.tutorialCategories,
+                  query: state.tutorialsQuery,
+                  selectedCategoryId: state.tutorialsSelectedCategoryId,
+                  playingLink: state.tutorialsPlayingLink,
+                  onTabChange: (tab) => {
+                    state.tutorialsActiveTab = tab;
+                    if (tab === "video") {
+                      state.tutorialsPlayingLink = null;
+                    }
+                  },
+                  onOpenDocumentationExternal: () =>
+                    void openExternalUrl(ONLINE_DOCUMENTATION_URL, {
+                      gatewayHost: state.settings.gatewayUrl,
+                      gatewayToken: state.settings.token,
+                    }),
+                  onQueryChange: (next) => {
+                    if (state.tutorialsQueryDebounceTimer) {
+                      window.clearTimeout(state.tutorialsQueryDebounceTimer);
+                    }
+                    state.tutorialsQueryDebounceTimer = window.setTimeout(() => {
+                      state.tutorialsQuery = next;
+                      state.tutorialsQueryDebounceTimer = null;
+                    }, 200);
+                  },
+                  onSelectCategory: (id) => (state.tutorialsSelectedCategoryId = id),
+                  onLessonClick: (link) => {
+                    state.tutorialsPlayingLink = link;
+                  },
+                  onPlayingClose: () => (state.tutorialsPlayingLink = null),
+                  onRefresh: async () => {
+                    await onRefresh();
+                  },
                 });
               })()
             : nothing
@@ -3943,11 +4065,6 @@ export function renderApp(state: AppViewState) {
           : nothing
       }
     </div>
-    ${
-      isMessagePage && !state.setupWizardActive
-        ? html`<openocta-mascot .busy=${mascotBusy} asset-base=${basePath}></openocta-mascot>`
-        : nothing
-    }
     ${renderSetupWizard(buildSetupWizardProps(state))}
     ${state.apiKeysFormModalOpen ? renderApiKeysFormModal(apiKeysProps) : nothing}
     ${state.apiKeysViewSecret ? renderApiKeysSecretModal(apiKeysProps) : nothing}

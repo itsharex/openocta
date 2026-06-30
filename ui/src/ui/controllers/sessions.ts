@@ -195,3 +195,39 @@ export async function deleteSession(state: SessionsState, key: string) {
     state.sessionsLoading = false;
   }
 }
+
+export async function deleteSessions(state: SessionsState, keys: string[]) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  if (state.sessionsLoading) {
+    return;
+  }
+  const safeKeys = Array.from(
+    new Set(keys.filter((key) => key && key !== "agent.main.main")),
+  );
+  if (safeKeys.length === 0) {
+    return;
+  }
+  const label =
+    safeKeys.length === 1
+      ? "确定删除此会话？"
+      : `确定删除 ${safeKeys.length} 个会话？`;
+  const confirmed = await nativeConfirm(label);
+  if (!confirmed) {
+    return;
+  }
+  state.sessionsLoading = true;
+  state.sessionsError = null;
+  try {
+    for (const key of safeKeys) {
+      await state.client.request("sessions.delete", { key, deleteTranscript: true });
+    }
+    state.sessionsLoading = false;
+    await loadSessions(state, { includeLastMessage: true });
+  } catch (err) {
+    state.sessionsError = String(err);
+  } finally {
+    state.sessionsLoading = false;
+  }
+}

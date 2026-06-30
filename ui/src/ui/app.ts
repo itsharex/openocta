@@ -409,6 +409,12 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() sessionOverflow: { top: number; right: number; key: string } | null = null;
   @state() sessionSidebarQuery = "";
   @state() sessionsError: string | null = null;
+  @state() sessionsFilterActive = "";
+  @state() sessionsFilterLimit = "120";
+  @state() sessionsIncludeGlobal = true;
+  @state() sessionsIncludeUnknown = false;
+  @state() sessionsBulkMode = false;
+  @state() sessionsSelectedKeys: string[] = [];
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
@@ -630,6 +636,16 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() toolLibraryInstallingId: number | null = null;
   @state() toolLibraryMcpEditModalOpen = false;
   @state() toolLibraryMcpEditServerKey = "";
+
+  @state() tutorialsLoadedOnce = false;
+  @state() tutorialsLoading = false;
+  @state() tutorialsError: string | null = null;
+  @state() tutorialCategories: import("./controllers/remote-market.ts").EduCategory[] = [];
+  @state() tutorialsActiveTab: import("./views/tutorials.ts").TutorialTab = "video";
+  @state() tutorialsQuery = "";
+  @state() tutorialsSelectedCategoryId: number | null = null;
+  @state() tutorialsPlayingLink: string | null = null;
+  @state() tutorialsQueryDebounceTimer: number | null = null;
 
   @state() aboutUninstallModalOpen = false;
   @state() aboutUninstallMode: "program" | "full" = "program";

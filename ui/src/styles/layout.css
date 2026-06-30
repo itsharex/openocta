@@ -834,6 +834,18 @@ button.nav-item {
   color: var(--accent);
 }
 
+.top-tab .nav-item__icon {
+  color: var(--text-secondary);
+}
+
+.top-tab:hover .nav-item__icon {
+  color: var(--text-primary);
+}
+
+.top-tab--active .nav-item__icon {
+  color: var(--accent);
+}
+
 /* ===========================================
    Content Area
    =========================================== */
@@ -1222,7 +1234,7 @@ button.nav-item {
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
@@ -1633,7 +1645,9 @@ button.nav-item {
   --shell-nav-width: 240px;
 }
 
-.shell--knowledge-vault {
+.shell--tutorials,
+.shell--knowledge-vault,
+.shell--no-side-nav {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "topbar"
@@ -1873,10 +1887,27 @@ button.nav-item {
   opacity: 0.9;
 }
 
+.nav--config {
+  padding: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nav--config .nav-group-list {
+  padding: 0 8px;
+}
+
 .nav--config .nav-group__items--flat {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-top: 8px;
+}
+
+.nav--config .nav-label--static {
+  display: none;
 }
 
 @media (max-width: 1200px) {

@@ -20,12 +20,15 @@ export type Tab =
   | "knowledgeVault"
   | "toolLibrary"
   | "modelLibrary"
+  | "tutorials"
+  | "documentation"
   | "aboutUs"
   | "community"
   | "agents"
   | "overview"
   | "channels"
   | "instances"
+  | "sessions"
   | "cron"
   | "skills"
   | "mcp"
@@ -50,12 +53,15 @@ const TAB_PATHS: Record<Tab, string> = {
   knowledgeVault: "/knowledge-vault",
   toolLibrary: "/tool-library",
   modelLibrary: "/model-library",
+  tutorials: "/tutorials",
+  documentation: "/documentation",
   aboutUs: "/about-us",
   community: "/community",
   agents: "/agents",
   overview: "/overview",
   channels: "/channels",
   instances: "/instances",
+  sessions: "/sessions",
   cron: "/cron",
   skills: "/skills",
   mcp: "/mcp",
@@ -78,7 +84,11 @@ const ACTIVE_TOP_TAB_ICONS: Partial<Record<Tab, IconName>> = {
   message: "messageSquareActive",
   scheduledTasks: "alarmClockActive",
   employeeMarket: "usersActive",
+  skillLibrary: "zapActive",
   knowledgeVault: "documentation",
+  toolLibrary: "wrenchActive",
+  modelLibrary: "modelCubeActive",
+  tutorials: "bookActive",
   community: "globeActive",
   config: "settingsActive",
 };
@@ -185,11 +195,15 @@ export function iconForTab(tab: Tab, active = false): IconName {
     case "skillLibrary":
       return "zap";
     case "knowledgeVault":
-      return "fileText";
+      return "documentation";
     case "toolLibrary":
       return "wrench";
     case "modelLibrary":
       return "modelCube";
+    case "tutorials":
+      return "book";
+    case "documentation":
+      return "documentation";
     case "aboutUs":
       return "info";
     case "community":
@@ -208,6 +222,8 @@ export function iconForTab(tab: Tab, active = false): IconName {
       return "link";
     case "instances":
       return "radio";
+    case "sessions":
+      return "messageSquare";
     case "cron":
       return "loader";
     case "skills":
@@ -253,6 +269,10 @@ export function titleForTab(tab: Tab) {
       return "工具库";
     case "modelLibrary":
       return "模型库";
+    case "tutorials":
+      return "教程";
+    case "documentation":
+      return "文档";
     case "aboutUs":
       return "关于我们";
     case "community":
@@ -265,6 +285,8 @@ export function titleForTab(tab: Tab) {
       return t("navTitleChannels");
     case "instances":
       return t("navTitleInstances");
+    case "sessions":
+      return t("navTitleSessions");
     case "cron":
       return t("navTitleCron");
     case "skills":
@@ -350,9 +372,13 @@ export function subtitleForTab(tab: Tab) {
       return "";
     case "skillLibrary":
       return "";
+    case "knowledgeVault":
+      return "";
     case "toolLibrary":
       return "";
     case "modelLibrary":
+      return "";
+    case "tutorials":
       return "";
     case "aboutUs":
       return "";
@@ -364,6 +390,8 @@ export function subtitleForTab(tab: Tab) {
       return t("subtitleOverview");
     case "channels":
       return t("subtitleChannels");
+    case "sessions":
+      return "";
     case "instances":
       return t("subtitleInstances");
     case "cron":

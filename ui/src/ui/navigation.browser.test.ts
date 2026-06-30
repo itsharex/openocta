@@ -115,10 +115,10 @@ describe("control UI routing", () => {
     await app.updateComplete;
 
     expect(app.tab).toBe("skillLibrary");
-    expect(app.querySelector(".top-tab--active")?.textContent).toContain("配置");
+    expect(app.querySelector(".top-tab--active")?.textContent).toContain("技能库");
   });
 
-  it("renders the five primary top tabs plus config", async () => {
+  it("renders the primary top tabs plus config", async () => {
     const app = mountApp("/message");
     await app.updateComplete;
 
@@ -126,7 +126,17 @@ describe("control UI routing", () => {
       node.textContent?.trim() ?? "",
     );
 
-    expect(labels).toEqual(["消息", "员工市场", "知识库", "定时任务", "配置"]);
+    expect(labels).toEqual([
+      "消息",
+      "定时任务",
+      "员工市场",
+      "技能库",
+      "知识库",
+      "工具库",
+      "模型",
+      "教程",
+      "配置",
+    ]);
   });
 
   it("auto-scrolls chat history to the latest message", async () => {

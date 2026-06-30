@@ -7,7 +7,6 @@ import { groupByCategoryKey } from "../utils/category-helpers.ts";
 import { icons } from "../icons.js";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
-import { renderToolCategoryAside } from "./catalog-category-aside.ts";
 import { t } from "../strings.js";
 import {
   isMcpAddFormValid,
@@ -410,22 +409,6 @@ export function renderToolLibrary(props: ToolLibraryProps) {
     <main class="emp-page">
       <section class="emp-list-wrap">
         <div class="emp-content">
-          ${renderToolCategoryAside({
-            items: props.items ?? [],
-            selectedCategory: effectiveCategory,
-            keyword: props.query,
-            gatewayHost: props.gatewayHost,
-            token: props.token,
-            reloadVersion: props.categoryReloadVersion ?? 0,
-            disabled: props.loading,
-            onSelect: (name, descendantNames) => {
-              if (props.onCategoryTreeSelect) {
-                props.onCategoryTreeSelect(name, descendantNames);
-                return;
-              }
-              props.onCategoryChange?.(name);
-            },
-          })}
           <div class="emp-main">
             ${
               props.addModalOpen && props.onAddClose

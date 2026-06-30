@@ -6,28 +6,31 @@
 
 .stat-grid {
   margin-top: 20px;
-  display: flex;
-  gap: 20px 72px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px 24px;
 }
 
 .stat {
   display: flex;
-  align-items: flex-end;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
 }
 
 .stat-label {
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: normal;
-  line-height: 26px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 500;
-  line-height: 36px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
 }
 
 .stat-value.ok {

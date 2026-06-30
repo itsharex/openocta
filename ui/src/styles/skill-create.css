@@ -117,12 +117,14 @@
   width: 48px;
   height: 48px;
   margin: 0 auto 12px;
-  color: var(--primary, #e85d4c);
+  color: var(--accent);
 }
 
 .skill-create__dropzone-icon svg {
   width: 48px;
   height: 48px;
+  stroke: currentColor;
+  fill: none;
 }
 
 .skill-create__dropzone-title {
@@ -219,13 +221,15 @@
 .skill-create__choice-icon {
   width: 36px;
   height: 36px;
-  color: var(--primary, #e85d4c);
+  color: var(--accent);
   margin-bottom: 10px;
 }
 
 .skill-create__choice-icon svg {
   width: 36px;
   height: 36px;
+  stroke: currentColor;
+  fill: none;
 }
 
 .skill-create__choice-title {

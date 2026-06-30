@@ -234,6 +234,12 @@ export type AppViewState = {
   /** 消息页侧栏：按名称 / 标签字段 / 副标题等模糊过滤会话 */
   sessionSidebarQuery: string;
   sessionsError: string | null;
+  sessionsFilterActive: string;
+  sessionsFilterLimit: string;
+  sessionsIncludeGlobal: boolean;
+  sessionsIncludeUnknown: boolean;
+  sessionsBulkMode: boolean;
+  sessionsSelectedKeys: string[];
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
@@ -464,6 +470,16 @@ export type AppViewState = {
   toolLibraryMcpEditServerKey: string;
   toolLibraryQueryDebounceTimer: number | null;
   toolLibraryReloadVersion: number;
+
+  tutorialsLoadedOnce: boolean;
+  tutorialsLoading: boolean;
+  tutorialsError: string | null;
+  tutorialCategories: import("./controllers/remote-market.ts").EduCategory[];
+  tutorialsActiveTab: import("./views/tutorials.ts").TutorialTab;
+  tutorialsQuery: string;
+  tutorialsSelectedCategoryId: number | null;
+  tutorialsPlayingLink: string | null;
+  tutorialsQueryDebounceTimer: number | null;
 
   aboutUninstallModalOpen: boolean;
   aboutUninstallMode: "program" | "full";

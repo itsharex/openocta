@@ -140,6 +140,39 @@ export type SkillDetail = {
   logo_url?: string;
 };
 
+export type EduLesson = {
+  id: number;
+  title: string;
+  duration?: string;
+  link?: string;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EduCourse = {
+  id: number;
+  title: string;
+  course_type?: string;
+  duration?: string;
+  link?: string;
+  sort_order?: number;
+  lessons?: EduLesson[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EduCategory = {
+  id: number;
+  name: string;
+  icon_class?: string;
+  accent?: string;
+  sort_order?: number;
+  courses?: EduCourse[];
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type CategoryTreeNode = {
   id: number | string;
   name: string;
@@ -230,6 +263,14 @@ export async function fetchCategories(
     opts?.gatewayHost,
     opts?.token,
   );
+}
+
+export async function fetchEduCategories(opts?: RemoteMarketOptions) {
+  return await siteGet<EduCategory[]>(`/api/v1/edu/categories`, opts);
+}
+
+export async function fetchEduLessonDetail(id: number, opts?: RemoteMarketOptions) {
+  return await localGet<EduLesson>(`/api/v1/edu/lessons/${id}`, opts?.gatewayHost, opts?.token);
 }
 
 export type InstallKind = "employee" | "skill" | "mcp";

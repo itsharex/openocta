@@ -27,30 +27,38 @@ export class CategoryTreeSidebar extends LitElement {
 
   static styles = css`
     :host {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
+      display: block;
     }
     .tree-row {
-      display: flex;
+      display: grid;
       align-items: center;
+      gap: 6px;
       min-height: 36px;
       padding: 0 12px;
-      border-radius: 6px;
+      border-radius: 0;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition:
+        color 0.2s ease,
+        background 0.2s ease;
       color: var(--text-regular);
       font-size: 14px;
+      line-height: 20px;
       border: none;
       background: transparent;
       width: 100%;
       text-align: left;
     }
+    .tree-row--branch {
+      grid-template-columns: 14px minmax(0, 1fr) auto;
+    }
+    .tree-row--leaf {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
     .tree-row:hover:not(:disabled) {
       color: var(--accent);
     }
     .tree-row.active {
-      background: var(--bg-content);
+      background: var(--bg-catalog, #f5f6f7);
       color: var(--accent);
       font-weight: 500;
     }
@@ -58,13 +66,15 @@ export class CategoryTreeSidebar extends LitElement {
       opacity: 0.5;
       cursor: not-allowed;
     }
+    .tree-indent {
+      display: block;
+    }
     .tree-caret {
-      width: 16px;
+      width: 14px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 10px;
-      margin-right: 4px;
       color: var(--text-secondary);
       flex-shrink: 0;
     }
@@ -75,7 +85,7 @@ export class CategoryTreeSidebar extends LitElement {
       color: var(--accent);
     }
     .tree-label {
-      flex: 1;
+      min-width: 0;
       text-align: left;
       white-space: nowrap;
       overflow: hidden;
@@ -83,9 +93,10 @@ export class CategoryTreeSidebar extends LitElement {
     }
     .tree-count {
       height: 20px;
+      min-width: 20px;
       padding: 0 8px;
       border-radius: 999px;
-      background: var(--bg-content);
+      background: var(--bg-catalog, #f5f6f7);
       color: var(--text-secondary);
       font-size: 12px;
       display: inline-flex;
@@ -93,7 +104,6 @@ export class CategoryTreeSidebar extends LitElement {
       justify-content: center;
       line-height: 20px;
       flex-shrink: 0;
-      margin-left: 4px;
     }
     .tree-row.active .tree-count {
       background: var(--accent);
@@ -186,7 +196,7 @@ export class CategoryTreeSidebar extends LitElement {
 
     return html`
       <button
-        class="tree-row ${this.selectedCategory === "__all__" ? "active" : ""}"
+        class="tree-row tree-row--leaf ${this.selectedCategory === "__all__" ? "active" : ""}"
         type="button"
         ?disabled=${this.disabled}
         @click=${() => this.emitCategorySelect({ id: "__all__", name: "__all__", children: [] })}
@@ -199,25 +209,29 @@ export class CategoryTreeSidebar extends LitElement {
         const isExpanded = this.expandedIds.has(node.id);
         const isActive = this.selectedCategory === node.name;
         const count = countMap.get(node.id) ?? 0;
-        const paddingLeft = 12 + level * 16;
 
         return html`
-          <button
-            class="tree-row ${isActive ? "active" : ""}"
-            type="button"
-            ?disabled=${this.disabled}
-            style="padding-left:${paddingLeft}px"
-            @click=${() => this.emitCategorySelect(node)}
-          >
-            <span
-              class="tree-caret ${hasChildren ? "clickable" : ""}"
-              @click=${hasChildren ? (e: Event) => this.toggleExpand(node, e) : undefined}
+          <div class="tree-indent" style="padding-left:${level * 12}px">
+            <button
+              class="tree-row ${hasChildren ? "tree-row--branch" : "tree-row--leaf"} ${isActive ? "active" : ""}"
+              type="button"
+              ?disabled=${this.disabled}
+              @click=${() => this.emitCategorySelect(node)}
             >
-              ${hasChildren ? (isExpanded ? "▼" : "▶") : ""}
-            </span>
-            <span class="tree-label">${node.name}</span>
-            <span class="tree-count">${count}</span>
-          </button>
+              ${
+                hasChildren
+                  ? html`<span
+                      class="tree-caret clickable"
+                      @click=${(e: Event) => this.toggleExpand(node, e)}
+                    >
+                      ${isExpanded ? "▼" : "▶"}
+                    </span>`
+                  : nothing
+              }
+              <span class="tree-label">${node.name}</span>
+              <span class="tree-count">${count}</span>
+            </button>
+          </div>
         `;
       })}
     `;

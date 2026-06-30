@@ -1,6 +1,7 @@
 :root {
-  --bg: #fafbfc;
-  --bg-content: #f0f2f5;
+  --bg: #ffffff;
+  --bg-content: #ffffff;
+  --bg-catalog: #f5f6f7;
   --bg-elevated: #ffffff;
   --bg-glass: rgba(255, 255, 255, 0.72);
 
@@ -79,6 +80,7 @@
 :root[data-theme="dark"] {
   --bg: #0a0c10;
   --bg-content: #0f1218;
+  --bg-catalog: #0f1218;
   --bg-elevated: #141820;
   --bg-glass: rgba(10, 12, 16, 0.82);
 

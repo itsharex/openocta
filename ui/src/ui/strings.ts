@@ -45,6 +45,7 @@ type Strings = {
   navTitleOverview: string;
   navTitleChannels: string;
   navTitleInstances: string;
+  navTitleSessions: string;
   navTitleUsage: string;
   navTitleCron: string;
   navTitleSkills: string;
@@ -104,6 +105,23 @@ type Strings = {
   overviewInstances: string;
   overviewInstancesSub: string;
   overviewSessions: string;
+  sessionsTitle: string;
+  sessionsSub: string;
+  sessionsActiveWithin: string;
+  sessionsLimit: string;
+  sessionsIncludeGlobal: string;
+  sessionsIncludeUnknown: string;
+  sessionsStore: string;
+  sessionsKey: string;
+  sessionsLabel: string;
+  sessionsKind: string;
+  sessionsUpdated: string;
+  sessionsTokens: string;
+  sessionsThinking: string;
+  sessionsVerbose: string;
+  sessionsReasoning: string;
+  sessionsActions: string;
+  sessionsNoFound: string;
   overviewSessionsSub: string;
   overviewCron: string;
   overviewCronNext: string;
@@ -1037,6 +1055,7 @@ const EN: Strings = {
   navTitleOverview: "Overview",
   navTitleChannels: "Channels",
   navTitleInstances: "Instances",
+  navTitleSessions: "Sessions",
   navTitleUsage: "Usage",
   navTitleCron: "Cron Jobs",
   navTitleSkills: "Skills",
@@ -1076,6 +1095,23 @@ const EN: Strings = {
   overviewInstances: "Instances",
   overviewInstancesSub: "Presence beacons in the last 5 minutes.",
   overviewSessions: "Sessions",
+  sessionsTitle: "Sessions",
+  sessionsSub: "Active session keys and per-session overrides.",
+  sessionsActiveWithin: "Active within (minutes)",
+  sessionsLimit: "Limit",
+  sessionsIncludeGlobal: "Include global",
+  sessionsIncludeUnknown: "Include unknown",
+  sessionsStore: "Store",
+  sessionsKey: "Key",
+  sessionsLabel: "Label",
+  sessionsKind: "Kind",
+  sessionsUpdated: "Updated",
+  sessionsTokens: "Tokens",
+  sessionsThinking: "Thinking",
+  sessionsVerbose: "Verbose",
+  sessionsReasoning: "Reasoning",
+  sessionsActions: "Actions",
+  sessionsNoFound: "No sessions found.",
   overviewSessionsSub: "Recent session keys tracked by the gateway.",
   overviewCron: "Cron",
   overviewCronNext: "Next wake",
@@ -2020,6 +2056,7 @@ const ZH: Strings = {
   navTitleOverview: "概览",
   navTitleChannels: "通道",
   navTitleInstances: "实例",
+  navTitleSessions: "会话",
   navTitleUsage: "用量",
   navTitleCron: "定时任务",
   navTitleSkills: "技能",
@@ -2059,6 +2096,23 @@ const ZH: Strings = {
   overviewInstances: "实例",
   overviewInstancesSub: "过去 5 分钟内的在线实例数。",
   overviewSessions: "会话",
+  sessionsTitle: "会话",
+  sessionsSub: "活跃会话 Key 及每会话覆盖项。",
+  sessionsActiveWithin: "活跃时间（分钟）",
+  sessionsLimit: "数量上限",
+  sessionsIncludeGlobal: "包含全局",
+  sessionsIncludeUnknown: "包含未知",
+  sessionsStore: "存储",
+  sessionsKey: "Key",
+  sessionsLabel: "标签",
+  sessionsKind: "类型",
+  sessionsUpdated: "更新时间",
+  sessionsTokens: "Token",
+  sessionsThinking: "思考",
+  sessionsVerbose: "详细",
+  sessionsReasoning: "推理",
+  sessionsActions: "操作",
+  sessionsNoFound: "未找到会话。",
   overviewSessionsSub: "网关跟踪的最近会话 Key。",
   overviewCron: "定时任务",
   overviewCronNext: "下次执行",

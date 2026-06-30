@@ -211,11 +211,6 @@
   overflow: hidden;
 }
 
-.content--catalog {
-  padding: 20px;
-  background: var(--bg-content);
-}
-
 .content--catalog > * + * {
   margin-top: 0;
 }
@@ -224,29 +219,60 @@
   background: transparent;
 }
 
-.content--catalog .emp-list-wrap {
-  max-width: none;
-  margin: 0;
+.content--catalog {
   padding: 0;
-}
-
-.content--catalog .emp-content {
-  gap: 24px;
-  align-items: flex-start;
+  background: var(--bg-catalog);
 }
 
 .content--catalog .emp-sidebar {
   position: sticky;
-  top: 12px;
-  max-height: calc(100dvh - var(--shell-topbar-height) - 48px);
+  top: 0;
+  align-self: stretch;
+  width: 240px;
+  flex-shrink: 0;
+  max-height: calc(100dvh - var(--shell-topbar-height));
   overflow: auto;
-  padding-top: 4px;
+  padding: 16px 0 12px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  scrollbar-width: thin;
+}
+
+.content--catalog .emp-sidebar .emp-categories {
+  gap: 0;
+}
+
+.content--catalog .emp-sidebar .emp-cat {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 0;
+  font-size: 14px;
+}
+
+.content--catalog .emp-sidebar .emp-cat.active {
+  background: var(--bg-catalog);
+}
+
+.content--catalog .emp-sidebar .emp-cat__count {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 20px;
+  background: var(--bg-catalog);
+}
+
+.content--catalog .emp-sidebar .emp-cat.active .emp-cat__count {
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .content--catalog .emp-main {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  padding: 16px 20px 24px;
+  min-width: 0;
 }
 
 .content--catalog .emp-main__body {
@@ -302,10 +328,10 @@
 }
 
 .content--catalog .emp-card-wrap {
-  border: 2px solid transparent;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   background: var(--bg);
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .content--catalog .emp-card-wrap:hover {
@@ -392,9 +418,13 @@
   display: inline-flex;
   align-items: center;
   border-radius: 4px;
-  background: var(--bg-content);
+  background: #f5f6f7;
   color: var(--text-regular);
   font-size: 13px;
+}
+
+:root[data-theme="dark"] .market-card-chip {
+  background: var(--bg-content);
 }
 
 .market-card-chip--state {

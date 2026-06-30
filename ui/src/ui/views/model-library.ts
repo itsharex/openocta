@@ -11,7 +11,6 @@ import {
   type ModelsProps,
   type ModelProvider,
 } from "./models.ts";
-import { renderModelCategoryAside } from "./catalog-category-aside.ts";
 import { resolveModelProviderLogo } from "./model-provider-logos.js";
 
 export type ModelLibraryCategory = "__all__" | "public" | "local";
@@ -295,13 +294,6 @@ export function renderModelLibrary(props: ModelLibraryProps) {
     <main class="emp-page">
       <section class="emp-list-wrap">
         <div class="emp-content">
-          ${renderModelCategoryAside({
-            providers: props.providers,
-            providerSearchQuery: props.providerSearchQuery,
-            selectedCategory: selectedCategory,
-            disabled: props.loading,
-            onCategoryChange: (category) => props.onCategoryChange?.(category),
-          })}
           <div class="emp-main">
             ${showToolbarActions
               ? html`
