@@ -393,14 +393,26 @@ func (s *Server) handleSiteOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 // employeeMarketItem 与官网 API 返回格式兼容，id 可为 number（远程）或 string（本地 "local:xxx"）
+type employeeMarketCategoryItem struct {
+	ID       int    `json:"id,omitempty"`
+	Name     string `json:"name"`
+	Scope    string `json:"scope,omitempty"`
+	IsTop    bool   `json:"is_top,omitempty"`
+	ParentID int    `json:"parent_id,omitempty"`
+	Level    int    `json:"level,omitempty"`
+	Sort     int    `json:"sort,omitempty"`
+	Path     string `json:"path,omitempty"`
+}
+
 type employeeMarketItem struct {
-	ID          interface{} `json:"id"` // number 或 "local:xxx"
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	LogoURL     string      `json:"logo_url,omitempty"`
-	Category    string      `json:"category,omitempty"`
-	Status      string      `json:"status,omitempty"`
-	Tags        string      `json:"tags,omitempty"`
+	ID          interface{}                  `json:"id"` // number 或 "local:xxx"
+	Name        string                       `json:"name"`
+	Description string                       `json:"description,omitempty"`
+	LogoURL     string                       `json:"logo_url,omitempty"`
+	Category    string                       `json:"category,omitempty"`
+	Categories  []employeeMarketCategoryItem `json:"categories,omitempty"`
+	Status      string                       `json:"status,omitempty"`
+	Tags        string                       `json:"tags,omitempty"`
 	// Readme 与官网员工详情一致；反序列化时必须保留该字段，否则详情弹层无法展示说明文档。
 	Readme string `json:"readme,omitempty"`
 	// Content 部分站点与技能详情一致用该字段承载 Markdown；合并进 Readme 后清空，避免重复。
@@ -408,6 +420,14 @@ type employeeMarketItem struct {
 	Enabled   *bool  `json:"enabled,omitempty"`   // 本地员工启用状态
 	Installed bool   `json:"installed,omitempty"` // 从远程安装后刷新仍可识别
 	LocalID   string `json:"localId,omitempty"`   // 安装后的本地 id
+}
+
+func employeeCategoriesFromType(typeVal string) []employeeMarketCategoryItem {
+	typeVal = strings.TrimSpace(typeVal)
+	if typeVal == "" {
+		typeVal = "其它"
+	}
+	return []employeeMarketCategoryItem{{Name: typeVal}}
 }
 
 // writeEmployeeMarketItemFromLocalManifest 从本地员工目录生成与官网详情兼容的 JSON。
@@ -432,6 +452,7 @@ func writeEmployeeMarketItemFromLocalManifest(w http.ResponseWriter, marketID, l
 		Name:        m.Name,
 		Description: m.Description,
 		Category:    typeVal,
+		Categories:  employeeCategoriesFromType(typeVal),
 		Status:      "open",
 		Readme:      readme,
 		Enabled:     &enabled,
@@ -496,6 +517,7 @@ func (s *Server) handleSiteEmployees(w http.ResponseWriter, r *http.Request) {
 			Name:        e.Name,
 			Description: e.Description,
 			Category:    e.Type,
+			Categories:  employeeCategoriesFromType(e.Type),
 			Status:      "open",
 			Enabled:     &enabled,
 		})

@@ -366,7 +366,6 @@ export function renderToolLibrary(props: ToolLibraryProps) {
     filteredByQuery,
     effectiveCategory,
     props.categoryDescendants ?? [effectiveCategory],
-    (it) => normalizeCategory(it.category)
   );
   const showToolbarActions = !props.error || (props.items?.length ?? 0) > 0;
 

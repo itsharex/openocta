@@ -20,6 +20,7 @@ import {
 import type { EmployeeListItem } from "../controllers/remote-market.ts";
 import type { McpListItem } from "../controllers/remote-market.ts";
 import type { SkillListItem } from "../controllers/remote-market.ts";
+import { primaryItemCategoryName } from "../utils/category-helpers.ts";
 import type { ConfigUiHints } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
 import type { ChannelsProps } from "./channels.types.ts";
@@ -640,7 +641,7 @@ function renderEmployeeTab(props: SetupWizardProps) {
       sub: it.description ?? "",
       actionLabel: it.installed ? "已安装" : "安装",
       loading: String(props.employeeInstallingId) === String(it.id),
-      onInstall: () => props.onInstallEmployee(it.id, it.category),
+      onInstall: () => props.onInstallEmployee(it.id, primaryItemCategoryName(it)),
     }));
   return html`
     <div class="setup-wizard__toolbar">

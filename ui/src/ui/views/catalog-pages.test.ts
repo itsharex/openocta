@@ -40,8 +40,20 @@ function renderIntoContainer(result: unknown, container: HTMLElement) {
 
 function employeeItems(): EmployeeListItem[] {
   return [
-    { id: 1, name: "Prometheus专家", description: "监控专家", category: "安全合规", tags: "monitor,ops" },
-    { id: 2, name: "Zabbix专家", description: "告警分析", category: "运维自动化", tags: "alert,ops" },
+    {
+      id: 1,
+      name: "Prometheus专家",
+      description: "监控专家",
+      categories: [{ name: "安全合规" }],
+      tags: "monitor,ops",
+    },
+    {
+      id: 2,
+      name: "Zabbix专家",
+      description: "告警分析",
+      categories: [{ name: "运维自动化" }],
+      tags: "alert,ops",
+    },
   ];
 }
 

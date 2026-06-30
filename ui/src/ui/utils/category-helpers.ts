@@ -22,6 +22,33 @@ export function collectDescendantNames(node: CategoryTreeNode): string[] {
   return names;
 }
 
+export function normalizeCategoryName(raw?: string): string {
+  const v = (raw ?? "").trim();
+  return v ? v : "其它";
+}
+
+/** 收集 item 的全部分类名（优先 categories，兼容 category / categoryCn） */
+export function collectItemCategoryNames(item: CategorizableItem): string[] {
+  const names = new Set<string>();
+  if (item.categories?.length) {
+    for (const c of item.categories) {
+      const v = (c.name ?? "").trim();
+      if (v) names.add(v);
+    }
+  }
+  const categoryCn = (item.categoryCn ?? "").trim();
+  if (categoryCn) names.add(categoryCn);
+  const category = (item.category ?? "").trim();
+  if (category) names.add(category);
+  if (names.size === 0) return ["其它"];
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+}
+
+/** 主分类（安装等场景取第一个） */
+export function primaryItemCategoryName(item: CategorizableItem): string {
+  return collectItemCategoryNames(item)[0] ?? "其它";
+}
+
 /** 判断单个 item 是否属于指定分类节点（含后代） */
 export function itemBelongsToCategory(
   item: CategorizableItem,
@@ -68,7 +95,6 @@ export function groupByCategoryKey<T extends CategorizableItem>(
   items: T[],
   category: string,
   categoryDescendants: string[],
-  getKey: (item: T) => string
 ): { filtered: T[]; sections: Array<{ title: string; items: T[] }> } {
   const filtered =
     category === "__all__"
@@ -77,10 +103,11 @@ export function groupByCategoryKey<T extends CategorizableItem>(
 
   const grouped = new Map<string, T[]>();
   for (const it of filtered) {
-    const cat = getKey(it);
-    const arr = grouped.get(cat) ?? [];
-    arr.push(it);
-    grouped.set(cat, arr);
+    for (const cat of collectItemCategoryNames(it)) {
+      const arr = grouped.get(cat) ?? [];
+      arr.push(it);
+      grouped.set(cat, arr);
+    }
   }
 
   const sections =

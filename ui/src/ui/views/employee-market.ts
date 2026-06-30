@@ -3,7 +3,11 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { genericListPage, genericSectionListPage } from "../components/generic-list-page.ts";
 import type { EmployeeDetail, EmployeeListItem } from "../controllers/remote-market.ts";
 import { resolveLogoUrl } from "../controllers/remote-market.ts";
-import { groupByCategoryKey } from "../utils/category-helpers.ts";
+import {
+  collectItemCategoryNames,
+  groupByCategoryKey,
+  primaryItemCategoryName,
+} from "../utils/category-helpers.ts";
 import { icons } from "../icons.js";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
 import { t } from "../strings.js";
@@ -68,8 +72,9 @@ export function computeEmployeeMarketCategories(
   const counts = new Map<string, number>();
   counts.set("__all__", filteredByQuery.length);
   for (const it of filteredByQuery) {
-    const cat = normalizeCategory(it.category);
-    counts.set(cat, (counts.get(cat) ?? 0) + 1);
+    for (const cat of collectItemCategoryNames(it)) {
+      counts.set(cat, (counts.get(cat) ?? 0) + 1);
+    }
   }
   const orderedCategories = [
     "__all__",
@@ -90,21 +95,33 @@ function splitCsv(raw?: string) {
 
 const EMP_CARD_TAGS_MAX = 3;
 
-function renderCardTags(tagsRaw?: string, currentCategory?: string) {
-  const tags = splitCsv(tagsRaw);
-  const isInSingleCategoryView = currentCategory && currentCategory !== "__all__";
-  const visibleTags = isInSingleCategoryView
-    ? tags.filter((t) => t !== currentCategory)
-    : tags;
-  if (visibleTags.length === 0) return null;
-  const show = visibleTags.slice(0, EMP_CARD_TAGS_MAX);
-  const hasMore = visibleTags.length > EMP_CARD_TAGS_MAX;
+function renderCardChips(labels: string[], max = EMP_CARD_TAGS_MAX) {
+  if (labels.length === 0) return null;
+  const show = labels.slice(0, max);
+  const hasMore = labels.length > max;
   return html`
     <div class="market-card-meta">
       ${show.map((t) => html`<span class="market-card-chip">${t}</span>`)}
       ${hasMore ? html`<span class="market-card-chip market-card-chip--muted">...</span>` : nothing}
     </div>
   `;
+}
+
+function renderCardMeta(item: EmployeeListItem, currentCategory?: string) {
+  const isInSingleCategoryView = currentCategory && currentCategory !== "__all__";
+  const categories = collectItemCategoryNames(item);
+  const visibleCategories = isInSingleCategoryView
+    ? categories.filter((c) => c !== currentCategory)
+    : categories;
+  const categorySet = new Set(categories);
+  const tags = splitCsv(item.tags).filter((t) => {
+    const nt = normalizeCategory(t);
+    if (categorySet.has(nt)) return false;
+    if (isInSingleCategoryView && nt === currentCategory) return false;
+    return true;
+  });
+  const chips = [...visibleCategories, ...tags];
+  return renderCardChips(chips);
 }
 
 /** Strip YAML frontmatter (--- ... ---) from the start of markdown. */
@@ -162,7 +179,7 @@ function renderEmployeeCardAction(
         ?disabled=${installing}
         @click=${(e: Event) => {
           e.stopPropagation();
-          void props.onInstall!(item.id, item.category);
+          void props.onInstall!(item.id, primaryItemCategoryName(item));
         }}
       >
         ${installing ? "安装中" : "安装"}
@@ -207,7 +224,7 @@ function renderEmployeeCard(
         </div>
         <h3 class="emp-card__title">${it.name}</h3>
         <p class="emp-card__desc">${it.description ?? "暂无描述"}</p>
-        ${renderCardTags(it.tags, effectiveCategory)}
+        ${renderCardMeta(it, effectiveCategory)}
       </div>
     </div>
   `;
@@ -250,7 +267,7 @@ function renderEmployeeDetailActions(props: EmployeeMarketProps, detail: Employe
         class="btn primary"
         type="button"
         ?disabled=${props.installingId === String(detail.id)}
-        @click=${() => void props.onInstall!(detail.id, detail.category)}
+        @click=${() => void props.onInstall!(detail.id, primaryItemCategoryName(detail))}
       >
         ${props.installingId === String(detail.id) ? "安装中" : "安装"}
       </button>
@@ -282,7 +299,6 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
     filteredByQuery,
     effectiveCategory,
     props.categoryDescendants,
-    (it) => normalizeCategory(it.category)
   );
   const showToolbarActions = !props.error || (props.items?.length ?? 0) > 0;
 
@@ -398,24 +414,27 @@ export function renderEmployeeMarket(props: EmployeeMarketProps) {
                         <div class="emp-detail-tags">
                           <span class="badge ghost">${statusLabel(props.selectedDetail.status)}</span>
                           ${(() => {
-                            const detailCategory = normalizeCategory(props.selectedDetail.category);
-                            const hideDetailCategory = effectiveCategory && effectiveCategory !== "__all__" && detailCategory === effectiveCategory;
-                            return (props.selectedDetail.category ?? "").trim() && !hideDetailCategory
-                              ? html`<span class="badge ghost">${detailCategory}</span>`
-                              : nothing;
-                          })()}
-                          ${(() => {
-                            const detailCategory = normalizeCategory(props.selectedDetail.category);
+                            const detailCategories = collectItemCategoryNames(props.selectedDetail);
+                            const detailCategorySet = new Set(detailCategories);
+                            const visibleCategories = detailCategories.filter((c) => {
+                              if (effectiveCategory && effectiveCategory !== "__all__" && c === effectiveCategory) {
+                                return false;
+                              }
+                              return true;
+                            });
                             const detailTags = splitCsv(props.selectedDetail.tags);
                             const visibleDetailTags = detailTags.filter((t) => {
                               const nt = normalizeCategory(t);
-                              if (nt === detailCategory) return false;
-                              if (effectiveCategory && effectiveCategory !== "__all__" && nt === effectiveCategory) return false;
+                              if (detailCategorySet.has(nt)) return false;
+                              if (effectiveCategory && effectiveCategory !== "__all__" && nt === effectiveCategory) {
+                                return false;
+                              }
                               return true;
                             });
-                            return visibleDetailTags.length > 0
-                              ? visibleDetailTags.map((t) => html`<span class="badge ghost">${t}</span>`)
-                              : nothing;
+                            return [
+                              ...visibleCategories.map((c) => html`<span class="badge ghost">${c}</span>`),
+                              ...visibleDetailTags.map((t) => html`<span class="badge ghost">${t}</span>`),
+                            ];
                           })()}
                         </div>
                       </div>
