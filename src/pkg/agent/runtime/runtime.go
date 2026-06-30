@@ -378,21 +378,6 @@ func einoSkillMiddlewareActive(projectRoot string, opts Options) bool {
 	return strings.TrimSpace(eino.ResolveSkillsDir(projectRoot, opts.Config, opts.EmployeeID, opts.SkillFilter, opts.Env)) != ""
 }
 
-func resolveApprovalQueueStorePath(s *config.SandboxConfig, env func(string) string) string {
-	if s != nil && s.ApprovalStore != nil && strings.TrimSpace(*s.ApprovalStore) != "" {
-		p := strings.TrimSpace(*s.ApprovalStore)
-		if !strings.HasSuffix(strings.ToLower(p), ".json") {
-			return filepath.Join(p, "approvals.json")
-		}
-		return p
-	}
-	if env == nil {
-		env = func(string) string { return "" }
-	}
-	stateDir := paths.ResolveStateDir(env)
-	return filepath.Join(stateDir, "agents", "approvals", "approvals.json")
-}
-
 type SandboxOpts struct {
 	Root              string
 	AllowedPaths      []string

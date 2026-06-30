@@ -77,7 +77,7 @@ func (EnvProbeTool) Execute(ctx context.Context, params map[string]interface{}) 
 		buf.WriteString(line)
 		buf.WriteByte('\n')
 	}
-	return &tool.ToolResult{Success: true, Output: strings.TrimSpace(buf.String())}, nil
+	return &tool.ToolResult{Success: true, Output: strings.Trim(buf.String(), " ")}, nil
 }
 
 func normalizeProbeNames(raw interface{}) []string {
@@ -176,11 +176,11 @@ func runCmd(ctx context.Context, path string, args []string) string {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	_ = cmd.Run()
-	s := strings.TrimSpace(stdout.String())
+	s := strings.Trim(stdout.String(), " ")
 	if s != "" {
 		return s
 	}
-	return strings.TrimSpace(stderr.String())
+	return strings.Trim(stderr.String(), " ")
 }
 
 func runCmdCombined(ctx context.Context, path string, args []string) string {
@@ -190,7 +190,7 @@ func runCmdCombined(ctx context.Context, path string, args []string) string {
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	_ = cmd.Run()
-	return strings.TrimSpace(buf.String())
+	return strings.Trim(buf.String(), " ")
 }
 
 func firstLineOrTwo(s string) string {
@@ -198,7 +198,7 @@ func firstLineOrTwo(s string) string {
 	var b strings.Builder
 	n := 0
 	for _, ln := range lines {
-		ln = strings.TrimSpace(ln)
+		ln = strings.Trim(ln, " ")
 		if ln == "" {
 			continue
 		}
