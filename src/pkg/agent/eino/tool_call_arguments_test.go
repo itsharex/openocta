@@ -114,6 +114,37 @@ func TestBuildAgentMessagesRepairsInterruptedToolTurn(t *testing.T) {
 	}
 }
 
+func TestBuildAgentMessagesDoesNotDuplicateToolResultsAfterReorder(t *testing.T) {
+	t.Parallel()
+	msgs, err := BuildAgentMessages(types.Request{
+		Prompt: "next",
+		SessionMessages: []*schema.Message{
+			schema.UserMessage("browse"),
+			schema.ToolMessage(`{"ok":true}`, "call_a", schema.WithToolName("browser")),
+			schema.ToolMessage("shot", "call_b", schema.WithToolName("browser")),
+			schema.AssistantMessage("", []schema.ToolCall{
+				{ID: "call_a", Type: "function", Function: schema.FunctionCall{Name: "browser", Arguments: "{}"}},
+				{ID: "call_b", Type: "function", Function: schema.FunctionCall{Name: "browser", Arguments: "{}"}},
+			}),
+			schema.UserMessage("next"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildAgentMessages: %v", err)
+	}
+	if len(msgs) != 5 {
+		t.Fatalf("expected 5 messages, got %d: %#v", len(msgs), msgs)
+	}
+	for _, m := range msgs {
+		if m.Role == schema.Tool && m.Content == interruptedToolResultText {
+			t.Fatalf("unexpected interrupted placeholder: %#v", msgs)
+		}
+	}
+	if msgs[2].Role != schema.Tool || msgs[3].Role != schema.Tool {
+		t.Fatalf("expected tool results after assistant: %#v", msgs)
+	}
+}
+
 func TestBuildAgentMessagesSanitizesToolCallArguments(t *testing.T) {
 	t.Parallel()
 	msgs, err := BuildAgentMessages(types.Request{

@@ -117,7 +117,79 @@ func SchemaMessagesFromTranscript(msgs []session.TranscriptMessage, opts Transcr
 	for _, m := range filtered {
 		out = append(out, transcriptMessageToSchema(m)...)
 	}
+	return normalizeToolTurnMessageOrder(out)
+}
+
+// normalizeToolTurnMessageOrder reorders messages so each assistant tool_calls turn
+// is immediately followed by its tool results, matching Eino / provider API contracts.
+// Transcript append order can place toolResult rows before the assistant row when tool
+// execution events are persisted before MessageStop (e.g. long browser tool runs).
+func normalizeToolTurnMessageOrder(msgs []*schema.Message) []*schema.Message {
+	if len(msgs) < 2 {
+		return msgs
+	}
+	out := make([]*schema.Message, 0, len(msgs))
+	var pendingTools []*schema.Message
+	flushPendingTools := func() {
+		if len(pendingTools) == 0 {
+			return
+		}
+		out = append(out, pendingTools...)
+		pendingTools = nil
+	}
+	for _, msg := range msgs {
+		if msg == nil {
+			continue
+		}
+		switch msg.Role {
+		case schema.Tool:
+			pendingTools = append(pendingTools, msg)
+		case schema.Assistant:
+			if len(msg.ToolCalls) > 0 {
+				out = append(out, msg)
+				matched, rest := matchToolMessagesToCalls(pendingTools, msg.ToolCalls)
+				out = append(out, matched...)
+				pendingTools = rest
+			} else {
+				flushPendingTools()
+				out = append(out, msg)
+			}
+		default:
+			flushPendingTools()
+			out = append(out, msg)
+		}
+	}
+	flushPendingTools()
 	return out
+}
+
+func matchToolMessagesToCalls(tools []*schema.Message, calls []schema.ToolCall) (matched, unmatched []*schema.Message) {
+	if len(tools) == 0 || len(calls) == 0 {
+		return nil, tools
+	}
+	idOrder := make([]string, 0, len(calls))
+	idSet := make(map[string]struct{})
+	for _, tc := range calls {
+		if id := strings.TrimSpace(tc.ID); id != "" {
+			idOrder = append(idOrder, id)
+			idSet[id] = struct{}{}
+		}
+	}
+	byID := make(map[string]*schema.Message)
+	for _, t := range tools {
+		id := strings.TrimSpace(t.ToolCallID)
+		if _, ok := idSet[id]; ok {
+			byID[id] = t
+		} else {
+			unmatched = append(unmatched, t)
+		}
+	}
+	for _, id := range idOrder {
+		if t, ok := byID[id]; ok {
+			matched = append(matched, t)
+		}
+	}
+	return matched, unmatched
 }
 
 func allowedTranscriptRoles(configured []string) map[string]bool {

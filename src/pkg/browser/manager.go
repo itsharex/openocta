@@ -467,6 +467,7 @@ func (s *Service) ensureBrowser(ctx context.Context) error {
 		Set("disable-blink-features", "AutomationControlled").
 		Set("no-first-run").
 		Set("no-default-browser-check")
+
 	// Chromium refuses to start as root on Linux unless sandboxing is disabled.
 	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
 		l = l.Set("no-sandbox")

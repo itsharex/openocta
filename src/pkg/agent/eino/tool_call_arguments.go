@@ -70,6 +70,16 @@ func repairIncompleteToolCallMessages(msgs []*schema.Message) []*schema.Message 
 		if len(pending) == 0 {
 			continue
 		}
+		// Drop tool messages already emitted before this assistant (reordered history).
+		for j := len(out) - 1; j >= 0; j-- {
+			prev := out[j]
+			if prev == nil || prev.Role != schema.Tool {
+				break
+			}
+			if id := strings.TrimSpace(prev.ToolCallID); id != "" {
+				delete(pending, id)
+			}
+		}
 		i++
 		for len(pending) > 0 && i < len(msgs) && msgs[i] != nil && msgs[i].Role == schema.Tool {
 			if id := strings.TrimSpace(msgs[i].ToolCallID); id != "" {

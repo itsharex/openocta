@@ -2567,6 +2567,32 @@ func ChatSendHandler(opts HandlerOpts) error {
 			var totalToolDurationMs int64
 			toolStartTimes := make(map[string]time.Time)
 			turnHasA2UI := false
+			var pendingToolResultLines []interface{}
+			assistantToolTurnPersisted := false
+			appendToolResultTranscript := func(line interface{}) {
+				if assistantToolTurnPersisted {
+					if err := session.AppendTranscriptLine(transcriptPath, line); err != nil {
+						chatLog.Warn("append toolResult to transcript failed path=%s err=%v", transcriptPath, err)
+					}
+					return
+				}
+				pendingToolResultLines = append(pendingToolResultLines, line)
+			}
+			flushPendingToolResultTranscript := func() {
+				for _, line := range pendingToolResultLines {
+					if err := session.AppendTranscriptLine(transcriptPath, line); err != nil {
+						chatLog.Warn("append toolResult to transcript failed path=%s err=%v", transcriptPath, err)
+					}
+				}
+				pendingToolResultLines = nil
+			}
+			persistAssistantToolTurn := func(content []map[string]interface{}) {
+				if !assistantContentHasToolCalls(content) {
+					return
+				}
+				assistantToolTurnPersisted = true
+				flushPendingToolResultTranscript()
+			}
 
 			flushPartialAssistant = func() {
 				if len(assistantContent) == 0 && textBuf.Len() == 0 {
@@ -2605,6 +2631,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 					parentMessageID:   lastMessageID,
 				}); ok {
 					lastMessageID = snap.lastMessageID
+					persistAssistantToolTurn(assistantContent)
 					if t := imPlainFromTurn(snap.messageBody, textBuf.String(), stopReason); t != "" {
 						lastAssistantContent = t
 					}
@@ -2776,9 +2803,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 							"timestamp":  tsMs,
 						},
 					}
-					if err := session.AppendTranscriptLine(transcriptPath, line); err != nil {
-						chatLog.Warn("append toolResult to transcript failed path=%s err=%v", transcriptPath, err)
-					}
+					appendToolResultTranscript(line)
 				case stream.EventMessageDelta:
 					if evt.Usage != nil {
 						usageSnapshot = evt.Usage
@@ -2872,6 +2897,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 						if err := session.AppendTranscriptLine(transcriptPath, line); err != nil {
 							chatLog.Warn("append assistant message to transcript failed path=%s err=%v", transcriptPath, err)
 						}
+						persistAssistantToolTurn(contentSnapshot)
 						messageBody := map[string]interface{}{
 							"role":             "assistant",
 							"content":          contentSnapshot,
@@ -2990,9 +3016,13 @@ func ChatSendHandler(opts HandlerOpts) error {
 					}); ok {
 						flushedOnCancel = true
 						lastMessageID = snap.lastMessageID
+						persistAssistantToolTurn(assistantContent)
 					}
 					assistantContent = nil
 					textBuf.Reset()
+				}
+				if assistantToolTurnPersisted {
+					flushPendingToolResultTranscript()
 				}
 				reason := "已取消"
 				if ctx.Err() == context.DeadlineExceeded {
@@ -3043,6 +3073,7 @@ func ChatSendHandler(opts HandlerOpts) error {
 					parentMessageID:   lastMessageID,
 				}); ok {
 					lastMessageID = snap.lastMessageID
+					persistAssistantToolTurn(assistantContent)
 					if t := imPlainFromTurn(snap.messageBody, textBuf.String(), stopReason); t != "" {
 						//streamIMPlain = t
 						lastAssistantContent = t
@@ -3119,6 +3150,10 @@ func ChatSendHandler(opts HandlerOpts) error {
 						DeliverCronResultIfNeeded(ctxForBroadcast, sessionKey, cronSummary, "ok")
 					}
 				}
+			}
+
+			if assistantToolTurnPersisted {
+				flushPendingToolResultTranscript()
 			}
 
 			snapshot := &SessionRunSnapshot{SkillsSnapshot: buildSkillsSnapshotForSession(projectRoot, runtimeConfig, sessionKey)}

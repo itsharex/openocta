@@ -42,6 +42,7 @@ func BuildAgentMessages(req types.Request) ([]*schema.Message, error) {
 			out = msgs
 		}
 		sanitizeSchemaMessagesToolCalls(out)
+		out = normalizeToolTurnMessageOrder(out)
 		out = repairIncompleteToolCallMessages(out)
 		return out, nil
 	}

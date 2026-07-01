@@ -56,6 +56,51 @@ func TestSchemaMessagesFromTranscriptToolTurn(t *testing.T) {
 	}
 }
 
+func TestSchemaMessagesFromTranscriptToolResultsBeforeAssistant(t *testing.T) {
+	msgs := []session.TranscriptMessage{
+		{Role: "user", Content: []session.ContentBlock{{Type: "text", Text: "open browser"}}},
+		{
+			Role:       "toolResult",
+			ToolCallID: "call_a",
+			ToolName:   "browser",
+			Content:    []session.ContentBlock{{Type: "text", Text: `{"ok":true}`}},
+		},
+		{
+			Role:       "toolResult",
+			ToolCallID: "call_b",
+			ToolName:   "browser",
+			Content:    []session.ContentBlock{{Type: "text", Text: "screenshot"}},
+		},
+		{
+			Role: "assistant",
+			Content: []session.ContentBlock{
+				{Type: "toolCall", ID: "call_a", Name: "browser", Arguments: []byte(`{}`)},
+				{Type: "toolCall", ID: "call_b", Name: "browser", Arguments: []byte(`{}`)},
+			},
+		},
+		{Role: "user", Content: []session.ContentBlock{{Type: "text", Text: "next"}}},
+	}
+	out := SchemaMessagesFromTranscript(msgs, TranscriptLoadOptions{})
+	if len(out) != 5 {
+		t.Fatalf("expected 5 messages, got %d: %#v", len(out), out)
+	}
+	if out[0].Role != schema.User {
+		t.Fatalf("expected user first, got %#v", out[0])
+	}
+	if out[1].Role != schema.Assistant || len(out[1].ToolCalls) != 2 {
+		t.Fatalf("expected assistant with tool calls, got %#v", out[1])
+	}
+	if out[2].Role != schema.Tool || out[2].ToolCallID != "call_a" {
+		t.Fatalf("expected first tool result after assistant, got %#v", out[2])
+	}
+	if out[3].Role != schema.Tool || out[3].ToolCallID != "call_b" {
+		t.Fatalf("expected second tool result after assistant, got %#v", out[3])
+	}
+	if out[4].Role != schema.User || out[4].Content != "next" {
+		t.Fatalf("expected trailing user message, got %#v", out[4])
+	}
+}
+
 func TestSchemaMessagesFromTranscriptMaxMessages(t *testing.T) {
 	msgs := []session.TranscriptMessage{
 		{Role: "user", Content: []session.ContentBlock{{Type: "text", Text: "1"}}},
