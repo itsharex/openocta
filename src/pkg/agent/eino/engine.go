@@ -95,6 +95,7 @@ func NewEngine(ctx context.Context, cfg BuildConfig) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	handlers = append(handlers, newExecuteToolHintMiddleware())
 	if cfg.EnableApproval {
 		handlers = append(handlers, newApprovalMiddleware("execute"))
 	}

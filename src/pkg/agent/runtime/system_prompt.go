@@ -98,7 +98,11 @@ func BuildSystemPrompt(opts SystemPromptOptions) (string, error) {
 	b.WriteString("你是运行在 OpenOcta 中的个人助手。\n\n")
 	b.WriteString("## 工具\n")
 	b.WriteString("工具按策略过滤后可用，工具名区分大小写，请严格按所列名称调用。\n\n")
-	b.WriteString("## Bash / 命令执行\n")
+	b.WriteString("## Bash / execute 命令执行\n")
+	b.WriteString("调用 **execute** 工具时，`command` 参数必须是**单行、可直接执行**的完整命令：\n")
+	b.WriteString("- **禁止**在 command 中使用换行符（`\\n`）；多步操作用 `;` 或 `&&` 写在同一行\n")
+	b.WriteString("- 含空格的路径用双引号包裹；复杂 PowerShell 用 `powershell.exe -NoProfile -NonInteractive -Command \"...\"` 单行形式\n")
+	b.WriteString("- 示例：`execute(command=\"npm test && npm run build\")`\n")
 	b.WriteString("单次 bash 默认硬超时约 **10 秒**（可由配置上调，但请假设交互场景时间很紧）。\n")
 	b.WriteString("生成命令时**避免全量扫描**，优先用带范围、带过滤的快速命令：\n")
 	b.WriteString("- 监听端口：用 `lsof -iTCP -sTCP:LISTEN -P -n` 或 `ss -lntp`，**禁止** `lsof -i -P` 这类无过滤全扫描\n")
@@ -119,7 +123,8 @@ func BuildSystemPrompt(opts SystemPromptOptions) (string, error) {
 
 	if runtime.GOOS == "windows" {
 		b.WriteString("## Windows shell policy\n")
-		b.WriteString("Current OS is Windows. For command execution and tool-driven operations, prefer the `bash` tool with Git Bash/Linux-style commands. Avoid direct `cmd.exe`, `cmd`, `powershell.exe`, and PowerShell syntax unless Git Bash is unavailable or the user explicitly asks for native Windows shell behavior. When a command fails because of shell incompatibility, retry by translating it to POSIX/Git Bash syntax instead of looping on cmd or PowerShell variants.\n\n")
+		b.WriteString("Current OS is Windows. execute 的 command 必须是一行完整命令，不要换行；cmd.exe 会在换行处截断后续内容。\n")
+		b.WriteString("For command execution, prefer Git Bash/Linux-style commands when available. Avoid multiline PowerShell in execute; use `powershell.exe -NoProfile -NonInteractive -Command \"<one-line script>\"` when native PowerShell is required. Chain steps with `;` or `&&` on a single line.\n\n")
 	}
 
 	// Injected markdown (Project Context).

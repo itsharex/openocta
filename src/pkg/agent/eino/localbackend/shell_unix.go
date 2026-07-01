@@ -10,9 +10,17 @@ import (
 )
 
 func (b *Backend) Execute(ctx context.Context, input *filesystem.ExecuteRequest) (*filesystem.ExecuteResponse, error) {
-	return b.Local.Execute(ctx, input)
+	normalized, err := normalizeExecuteRequest(input)
+	if err != nil {
+		return nil, err
+	}
+	return b.Local.Execute(ctx, normalized)
 }
 
 func (b *Backend) ExecuteStreaming(ctx context.Context, input *filesystem.ExecuteRequest) (*schema.StreamReader[*filesystem.ExecuteResponse], error) {
-	return b.Local.ExecuteStreaming(ctx, input)
+	normalized, err := normalizeExecuteRequest(input)
+	if err != nil {
+		return nil, err
+	}
+	return b.Local.ExecuteStreaming(ctx, normalized)
 }

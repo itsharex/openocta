@@ -32,14 +32,15 @@ func newWindowsCmd(ctx context.Context, command string) *exec.Cmd {
 }
 
 func (b *Backend) Execute(ctx context.Context, input *filesystem.ExecuteRequest) (*filesystem.ExecuteResponse, error) {
-	if input == nil || input.Command == "" {
-		return nil, fmt.Errorf("command is required")
+	normalized, err := normalizeExecuteRequest(input)
+	if err != nil {
+		return nil, err
 	}
-	if err := b.validateCommand(input.Command); err != nil {
+	if err := b.validateCommand(normalized.Command); err != nil {
 		return nil, err
 	}
 
-	cmd := newWindowsCmd(ctx, input.Command)
+	cmd := newWindowsCmd(ctx, normalized.Command)
 
 	var stdoutBuf, stderrBuf strings.Builder
 	cmd.Stdout = &stdoutBuf
@@ -74,14 +75,15 @@ func (b *Backend) Execute(ctx context.Context, input *filesystem.ExecuteRequest)
 }
 
 func (b *Backend) ExecuteStreaming(ctx context.Context, input *filesystem.ExecuteRequest) (*schema.StreamReader[*filesystem.ExecuteResponse], error) {
-	if input == nil || input.Command == "" {
-		return nil, fmt.Errorf("command is required")
+	normalized, err := normalizeExecuteRequest(input)
+	if err != nil {
+		return nil, err
 	}
-	if err := b.validateCommand(input.Command); err != nil {
+	if err := b.validateCommand(normalized.Command); err != nil {
 		return nil, err
 	}
 
-	cmd, stdout, stderr, err := initStreamingCmd(ctx, input.Command)
+	cmd, stdout, stderr, err := initStreamingCmd(ctx, normalized.Command)
 	if err != nil {
 		return nil, err
 	}
