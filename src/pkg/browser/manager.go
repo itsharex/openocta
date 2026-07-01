@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -465,6 +467,10 @@ func (s *Service) ensureBrowser(ctx context.Context) error {
 		Set("disable-blink-features", "AutomationControlled").
 		Set("no-first-run").
 		Set("no-default-browser-check")
+	// Chromium refuses to start as root on Linux unless sandboxing is disabled.
+	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
+		l = l.Set("no-sandbox")
+	}
 	// leakless + headed system Chrome on macOS can SIGSEGV; CfT is launched without leakless when headed.
 	if !headless {
 		l = l.Leakless(false)
