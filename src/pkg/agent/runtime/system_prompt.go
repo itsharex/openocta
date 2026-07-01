@@ -101,7 +101,10 @@ func BuildSystemPrompt(opts SystemPromptOptions) (string, error) {
 	b.WriteString("## Bash / execute 命令执行\n")
 	b.WriteString("调用 **execute** 工具时，`command` 参数必须是**单行、可直接执行**的完整命令：\n")
 	b.WriteString("- **禁止**在 command 中使用换行符（`\\n`）；多步操作用 `;` 或 `&&` 写在同一行\n")
-	b.WriteString("- 含空格的路径用双引号包裹；复杂 PowerShell 用 `powershell.exe -NoProfile -NonInteractive -Command \"...\"` 单行形式\n")
+	b.WriteString("- **禁止**在 command 中嵌入超长脚本（建议 inline 命令 < 800 字符）；过长会导致 tool arguments JSON 被模型截断（finish_reason=length）而无法执行\n")
+	b.WriteString("- 长脚本流程：先用 **write_file** 写入 `.ps1`/`.sh`，再 `execute(command=\"powershell -NoProfile -ExecutionPolicy Bypass -File \\\"<绝对路径>\\\"\")`\n")
+	b.WriteString("- Windows 进程/桌面类任务优先用 **desktop-control** skill 自带脚本（如 `process-manager.ps1`），不要手写同等的大段 inline PowerShell\n")
+	b.WriteString("- 含空格的路径用双引号包裹；避免在 `powershell -Command \"...\"` 里塞整段脚本（`$` 变量易被外层 shell 吃掉且 JSON 极易超长）\n")
 	b.WriteString("- 示例：`execute(command=\"npm test && npm run build\")`\n")
 	b.WriteString("单次 bash 默认硬超时约 **10 秒**（可由配置上调，但请假设交互场景时间很紧）。\n")
 	b.WriteString("生成命令时**避免全量扫描**，优先用带范围、带过滤的快速命令：\n")
@@ -124,7 +127,8 @@ func BuildSystemPrompt(opts SystemPromptOptions) (string, error) {
 	if runtime.GOOS == "windows" {
 		b.WriteString("## Windows shell policy\n")
 		b.WriteString("Current OS is Windows. execute 的 command 必须是一行完整命令，不要换行；cmd.exe 会在换行处截断后续内容。\n")
-		b.WriteString("For command execution, prefer Git Bash/Linux-style commands when available. Avoid multiline PowerShell in execute; use `powershell.exe -NoProfile -NonInteractive -Command \"<one-line script>\"` when native PowerShell is required. Chain steps with `;` or `&&` on a single line.\n\n")
+		b.WriteString("Native PowerShell 优先 `-File` 脚本而非 `-Command` 内联；进程监控/窗口控制优先 desktop-control skill。\n")
+		b.WriteString("If tool result mentions truncated JSON / finish_reason=length, shorten the command or switch to write_file + -File — never retry with a longer inline script.\n\n")
 	}
 
 	// Injected markdown (Project Context).

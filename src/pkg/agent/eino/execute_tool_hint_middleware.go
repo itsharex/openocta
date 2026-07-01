@@ -11,8 +11,12 @@ const executeToolSingleLineHint = `
 ## execute tool (command parameter)
 - The "command" argument MUST be a single line with no newline characters.
 - Chain multiple steps with ";" or "&&" on the same line (e.g. "mkdir dir && cd dir && npm test").
-- On Windows, cmd.exe truncates at newlines; use one-line PowerShell via powershell.exe -NoProfile -NonInteractive -Command "..." when needed.
+- Keep inline command short (aim for < 800 characters). If JSON arguments may exceed model output limits, do NOT embed large scripts in command.
+- For long PowerShell/Bash: use write_file to save a .ps1/.sh script, then execute with powershell -NoProfile -ExecutionPolicy Bypass -File "<absolute-path>" (or bash "<path>").
+- On Windows process/desktop tasks, prefer the desktop-control skill scripts (e.g. process-manager.ps1) instead of rewriting inline PowerShell.
+- On Windows, avoid mega inline powershell -Command "..." ; cmd.exe and JSON escaping eat $ variables easily. Prefer -File scripts.
 - Do not split one logical command across multiple lines in the JSON argument.
+- If tool result says arguments JSON was truncated (finish_reason=length), shorten the approach — never retry with a longer inline command.
 `
 
 type executeToolHintMiddleware struct {
