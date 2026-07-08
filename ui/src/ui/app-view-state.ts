@@ -355,6 +355,7 @@ export type AppViewState = {
   embeddedPlazaDetailLoading: boolean;
   embeddedPlazaDetailError: string | null;
   embeddedPlazaRecommendOpen: boolean;
+  embeddedPlazaManualImportOpen: boolean;
   embeddedPlazaHardware: import("./controllers/model-recommendation.ts").LocalHardwareProfile | null;
   embeddedPlazaChatModel: import("./controllers/embedded-models.ts").EmbeddedModelEntry | null;
   embeddedPlazaChatMessages: import("./controllers/embedded-chat-test.ts").PlazaChatMessage[];

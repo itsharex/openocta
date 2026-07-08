@@ -388,6 +388,7 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() embeddedPlazaDetailLoading = false;
   @state() embeddedPlazaDetailError: string | null = null;
   @state() embeddedPlazaRecommendOpen = false;
+  @state() embeddedPlazaManualImportOpen = false;
   @state() embeddedPlazaHardware: import("./controllers/model-recommendation.ts").LocalHardwareProfile | null = null;
   @state() embeddedPlazaChatModel: import("./controllers/embedded-models.ts").EmbeddedModelEntry | null = null;
   @state() embeddedPlazaChatMessages: import("./controllers/embedded-chat-test.ts").PlazaChatMessage[] = [];

@@ -50,10 +50,13 @@ export type ModelLibraryProps = ModelsProps & {
   embeddedPlazaDetailLoading?: boolean;
   embeddedPlazaDetailError?: string | null;
   embeddedPlazaRecommendOpen?: boolean;
+  embeddedPlazaManualImportOpen?: boolean;
   embeddedPlazaHardware?: import("../controllers/model-recommendation.ts").LocalHardwareProfile | null;
   onEmbeddedSelectModel?: (model: EmbeddedModelEntry | null) => void;
   onEmbeddedOpenRecommend?: () => void;
   onEmbeddedCloseRecommend?: () => void;
+  onEmbeddedOpenManualImport?: () => void;
+  onEmbeddedCloseManualImport?: () => void;
   onEmbeddedHardwareChange?: (hw: import("../controllers/model-recommendation.ts").LocalHardwareProfile) => void;
   onEmbeddedChat?: (model: EmbeddedModelEntry) => void;
   gatewayHost?: string;
@@ -321,6 +324,7 @@ export function renderModelLibrary(props: ModelLibraryProps) {
         detailLoading: props.embeddedPlazaDetailLoading ?? false,
         detailError: props.embeddedPlazaDetailError ?? null,
         recommendOpen: props.embeddedPlazaRecommendOpen ?? false,
+        manualImportOpen: props.embeddedPlazaManualImportOpen ?? false,
         hardware: props.embeddedPlazaHardware ?? null,
         onRefresh: () => props.onEmbeddedRefresh?.(),
         onDownload: (id) => props.onEmbeddedDownload?.(id),
@@ -332,6 +336,8 @@ export function renderModelLibrary(props: ModelLibraryProps) {
         onSelectModel: (m) => props.onEmbeddedSelectModel?.(m),
         onOpenRecommend: () => props.onEmbeddedOpenRecommend?.(),
         onCloseRecommend: () => props.onEmbeddedCloseRecommend?.(),
+        onOpenManualImport: () => props.onEmbeddedOpenManualImport?.(),
+        onCloseManualImport: () => props.onEmbeddedCloseManualImport?.(),
         onHardwareChange: (hw) => props.onEmbeddedHardwareChange?.(hw),
         gatewayHost: props.gatewayHost ?? "",
         chatModel: props.embeddedPlazaChatModel ?? null,

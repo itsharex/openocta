@@ -118,7 +118,7 @@ export function renderModelCategoryNav(props: {
       case "__all__":
         return "全部";
       case "plaza":
-        return "模型广场";
+        return "内嵌模型";
       case "public":
         return "公有模型";
       case "local":

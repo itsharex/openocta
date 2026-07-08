@@ -37,6 +37,7 @@ import {
   type ModelTier,
 } from "../controllers/model-recommendation.ts";
 import { plazaDoc } from "../data/plaza-model-docs.ts";
+import { renderPlazaManualImportModal } from "../components/plaza-manual-import-modal.ts";
 
 /** 推荐说明弹窗内「隐藏 F 级」开关（仅 UI 态） */
 let guideHideFTier = false;
@@ -53,6 +54,7 @@ export type ModelPlazaProps = {
   detailLoading: boolean;
   detailError: string | null;
   recommendOpen: boolean;
+  manualImportOpen: boolean;
   hardware: LocalHardwareProfile | null;
   onRefresh: () => void;
   onDownload: (modelId: string) => void;
@@ -64,6 +66,8 @@ export type ModelPlazaProps = {
   onSelectModel: (model: EmbeddedModelEntry | null) => void;
   onOpenRecommend: () => void;
   onCloseRecommend: () => void;
+  onOpenManualImport: () => void;
+  onCloseManualImport: () => void;
   onHardwareChange: (hw: LocalHardwareProfile) => void;
   gatewayHost: string;
   chatModel: EmbeddedModelEntry | null;
@@ -1028,13 +1032,15 @@ export function renderModelPlaza(props: ModelPlazaProps) {
                   <p class="embedded-model-intro__tips">
                     建议优先选用推荐等级较高（S / A / B）的模型，对话与推理更稳定。参数量过小的模型、或不支持
                     thinking 的模型，推理能力有限，复杂问题与长对话体验可能较差；可按需查看右上角「推荐说明」了解评分标准与本机适配情况。
-                    也可自行下载 GGUF 放入
-                    <code>~/.openocta/embedded-models/&lt;模型ID&gt;/</code>，点击「刷新」扫描识别后即可启动（详见
-                    <strong>内嵌模型手动导入</strong> 说明文档）。
+                    也可自行下载 GGUF 手动导入本地模型，详见
+                    <button class="plaza-manual-import-link" type="button" @click=${props.onOpenManualImport}>
+                      手动导入说明
+                    </button>。
                   </p>
                 </div>
                 <div class="plaza-toolbar__actions">
                   <button class="btn" type="button" ?disabled=${props.loading} @click=${props.onRefresh}>刷新</button>
+                  <button class="btn" type="button" @click=${props.onOpenManualImport}>手动导入</button>
                   <button class="btn primary" type="button" @click=${props.onOpenRecommend}>推荐说明</button>
                   ${props.downloadingModelId
                     ? html`
@@ -1058,6 +1064,7 @@ export function renderModelPlaza(props: ModelPlazaProps) {
       </section>
     </main>
     ${renderRecommendGuideModal(props)}
+    ${renderPlazaManualImportModal({ open: props.manualImportOpen, onClose: props.onCloseManualImport })}
     ${renderDetailModal(props)}
     ${renderPlazaChatTestModal(props)}
   `;

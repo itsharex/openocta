@@ -1435,6 +1435,93 @@
   cursor: pointer;
 }
 
+.plaza-manual-import-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.plaza-manual-import-link:hover {
+  opacity: 0.85;
+}
+
+.plaza-manual-import-modal__body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.plaza-manual-import__lead {
+  margin: 0 0 16px;
+}
+
+.plaza-manual-import__pre {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.plaza-manual-import__steps {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.plaza-manual-import__steps li + li {
+  margin-top: 12px;
+}
+
+.plaza-manual-import__steps ul {
+  margin: 8px 0 0;
+  padding-left: 1.1rem;
+}
+
+.plaza-manual-import__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.plaza-manual-import__table th,
+.plaza-manual-import__table td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.plaza-manual-import__table th {
+  background: var(--bg);
+  font-weight: 600;
+}
+
+.plaza-manual-import__faq {
+  margin: 0;
+}
+
+.plaza-manual-import__faq dt {
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.plaza-manual-import__faq dt:first-child {
+  margin-top: 0;
+}
+
+.plaza-manual-import__faq dd {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
 .plaza-guide-criteria {
   margin: 0;
   padding-left: 18px;

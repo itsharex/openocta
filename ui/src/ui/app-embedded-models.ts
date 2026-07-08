@@ -234,6 +234,14 @@ export function closeEmbeddedPlazaRecommend(state: Host) {
   state.embeddedPlazaRecommendOpen = false;
 }
 
+export function openEmbeddedPlazaManualImport(state: Host) {
+  state.embeddedPlazaManualImportOpen = true;
+}
+
+export function closeEmbeddedPlazaManualImport(state: Host) {
+  state.embeddedPlazaManualImportOpen = false;
+}
+
 export function setEmbeddedPlazaHardware(state: Host, hw: LocalHardwareProfile) {
   state.embeddedPlazaHardware = hw;
 }
