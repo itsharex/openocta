@@ -2,6 +2,87 @@
 
 OpenOcta 版本更新记录。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [1.2.0] - 2026-07-08
+
+上一版本：[v1.0.5](https://github.com/openocta/openocta/releases/tag/v1.0.5)
+
+### 亮点
+
+v1.2.0 在 v1.0.5 基础上聚焦 **本地模型** 与 **发布运维**，核心围绕四件事：
+
+1. **内嵌模型与模型广场** — 基于 yzma + GGUF 的本地 Chat / Embedding 推理，CanIRun 风格目录、下载、启停与 Gateway 代理
+2. **手动导入 GGUF** — 用户自行下载权重放入指定目录，刷新扫描后即可识别、启动
+3. **应用自动更新** — 桌面端与服务端共用版本检查、跳过记录与一键/手动安装流程
+4. **对话与模型路由稳定性** — 内嵌模型 Gateway 代理路由、会话模型解析等修复
+
+### Added
+
+#### 内嵌模型与模型广场
+
+- 新增 **模型广场**（模型库 → 模型广场）：集成 CanIRun.ai 风格目录（约 77 个模型条目），本地 S–F 推荐分级与硬件适配说明
+- 支持 **内嵌下载** 内置 GGUF 模型（如 Qwen3-0.6B、Qwen3-Embedding、Qwen2.5-VL-3B、SmolLM2-135M 等），带进度条与取消
+- 本地 **Chat / Embedding** 推理：权重存于 `~/.openocta/embedded-models/`，多模型可并行运行，经 Gateway `/api/embedded-models/v1` 统一代理
+- 启动后自动合并 `openocta.json` 的 `openocta-embedded-chat` / `openocta-embedded-embedding` provider；Gateway 重启后按 manifest 自动恢复运行中模型
+- 模型广场 **测试对话** 弹窗，可验证单模型推理路由
+- 新增 **手动导入**：扫描 `embedded-models/<模型ID>/` 下用户放置的 GGUF，刷新后出现在列表（自定义 ID 标记「手动导入」）
+- 模型广场 **「手动导入」** 说明弹框，与 [embedded-models-manual-import.md](./docs/embedded-models-manual-import.md) 内容一致
+- 详见 [embedded-models.md](./docs/embedded-models.md)、[embedded-models-manual-import.md](./docs/embedded-models-manual-import.md)
+
+#### 应用自动更新
+
+- 桌面（Wails）与服务端（systemd）共用 **版本检查** API 与 UI 弹框
+- 支持每日自动检查、手动「检查更新」、跳过指定版本、deb/rpm/dmg/exe 自动安装及手动命令指引
+- 详见 [app-update.md](./docs/app-update.md)
+
+#### 对话与控制台
+
+- 对话页支持 **按会话选择模型**（覆盖 Agent 默认配置）
+- 新增 **快捷建议提示**（chat suggestions）组件
+- 知识库页新增 **图谱视图**（vault graph），可视化笔记关联
+- 推理内容支持 `reasoning` / thinking 标签解析与展示优化
+
+#### Agent 运行时
+
+- 内嵌模型专用 `createEmbeddedChatModelFactory`，强制走 Gateway OpenAI 兼容代理
+
+#### 文档与脚本
+
+- 新增/更新：`embedded-models.md`、`embedded-models-manual-import.md`、`app-update.md`、`release-checklist.md`、`desktop-app-design.md` 等
+- 新增 `ui/scripts/generate-plaza-catalog.mjs`、`resolve-plaza-gguf-links.mjs` 用于维护广场目录
+
+### Changed
+
+- **模型库**：侧栏增加「模型广场」分类；已安装内嵌模型在本地分区展示
+- **内嵌模型 provider**：`baseUrl` 统一指向 Gateway 代理（`http://127.0.0.1:{port}/api/embedded-models/v1`），由请求体 `model` 字段路由到具体实例
+- **对话布局**与 **知识库** 样式微调，与模型广场视觉统一
+- **sessions** 模型解析：Agent 配置优先于 defaults，支持 `{ primary: "..." }` 对象格式
+
+### Fixed
+
+- **内嵌模型对话**：修复选用 `openocta-embedded-chat/...` 时仍请求 `api.anthropic.com` 的问题；未知 provider 不再静默回退 Anthropic
+- **会话模型展示**：修复 `resolveSessionModelRef` 中 defaults 覆盖 Agent 专属模型配置的问题
+
+### 升级建议
+
+1. 首次使用内嵌模型：打开 **模型 → 模型广场**，下载或手动导入 GGUF 后点击 **刷新**，再 **启动** 并在对话中选择 `openocta-embedded-chat/<modelId>`
+2. 若曾手动编辑 `openocta.json` 中内嵌 provider 的 `baseUrl` 为旧版直连端口（如 `18902`），请重新启动内嵌模型或打开模型广场以同步为 Gateway 代理地址
+3. 自行下载 GGUF 时，目录名即为模型 ID；完整步骤见模型广场 **「手动导入」** 弹框
+4. 桌面用户可在顶部栏使用 **检查更新**；Linux 服务端自动安装需配置无密码 `sudo`
+5. 从 v1.0.5 升级后若多轮 tool 对话仍异常，请确认 Gateway 版本不低于 v1.0.5（含工具历史水合修复）
+
+### 获取方式
+
+```bash
+git clone https://github.com/openocta/openocta.git
+cd openocta
+git checkout v1.2.0
+make build
+./openocta gateway run
+```
+
+- GitHub Release：[v1.2.0](https://github.com/openocta/openocta/releases/tag/v1.2.0)
+- 上一版本说明：见下方 [v1.0.0](#100---2026-06-25)
+
 ## [1.0.0] - 2026-06-25
 
 上一版本：[v0.3.0](https://github.com/openocta/openocta/releases/tag/v0.3.0)
