@@ -77,4 +77,22 @@ describe("extractThinkingCached", () => {
     expect(extractThinkingCached(message)).toBe("Plan A");
     expect(extractThinkingCached(message)).toBe("Plan A");
   });
+
+  it("extracts thinking tags from A2UI data model payloads", () => {
+    const message = {
+      role: "assistant",
+      content: [
+        {
+          type: "a2ui",
+          a2ui: {
+            updateDataModel: {
+              path: "/content",
+              value: "\ninternal reasoning\n\n\nHello user",
+            },
+          },
+        },
+      ],
+    };
+    expect(extractThinking(message)).toBe("internal reasoning");
+  });
 });

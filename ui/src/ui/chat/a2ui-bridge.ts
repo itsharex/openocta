@@ -1,3 +1,4 @@
+import { stripThinkingTags } from "../format.ts";
 import * as v0_9 from "@a2ui/web_core/v0_9";
 import { basicCatalog } from "@a2ui/lit/v0_9";
 import type { LitComponentApi } from "@a2ui/lit/v0_9";
@@ -249,7 +250,7 @@ export function sanitizeA2UIDisplayText(text: string | null | undefined): string
   if (text == null) {
     return null;
   }
-  const cleaned = stripPersistedOutputBlocks(text.trim());
+  const cleaned = stripThinkingTags(stripPersistedOutputBlocks(text.trim()));
   if (!cleaned || isToolLikeDisplayText(cleaned)) {
     return null;
   }

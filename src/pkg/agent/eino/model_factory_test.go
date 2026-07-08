@@ -7,6 +7,34 @@ import (
 	"github.com/openocta/openocta/pkg/config"
 )
 
+func TestCreateModelFactoryFromConfig_EmbeddedChatWithoutProviderConfig(t *testing.T) {
+	port := 18900
+	cfg := &config.OpenOctaConfig{
+		Gateway: &config.GatewayConfig{Port: &port},
+	}
+	factory, err := CreateModelFactoryFromConfig(cfg, "openocta-embedded-chat/test-model")
+	if err != nil {
+		t.Fatalf("CreateModelFactoryFromConfig: %v", err)
+	}
+	if factory == nil {
+		t.Fatal("expected non-nil factory")
+	}
+}
+
+func TestCreateModelFactoryFromConfig_UnknownProvider(t *testing.T) {
+	_, err := CreateModelFactoryFromConfig(&config.OpenOctaConfig{}, "unknown-provider/some-model")
+	if err == nil {
+		t.Fatal("expected error for unknown provider")
+	}
+}
+
+func TestCreateModelFactoryFromConfig_EmbeddedEmbeddingRejectedForChat(t *testing.T) {
+	_, err := CreateModelFactoryFromConfig(&config.OpenOctaConfig{}, "openocta-embedded-embedding/test-model")
+	if err == nil {
+		t.Fatal("expected error when using embedding provider for chat")
+	}
+}
+
 func TestCreateModelFactoryFromConfig_MiniMax(t *testing.T) {
 	t.Setenv("MINIMAX_API_KEY", "test-key")
 	cfg := &config.OpenOctaConfig{

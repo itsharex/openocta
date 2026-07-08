@@ -11,6 +11,7 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 
 	"github.com/openocta/openocta/pkg/config"
+	"github.com/openocta/openocta/pkg/embeddedmodels"
 )
 
 type builtInProvider struct {
@@ -127,7 +128,38 @@ func buildChatModel(ctx context.Context, useAnthropic bool, modelName, apiKey, b
 	return openai.NewChatModel(ctx, cfg)
 }
 
+func createEmbeddedChatModelFactory(cfg *config.OpenOctaConfig, provider, modelID string) (ChatModelFactory, error) {
+	if provider == embeddedmodels.EmbeddedEmbeddingProviderKey {
+		return nil, fmt.Errorf("provider %q is for embedding models; use %q for chat", provider, embeddedmodels.EmbeddedChatProviderKey)
+	}
+	foundModelID := strings.TrimSpace(modelID)
+	var maxOut int
+	if cfg != nil && cfg.Models != nil && cfg.Models.Providers != nil {
+		if providerCfg, ok := cfg.Models.Providers[provider]; ok {
+			if foundModelID == "" && len(providerCfg.Models) > 0 {
+				foundModelID = providerCfg.Models[0].ID
+			}
+			if def := modelDefFromProviderCfg(providerCfg, foundModelID); def != nil && def.MaxTokens != nil {
+				maxOut = *def.MaxTokens
+			}
+		}
+	}
+	if foundModelID == "" {
+		return nil, fmt.Errorf("no model specified for provider %s", provider)
+	}
+	baseURL := embeddedmodels.GatewayProxyBaseURL(cfg, os.Getenv)
+	modelName := foundModelID
+	return chatModelFactoryFunc(func(ctx context.Context) (einomodel.ToolCallingChatModel, error) {
+		// Gateway proxy at /api/embedded-models/v1 is OpenAI-compatible.
+		return buildChatModel(ctx, false, modelName, "local", baseURL, maxOut)
+	}), nil
+}
+
 func createChatModelFactory(cfg *config.OpenOctaConfig, provider, modelID string) (ChatModelFactory, error) {
+	if embeddedmodels.IsEmbeddedProvider(provider) {
+		return createEmbeddedChatModelFactory(cfg, provider, modelID)
+	}
+
 	if cfg != nil && cfg.Models != nil && cfg.Models.Providers != nil {
 		if providerCfg, ok := cfg.Models.Providers[provider]; ok {
 			foundModelID := modelID
@@ -218,10 +250,7 @@ func createChatModelFactory(cfg *config.OpenOctaConfig, provider, modelID string
 			return buildChatModel(ctx, false, name, apiKey, "", 0)
 		}), nil
 	default:
-		apiKey := getEnvVar(cfg, "ANTHROPIC_API_KEY", "anthropic/claude-sonnet-4-5-20250929")
-		return chatModelFactoryFunc(func(ctx context.Context) (einomodel.ToolCallingChatModel, error) {
-			return buildChatModel(ctx, true, "claude-sonnet-4-5-20250929", apiKey, "", 0)
-		}), nil
+		return nil, fmt.Errorf("model provider %q not found in config", provider)
 	}
 }
 

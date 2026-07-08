@@ -2,6 +2,8 @@
 
 本文档说明 OpenOcta 支持的大模型厂商（Model Providers）、模型引用格式、以及如何通过配置文件或环境变量进行认证与自定义端点配置。格式与用法参考 [OpenClaw Model Providers](https://docs.openclaw.ai/concepts/model-providers)。
 
+> **内嵌本地模型**：若需在本地运行 GGUF 对话/向量模型（无需 Ollama），请参阅 [内嵌模型（Embedded Models）](./embedded-models.md)。
+
 ## 模型引用格式
 
 模型使用 **`provider/modelId`** 形式引用，例如：

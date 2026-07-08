@@ -1,4 +1,6 @@
 import { stripThinkingTags } from "../format.ts";
+import { extractReasoningFromText } from "../shared/text/reasoning-tags.ts";
+import { extractRawA2UIDisplayText } from "./a2ui-bridge.ts";
 
 const ENVELOPE_PREFIX = /^\[([^\]]+)\]\s*/;
 const ENVELOPE_CHANNELS = [
@@ -187,16 +189,26 @@ export function extractThinking(message: unknown): string | null {
     return parts.join("\n");
   }
 
-  // Back-compat: older logs may still have <think> tags inside text blocks.
+  // Back-compat: reasoning tags inside text blocks or A2UI data-model payloads.
+  const rawSources: string[] = [];
   const rawText = extractRawText(message);
-  if (!rawText) {
-    return null;
+  if (rawText) {
+    rawSources.push(rawText);
   }
-  const matches = [
-    ...rawText.matchAll(/<\s*think(?:ing)?\s*>([\s\S]*?)<\s*\/\s*think(?:ing)?\s*>/gi),
-  ];
-  const extracted = matches.map((m) => (m[1] ?? "").trim()).filter(Boolean);
-  return extracted.length > 0 ? extracted.join("\n") : null;
+  const rawA2ui = extractRawA2UIDisplayText(message);
+  if (rawA2ui) {
+    rawSources.push(rawA2ui);
+  }
+  for (const raw of rawSources) {
+    const extracted = extractReasoningFromText(raw);
+    if (extracted) {
+      parts.push(extracted);
+    }
+  }
+  if (parts.length > 0) {
+    return parts.join("\n\n");
+  }
+  return null;
 }
 
 export function extractThinkingCached(message: unknown): string | null {

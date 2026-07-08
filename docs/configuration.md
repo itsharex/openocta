@@ -107,6 +107,26 @@ OpenOcta 的配置文件默认位于：
 - `lastTouchedVersion` (string, 可选): 最后修改配置的版本号
 - `lastTouchedAt` (string, 可选): 最后修改时间（ISO 8601 格式）
 
+#### `update` - 更新设置
+
+控制桌面应用版本检查与跳过记录。完整行为说明见 [桌面应用自动更新](./app-update.md)。
+
+```json
+{
+  "update": {
+    "channel": "stable",
+    "checkOnStart": true,
+    "skippedVersions": ["v1.0.0"],
+    "lastCheckAt": "2026-07-04T02:00:00Z"
+  }
+}
+```
+
+- `channel` (string, 可选): npm/git 更新渠道（`stable` / `beta` / `dev`）
+- `checkOnStart` (boolean, 可选): 网关启动时检查 npm 更新
+- `skippedVersions` (string[], 可选): 用户跳过的新版本号；自动检查不再提示这些版本
+- `lastCheckAt` (string, 可选): 上次版本检查时间（RFC3339），用于每日自动检查间隔（24 小时）
+
 #### `env` - 环境变量配置
 
 配置环境变量和 shell 环境导入设置。
@@ -653,6 +673,7 @@ Gateway 支持配置热重载，无需重启即可应用配置更改。通过 `g
 
 ## 参考资源
 
+- [桌面应用自动更新](./app-update.md) - 版本检查、跳过与自动安装
 - [配置示例文档](https://docs.openocta.ai/zh-CN/gateway/configuration-examples)
 - [完整配置参考](https://docs.openocta.ai/gateway/configuration)
 - [渠道配置文档](https://docs.openocta.ai/channels/whatsapp)

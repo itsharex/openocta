@@ -99,19 +99,39 @@ export function renderModelCategoryNav(props: {
   providerSearchQuery: string;
   selectedCategory: ModelLibraryCategory;
   disabled: boolean;
+  embeddedPlazaCount?: number;
+  embeddedInstalledCount?: number;
   onCategoryChange: (category: ModelLibraryCategory) => void;
 }) {
+  const plazaCount = props.embeddedPlazaCount ?? 3;
+  const embeddedInstalled = props.embeddedInstalledCount ?? 0;
   const { orderedCategories, counts } = computeModelLibraryCategories(
     props.providers,
     props.providerSearchQuery,
+    plazaCount,
+    embeddedInstalled,
   );
   const effectiveCategory = props.selectedCategory ?? "__all__";
+
+  const labelFor = (catKey: ModelLibraryCategory) => {
+    switch (catKey) {
+      case "__all__":
+        return "全部";
+      case "plaza":
+        return "模型广场";
+      case "public":
+        return "公有模型";
+      case "local":
+        return "本地模型";
+      default:
+        return catKey;
+    }
+  };
 
   return renderCatalogCategoryNav(html`
     <div class="emp-categories">
       ${orderedCategories.map((catKey) => {
-        const label =
-          catKey === "__all__" ? "全部" : catKey === "public" ? "公有模型" : "本地模型";
+        const label = labelFor(catKey);
         const active = effectiveCategory === catKey;
         const count = counts.get(catKey) ?? 0;
         return html`

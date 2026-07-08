@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { stripReasoningTagsFromText } from "./reasoning-tags.js";
+import {
+  extractReasoningFromText,
+  splitReasoningFromText,
+  stripReasoningTagsFromText,
+} from "./reasoning-tags.js";
 
 describe("stripReasoningTagsFromText", () => {
   describe("basic functionality", () => {
@@ -213,6 +217,29 @@ describe("stripReasoningTagsFromText", () => {
     it("trim=start only trims start", () => {
       const input = "  <think>x</think>  result  ";
       expect(stripReasoningTagsFromText(input, { trim: "start" })).toBe("result  ");
+    });
+  });
+
+  describe("extractReasoningFromText", () => {
+    it("extracts redacted_thinking blocks", () => {
+      const input = "<think>\nplan A\n</think>\n\nHello";
+      expect(extractReasoningFromText(input)).toBe("plan A");
+    });
+
+    it("extracts think blocks", () => {
+      const input = "\nreason\n\nReply";
+      expect(extractReasoningFromText(input)).toBe("reason");
+    });
+  });
+
+  describe("splitReasoningFromText", () => {
+    it("separates thinking and visible reply", () => {
+      const input =
+        "<think>\n用户问名字\n</think>\n\n我的名字是小助手";
+      expect(splitReasoningFromText(input)).toEqual({
+        thinking: "用户问名字",
+        text: "我的名字是小助手",
+      });
     });
   });
 });

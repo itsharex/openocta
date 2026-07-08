@@ -11,6 +11,7 @@ import { icons } from "../icons.ts";
 import { nativeConfirm } from "../native-dialog-bridge.ts";
 import { t } from "../strings.js";
 import { DEFAULT_CHAT_QUICK_PROMPTS } from "../scenario-templates.ts";
+import "../chat-suggestion-prompts.ts";
 import "../components/resizable-divider.ts";
 import "../components/chat-file-preview.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
@@ -895,40 +896,33 @@ export function renderChat(props: ChatProps) {
     : nothing;
   const emptyPrompts = isEmptyThread
     ? html`
-        <div class="chat-empty-prompts">
-          <div class="chat-empty-prompts__title">选一个试试</div>
-          <div class="chat-empty__prompts">
-            ${quickPrompts.map(
-              (p) => html`
-                <button
-                  class="btn chat-empty__prompt"
-                  type="button"
-                  ?disabled=${!props.connected}
-                  @click=${() => {
-                    props.onSend(p);
-                  }}
-                >
-                  ${icons.chatPrompt} ${p}
-                </button>
-              `,
-            )}
-          </div>
-          ${
-            (props.localAgents?.length ?? 0) > 0
-              ? html`
-                  <div class="chat-local-agents-empty">
-                    <div class="chat-local-agents-empty__hint muted">${t("chatLocalAgentsHint")}</div>
-                    <openocta-local-agent-picker
-                      .agents=${props.localAgents ?? []}
-                      ?disabled=${!props.connected}
-                      @agent-insert=${(e: CustomEvent<{ mention: string }>) =>
-                        props.onComposeInsert?.(e.detail.mention)}
-                    ></openocta-local-agent-picker>
-                  </div>
-                `
-              : nothing
-          }
-        </div>
+        <openocta-chat-suggestions
+          .extraPrompts=${quickPrompts}
+          ?disabled=${!props.connected}
+          @suggestion-select=${(e: CustomEvent<{ prompt: string }>) => {
+            const prompt = e.detail.prompt;
+            if (props.onComposeInsert) {
+              props.onComposeInsert(prompt);
+              return;
+            }
+            props.onSend(prompt);
+          }}
+        ></openocta-chat-suggestions>
+        ${
+          (props.localAgents?.length ?? 0) > 0
+            ? html`
+                <div class="chat-local-agents-empty">
+                  <div class="chat-local-agents-empty__hint muted">${t("chatLocalAgentsHint")}</div>
+                  <openocta-local-agent-picker
+                    .agents=${props.localAgents ?? []}
+                    ?disabled=${!props.connected}
+                    @agent-insert=${(e: CustomEvent<{ mention: string }>) =>
+                      props.onComposeInsert?.(e.detail.mention)}
+                  ></openocta-local-agent-picker>
+                </div>
+              `
+            : nothing
+        }
       `
     : nothing;
   const thread = html`

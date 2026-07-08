@@ -120,6 +120,11 @@ describe("sanitizeA2UIDisplayText", () => {
     expect(extractRawA2UIDisplayText(message)).toContain("command exited");
     expect(extractA2UIDisplayText(message)).toBeNull();
   });
+
+  it("strips thinking tags from A2UI display text", () => {
+    const raw = "\nhidden plan\n\n\nVisible reply";
+    expect(sanitizeA2UIDisplayText(raw)).toBe("Visible reply");
+  });
 });
 
 describe("isTextOnlyA2UIDisplay", () => {

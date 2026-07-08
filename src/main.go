@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/openocta/openocta/pkg/appinstance"
+	"github.com/openocta/openocta/pkg/appupdate"
 	"github.com/openocta/openocta/pkg/desktop"
 	gatewayhttp "github.com/openocta/openocta/pkg/gateway/http"
 	"github.com/openocta/openocta/pkg/paths"
@@ -91,6 +92,7 @@ func main() {
 			wailsruntime.Quit(wailsAppCtx)
 		}
 	}
+	appupdate.SetDesktopQuit(gatewayhttp.DesktopQuit)
 
 	appOptions := &options.App{
 		AssetServer: &assetserver.Options{

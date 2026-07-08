@@ -37,3 +37,18 @@ export function gatewayHttpBase(host: string): string {
   const proto = typeof location !== "undefined" && location.protocol === "https:" ? "https" : "http";
   return `${proto}://${h}`;
 }
+
+/** True when the UI talks to a gateway on this machine (desktop shell or local service). */
+export function isLocalGatewayHost(host: string): boolean {
+  const h = parseGatewayHost(host);
+  if (!h) return false;
+  const hostname = h.split(":")[0]?.trim().toLowerCase() ?? "";
+  if (!hostname) return false;
+  if (hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1") {
+    return true;
+  }
+  if (typeof location !== "undefined") {
+    return hostname === location.hostname.toLowerCase();
+  }
+  return false;
+}

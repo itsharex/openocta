@@ -1250,34 +1250,23 @@ func resolveSessionModelRef(cfg *config.OpenOctaConfig, entry session.SessionEnt
 } {
 	provider := "anthropic"
 	model := "claude-sonnet-4-5-20250929"
+	resolved := false
 
 	if cfg != nil && cfg.Agents != nil {
-		// Try to find agent config
 		for _, a := range cfg.Agents.List {
 			if strings.EqualFold(a.ID, agentID) {
-				if a.Model != nil {
-					if modelStr, ok := a.Model.(string); ok && modelStr != "" {
-						parts := strings.SplitN(modelStr, "/", 2)
-						if len(parts) == 2 {
-							provider = strings.TrimSpace(parts[0])
-							model = strings.TrimSpace(parts[1])
-						} else {
-							model = strings.TrimSpace(modelStr)
-						}
-					}
+				if p, m, ok := parseSessionModelField(a.Model); ok {
+					provider, model = p, m
+					resolved = true
 				}
 				break
 			}
 		}
-		// Check defaults
-		if cfg.Agents.Defaults != nil && cfg.Agents.Defaults.Model != nil {
+		if !resolved && cfg.Agents.Defaults != nil && cfg.Agents.Defaults.Model != nil {
 			if primary := cfg.Agents.Defaults.Model.Primary; primary != nil && *primary != "" {
-				parts := strings.SplitN(*primary, "/", 2)
-				if len(parts) == 2 {
-					provider = strings.TrimSpace(parts[0])
-					model = strings.TrimSpace(parts[1])
-				} else {
-					model = strings.TrimSpace(*primary)
+				if p, m, ok := parseSessionModelRef(*primary); ok {
+					provider, model = p, m
+					resolved = true
 				}
 			}
 		}
@@ -1287,6 +1276,43 @@ func resolveSessionModelRef(cfg *config.OpenOctaConfig, entry session.SessionEnt
 		provider string
 		model    string
 	}{provider: provider, model: model}
+}
+
+func parseSessionModelRef(modelRef string) (provider, model string, ok bool) {
+	modelRef = strings.TrimSpace(modelRef)
+	if modelRef == "" {
+		return "", "", false
+	}
+	parts := strings.SplitN(modelRef, "/", 2)
+	if len(parts) == 2 {
+		provider = strings.TrimSpace(parts[0])
+		model = strings.TrimSpace(parts[1])
+	} else {
+		provider = "anthropic"
+		model = modelRef
+	}
+	if model == "" {
+		return "", "", false
+	}
+	if provider == "" {
+		provider = "anthropic"
+	}
+	return provider, model, true
+}
+
+func parseSessionModelField(raw interface{}) (provider, model string, ok bool) {
+	if raw == nil {
+		return "", "", false
+	}
+	if modelStr, isStr := raw.(string); isStr && strings.TrimSpace(modelStr) != "" {
+		return parseSessionModelRef(modelStr)
+	}
+	if modelMap, isMap := raw.(map[string]interface{}); isMap {
+		if primary, hasPrimary := modelMap["primary"].(string); hasPrimary && strings.TrimSpace(primary) != "" {
+			return parseSessionModelRef(primary)
+		}
+	}
+	return "", "", false
 }
 
 // resolveSessionTranscriptCandidates returns candidate paths for a session transcript.

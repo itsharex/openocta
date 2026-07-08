@@ -1,10 +1,10 @@
-import { html, nothing, svg, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { VaultFileEntry, VaultGraph } from "../controllers/vault.ts";
 import { icons } from "../icons.js";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
-import { layoutVaultGraph, NODE_RADIUS } from "./knowledge-vault-graph.ts";
+import "../components/vault-graph-view.ts";
 
 export type KnowledgeVaultViewMode = "notes" | "graph";
 
@@ -190,78 +190,14 @@ function renderTree(
 }
 
 function renderGraph(props: KnowledgeVaultProps): TemplateResult {
-  if (props.graphLoading) {
-    return html`<div class="kv-graph__empty">加载图谱…</div>`;
-  }
-  const graph = props.graph;
-  if (!graph || graph.nodes.length === 0) {
-    return html`<div class="kv-graph__empty">暂无笔记，可在 Vault 目录添加 .md 文件后刷新。</div>`;
-  }
-  const width = 1200;
-  const height = 640;
-  const layout = layoutVaultGraph(graph.nodes, graph.edges, width, height, props.selectedPath);
-  const byPath = new Map(layout.map((n) => [n.path, n]));
-  const isolated = graph.edges.length === 0;
   return html`
-    <div class="kv-graph">
-      ${svg`
-        <svg
-          class="kv-graph__svg"
-          viewBox="0 0 ${width} ${height}"
-          preserveAspectRatio="xMidYMid meet"
-          role="img"
-          aria-label="知识库文档关系图谱"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          ${graph.edges.map((e) => {
-            const a = byPath.get(e.source);
-            const b = byPath.get(e.target);
-            if (!a || !b) return nothing;
-            return svg`<line
-              class="kv-graph__edge kv-graph__edge--${e.kind}"
-              x1="${a.x}"
-              y1="${a.y}"
-              x2="${b.x}"
-              y2="${b.y}"
-            />`;
-          })}
-          ${layout.map((n) => {
-            const selected = n.path === props.selectedPath;
-            return svg`<g
-              class="kv-graph__node ${isolated ? "kv-graph__node--isolated" : ""} ${selected ? "kv-graph__node--selected" : ""}"
-              transform="translate(${n.x} ${n.y})"
-              @click=${() => props.onSelectFile(n.path)}
-            >
-              <circle
-                class="kv-graph__node-circle"
-                r="${NODE_RADIUS}"
-                fill="rgba(99, 102, 241, 0.18)"
-                stroke="#6366f1"
-                stroke-width="2"
-              />
-              <text class="kv-graph__node-label" text-anchor="middle" dy="4" fill="currentColor">
-                ${truncate(n.title || n.path, 10)}
-              </text>
-            </g>`;
-          })}
-        </svg>
-      `}
-      <div class="kv-graph__legend">
-        ${graph.edges.length > 0
-          ? html`
-              <span><i class="kv-graph__dot kv-graph__dot--wiki"></i>双链 [[ ]]</span>
-              <span><i class="kv-graph__dot kv-graph__dot--md"></i>Markdown 链接</span>
-            `
-          : html`<span>无链接时显示孤立笔记节点（Obsidian 图谱风格）</span>`}
-        <span>${graph.nodes.length} 篇笔记 · ${graph.edges.length} 条链接</span>
-      </div>
-    </div>
+    <vault-graph-view
+      .graph=${props.graph}
+      .loading=${props.graphLoading}
+      .selectedPath=${props.selectedPath}
+      .onSelectFile=${props.onSelectFile}
+    ></vault-graph-view>
   `;
-}
-
-function truncate(text: string, max: number) {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}…`;
 }
 
 export function renderKnowledgeVault(props: KnowledgeVaultProps): TemplateResult {
@@ -322,6 +258,16 @@ export function renderKnowledgeVault(props: KnowledgeVaultProps): TemplateResult
 
       ${props.error ? html`<div class="kv-alert kv-alert--error">${props.error}</div>` : nothing}
       ${props.saveMessage ? html`<div class="kv-alert kv-alert--ok">${props.saveMessage}</div>` : nothing}
+      ${props.syncing
+        ? html`
+            <div class="kv-sync-progress" role="status" aria-live="polite">
+              <div class="kv-sync-progress__track">
+                <div class="kv-sync-progress__bar"></div>
+              </div>
+              <span class="kv-sync-progress__label">正在同步索引，请稍候…</span>
+            </div>
+          `
+        : nothing}
       ${!props.loading && props.viewMode === "notes"
         ? html`<div class="kv-hint">
             对话中 Agent 会通过 <code>memory_search</code> 检索知识库；更新笔记后请点击「同步索引」，并在会话中再发一条新消息。

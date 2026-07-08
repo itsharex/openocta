@@ -22,6 +22,7 @@ import (
 	"github.com/openocta/openocta/pkg/channels/wework"
 	"github.com/openocta/openocta/pkg/config"
 	"github.com/openocta/openocta/pkg/cron"
+	"github.com/openocta/openocta/pkg/embeddedmodels"
 	"github.com/openocta/openocta/pkg/gateway/handlers"
 	"github.com/openocta/openocta/pkg/gateway/protocol"
 	"github.com/openocta/openocta/pkg/gateway/swarmsvc"
@@ -383,6 +384,9 @@ func NewServer(addr string, version string) *Server {
 		}
 	}()
 
+	// 恢复上次处于运行状态的内嵌模型（manifest.json running=true）。
+	go embeddedmodels.RestoreRuntimeOnStartup(os.Getenv)
+
 	s := &Server{
 		addr:    addr,
 		version: version,
@@ -464,6 +468,26 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("OPTIONS /api/desktop/clear-workspace", s.handleDesktopClearWorkspaceOptions)
 	s.mux.HandleFunc("POST /api/desktop/open-url", s.requireGatewayToken(s.handleDesktopOpenURL))
 	s.mux.HandleFunc("OPTIONS /api/desktop/open-url", s.handleDesktopOpenURLOptions)
+	s.mux.HandleFunc("GET /api/desktop/update/check", s.requireGatewayToken(s.handleDesktopUpdateCheck))
+	s.mux.HandleFunc("POST /api/desktop/update/skip", s.requireGatewayToken(s.handleDesktopUpdateSkip))
+	s.mux.HandleFunc("POST /api/desktop/update/install", s.requireGatewayToken(s.handleDesktopUpdateInstall))
+	s.mux.HandleFunc("GET /api/desktop/update/status", s.requireGatewayToken(s.handleDesktopUpdateStatus))
+	s.mux.HandleFunc("OPTIONS /api/desktop/update/check", s.handleDesktopUpdateOptions)
+	s.mux.HandleFunc("OPTIONS /api/desktop/update/skip", s.handleDesktopUpdateOptions)
+	s.mux.HandleFunc("OPTIONS /api/desktop/update/install", s.handleDesktopUpdateOptions)
+	s.mux.HandleFunc("OPTIONS /api/desktop/update/status", s.handleDesktopUpdateOptions)
+	s.mux.HandleFunc("GET /api/embedded-models/catalog", s.requireGatewayToken(s.handleEmbeddedModelsCatalog))
+	s.mux.HandleFunc("GET /api/embedded-models/model-info", s.requireGatewayToken(s.handleEmbeddedModelsModelInfo))
+	s.mux.HandleFunc("POST /api/embedded-models/download", s.requireGatewayToken(s.handleEmbeddedModelsDownloadStart))
+	s.mux.HandleFunc("GET /api/embedded-models/download/status", s.requireGatewayToken(s.handleEmbeddedModelsDownloadStatus))
+	s.mux.HandleFunc("POST /api/embedded-models/download/cancel", s.requireGatewayToken(s.handleEmbeddedModelsDownloadCancel))
+	s.mux.HandleFunc("POST /api/embedded-models/start", s.requireGatewayToken(s.handleEmbeddedModelsStart))
+	s.mux.HandleFunc("POST /api/embedded-models/stop", s.requireGatewayToken(s.handleEmbeddedModelsStop))
+	s.mux.HandleFunc("POST /api/embedded-models/delete", s.requireGatewayToken(s.handleEmbeddedModelsDelete))
+	s.mux.HandleFunc("POST /api/embedded-models/chat/completions", s.requireGatewayToken(s.handleEmbeddedModelsChatCompletions))
+	s.mux.HandleFunc("POST /api/embedded-models/v1/chat/completions", s.requireGatewayToken(s.handleEmbeddedModelsChatCompletions))
+	s.mux.HandleFunc("POST /api/embedded-models/v1/embeddings", s.requireGatewayToken(s.handleEmbeddedModelsEmbeddings))
+	s.mux.HandleFunc("OPTIONS /api/embedded-models/", s.handleEmbeddedModelsOptions)
 	s.mux.HandleFunc("OPTIONS /api/browser/", s.handleBrowserOptions)
 	s.mux.HandleFunc("POST /api/browser/request", s.requireGatewayToken(s.handleBrowserRequest))
 	s.mux.HandleFunc("GET /api/browser/install/status", s.requireGatewayToken(s.handleBrowserInstallStatus))

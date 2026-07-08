@@ -242,6 +242,7 @@ cd app && wails build -platform darwin/arm64
 
 - [architecture.md](./architecture.md) - OpenOcta 整体架构
 - [configuration.md](./configuration.md) - 配置说明
+- [app-update.md](./app-update.md) - 桌面应用自动更新
 - [deploy/dist-README.md](../../deploy/dist-README.md) - 安装与快速访问指南
 - [Wails 官方文档](https://wails.io/docs/introduction) - 桌面应用框架
 

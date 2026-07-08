@@ -298,6 +298,10 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "envVars" || host.tab === "models" || host.tab === "modelLibrary") {
     await loadConfig(host as unknown as Parameters<typeof loadConfig>[0]);
+    if (host.tab === "modelLibrary") {
+      const { loadEmbeddedModels } = await import("./app-embedded-models.ts");
+      void loadEmbeddedModels(host as unknown as import("./app-view-state.ts").AppViewState);
+    }
   }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as OpenClawApp);

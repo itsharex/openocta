@@ -121,3 +121,34 @@ export function stripReasoningTagsFromText(
 
   return applyTrim(result, trimMode);
 }
+
+const REASONING_INNER_RE =
+  /<\s*(?:redacted_)?think(?:ing)?\s*>([\s\S]*?)<\s*\/\s*(?:redacted_)?think(?:ing)?\s*>|<\s*thought\s*>([\s\S]*?)<\s*\/\s*thought\s*>|<\s*antthinking\s*>([\s\S]*?)<\s*\/\s*antthinking\s*>/gi;
+
+/** Extract inner reasoning text from model output tags (think / redacted_thinking / etc.). */
+export function extractReasoningFromText(text: string): string | null {
+  if (!text?.trim()) {
+    return null;
+  }
+  if (!QUICK_TAG_RE.test(text)) {
+    return null;
+  }
+  QUICK_TAG_RE.lastIndex = 0;
+
+  const chunks: string[] = [];
+  REASONING_INNER_RE.lastIndex = 0;
+  for (const match of text.matchAll(REASONING_INNER_RE)) {
+    const inner = (match[1] ?? match[2] ?? match[3] ?? "").trim();
+    if (inner) {
+      chunks.push(inner);
+    }
+  }
+  return chunks.length > 0 ? chunks.join("\n\n") : null;
+}
+
+/** Split model output into reasoning (thinking) and user-visible reply text. */
+export function splitReasoningFromText(text: string): { thinking: string | null; text: string } {
+  const thinking = extractReasoningFromText(text);
+  const visible = stripReasoningTagsFromText(text, { mode: "strict", trim: "both" });
+  return { thinking, text: visible };
+}

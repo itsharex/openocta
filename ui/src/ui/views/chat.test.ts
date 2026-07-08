@@ -117,7 +117,8 @@ describe("chat view", () => {
 
     expect(container.querySelector("section.chat.chat-empty")).not.toBeNull();
     expect(container.querySelector("div.chat-empty")).toBeNull();
-    expect(container.textContent).toContain("选一个试试");
+    expect(container.querySelector("openocta-chat-suggestions")).not.toBeNull();
+    expect(container.textContent).toContain("推荐");
   });
 
   it("renders scenario quick prompts when provided", () => {

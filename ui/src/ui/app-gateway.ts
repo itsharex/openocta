@@ -20,6 +20,7 @@ import {
   resetToolStream,
   type AgentEventPayload,
 } from "./app-tool-stream.ts";
+import { maybeRunDailyAppUpdateCheck } from "./app-update.ts";
 import { loadAgents } from "./controllers/agents.ts";
 import { loadAssistantIdentity } from "./controllers/assistant-identity.ts";
 import { loadChatHistory } from "./controllers/chat.ts";
@@ -189,6 +190,7 @@ export function connectGateway(host: GatewayHost) {
         await runApprovalsBannerPoll(app);
         startApprovalsBannerPolling(app);
       })();
+      void maybeRunDailyAppUpdateCheck(app as unknown as import("./app-view-state.ts").AppViewState);
     },
     onClose: ({ code, reason }) => {
       host.connected = false;

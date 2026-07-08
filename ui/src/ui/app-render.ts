@@ -388,6 +388,8 @@ import "./components/category-tree-sidebar.ts";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderNativeDialogOverlay } from "./views/native-dialog-overlay.ts";
+import { renderAppUpdateModal } from "./views/app-update-modal.ts";
+import { isAppUpdateUIAvailable } from "./app-update.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
@@ -413,6 +415,23 @@ import { renderSecurity } from "./views/security.ts";
 import { renderModels } from "./views/models.ts";
 import { renderApiKeys, renderApiKeysFormModal, renderApiKeysSecretModal, renderApiKeysExamplesModal } from "./views/api-keys.ts";
 import { renderModelLibrary } from "./views/model-library.ts";
+import {
+  handleEmbeddedDownloadCancel,
+  handleEmbeddedModelDelete,
+  handleEmbeddedModelDownload,
+  handleEmbeddedModelStart,
+  handleEmbeddedModelStop,
+  loadEmbeddedModels,
+  openEmbeddedPlazaRecommend,
+  closeEmbeddedPlazaRecommend,
+  setEmbeddedPlazaHardware,
+  selectEmbeddedPlazaModel,
+  openEmbeddedPlazaChatTest,
+  closeEmbeddedPlazaChatTest,
+  setEmbeddedPlazaChatInput,
+  sendEmbeddedPlazaChatTest,
+} from "./app-embedded-models.ts";
+import { PLAZA_CATALOG_COUNT } from "./data/plaza-catalog.ts";
 import {
   handleMcpAddServer,
   handleMcpAddClose,
@@ -759,6 +778,24 @@ export function renderApp(state: AppViewState) {
           <span class="theme-toggle__label">${themeToggleLabel(state.theme)}</span>
         </button>
         <div class="topbar-status">
+          ${
+            isAppUpdateUIAvailable(state)
+              ? html`
+                  <div class="pill pill--link topbar__no-drag">
+                    <button
+                      type="button"
+                      title="检查更新"
+                      class="topbar-link topbar__no-drag"
+                      ?disabled=${state.appUpdateCheckLoading || state.appUpdateInstalling}
+                      @click=${() => state.handleAppUpdateCheckClick()}
+                    >
+                      <span class="topbar-link__icon" aria-hidden="true">${icons.refreshCw}</span>
+                      <span class="topbar-link__label">${state.appUpdateCheckLoading ? "检查中…" : "检查更新"}</span>
+                    </button>
+                  </div>
+                `
+              : nothing
+          }
           <div class="pill pill--link topbar__no-drag">
             <button
               type="button"
@@ -1177,12 +1214,18 @@ export function renderApp(state: AppViewState) {
                       })
                     : state.tab === "modelLibrary"
                       ? renderModelCategoryNav({
-                          providers: state.providers,
+                          providers: modelProviders,
                           providerSearchQuery: state.modelsProviderSearchQuery,
                           selectedCategory: state.modelLibraryCategory,
                           disabled: state.configLoading,
+                          embeddedPlazaCount:
+                            state.embeddedModels.length > 0 ? state.embeddedModels.length : PLAZA_CATALOG_COUNT,
+                          embeddedInstalledCount: state.embeddedModels.filter((m) => m.installed).length,
                           onCategoryChange: (category) => {
                             state.modelLibraryCategory = category;
+                            if (category === "plaza") {
+                              void loadEmbeddedModels(state);
+                            }
                           },
                         })
                       : html`<div class="nav-empty"></div>`
@@ -3749,6 +3792,40 @@ export function renderApp(state: AppViewState) {
                 onUseModel: (provider, modelId) => handleModelsUseModel(state, provider, modelId),
                 onCancelUse: (provider) => handleModelsCancelUse(state, provider),
                 onDeleteProvider: (providerKey) => void handleModelsDeleteProvider(state, providerKey),
+                embeddedModels: state.embeddedModels,
+                embeddedModelsLoading: state.embeddedModelsLoading,
+                embeddedModelsError: state.embeddedModelsError,
+                embeddedModelsBusyId: state.embeddedModelsBusyId,
+                embeddedDownloadProgress: state.embeddedDownloadStatus?.progress ?? null,
+                embeddedDownloadingModelId: state.embeddedDownloadStatus?.downloading
+                  ? (state.embeddedDownloadStatus.modelId ?? null)
+                  : null,
+                onEmbeddedRefresh: () => void loadEmbeddedModels(state),
+                onEmbeddedDownload: (id) => void handleEmbeddedModelDownload(state, id),
+                onEmbeddedCancelDownload: () => void handleEmbeddedDownloadCancel(state),
+                onEmbeddedStart: (m) => void handleEmbeddedModelStart(state, m),
+                onEmbeddedStop: (id) => void handleEmbeddedModelStop(state, id),
+                onEmbeddedDelete: (m) => void handleEmbeddedModelDelete(state, m),
+                gatewayHost: state.settings.gatewayUrl,
+                embeddedPlazaDetailModel: state.embeddedPlazaDetailModel,
+                embeddedPlazaDetailInfo: state.embeddedPlazaDetailInfo,
+                embeddedPlazaDetailLoading: state.embeddedPlazaDetailLoading,
+                embeddedPlazaDetailError: state.embeddedPlazaDetailError,
+                embeddedPlazaRecommendOpen: state.embeddedPlazaRecommendOpen,
+                embeddedPlazaHardware: state.embeddedPlazaHardware,
+                embeddedPlazaChatModel: state.embeddedPlazaChatModel,
+                embeddedPlazaChatMessages: state.embeddedPlazaChatMessages,
+                embeddedPlazaChatInput: state.embeddedPlazaChatInput,
+                embeddedPlazaChatLoading: state.embeddedPlazaChatLoading,
+                embeddedPlazaChatError: state.embeddedPlazaChatError,
+                onEmbeddedSelectModel: (m) => selectEmbeddedPlazaModel(state, m),
+                onEmbeddedOpenRecommend: () => openEmbeddedPlazaRecommend(state),
+                onEmbeddedCloseRecommend: () => closeEmbeddedPlazaRecommend(state),
+                onEmbeddedHardwareChange: (hw) => setEmbeddedPlazaHardware(state, hw),
+                onEmbeddedChat: (m) => openEmbeddedPlazaChatTest(state, m),
+                onEmbeddedCloseChat: () => closeEmbeddedPlazaChatTest(state),
+                onEmbeddedChatInput: (v) => setEmbeddedPlazaChatInput(state, v),
+                onEmbeddedSendChat: () => void sendEmbeddedPlazaChatTest(state),
               })
             : nothing
         }
@@ -4075,6 +4152,20 @@ export function renderApp(state: AppViewState) {
       onPromptInput: (v) => state.handleNativePromptInput(v),
       onConfirm: () => state.handleNativeDialogConfirm(),
       onCancel: () => state.handleNativeDialogCancel(),
+    })}
+    ${renderAppUpdateModal({
+      open: state.appUpdateModalOpen,
+      info: state.appUpdateInfo,
+      manualHint: state.appUpdateManualHint,
+      checking: state.appUpdateCheckLoading,
+      installing: state.appUpdateInstalling,
+      error: state.appUpdateError,
+      progress: state.appUpdateInstallProgress,
+      onClose: () => state.handleAppUpdateModalClose(),
+      onSkip: () => state.handleAppUpdateSkipClick(),
+      onInstall: () => state.handleAppUpdateInstallClick(),
+      onCopyManualHint: () => state.handleAppUpdateCopyManualHintClick(),
+      onOpenDownload: () => state.handleAppUpdateOpenDownloadClick(),
     })}
     ${renderSessionOverflowFlyout(state, basePath)}
   `;

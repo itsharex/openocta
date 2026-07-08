@@ -101,7 +101,15 @@ import {
   unregisterNativeDialogInvoker,
   type NativeDialogInvoker,
 } from "./native-dialog-bridge.ts";
-import { bootstrapShellModeFromUrl, isDesktopShell } from "./open-external-url.ts";
+import { bootstrapShellModeFromUrl, isDesktopShell, openExternalUrl } from "./open-external-url.ts";
+import {
+  closeAppUpdateModal,
+  copyAppUpdateManualHint,
+  handleAppUpdateInstall,
+  handleAppUpdateSkip,
+  handleManualAppUpdateCheck,
+  stopAppUpdateInstallPolling,
+} from "./app-update.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import type { NativeDialogModel } from "./views/native-dialog-overlay.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
@@ -369,7 +377,23 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() modelsUseModelModalOpen = false;
   @state() modelsUseModelModalProvider: string | null = null;
   @state() modelsSaveError: string | null = null;
-  @state() modelLibraryCategory: "__all__" | "public" | "local" = "__all__";
+  @state() modelLibraryCategory: "__all__" | "plaza" | "public" | "local" = "__all__";
+  @state() embeddedModelsLoading = false;
+  @state() embeddedModelsError: string | null = null;
+  @state() embeddedModels: import("./controllers/embedded-models.ts").EmbeddedModelEntry[] = [];
+  @state() embeddedModelsBusyId: string | null = null;
+  @state() embeddedDownloadStatus: import("./controllers/embedded-models.ts").EmbeddedDownloadStatus | null = null;
+  @state() embeddedPlazaDetailModel: import("./controllers/embedded-models.ts").EmbeddedModelEntry | null = null;
+  @state() embeddedPlazaDetailInfo: import("./controllers/plaza-model-detail.ts").PlazaModelDetailInfo | null = null;
+  @state() embeddedPlazaDetailLoading = false;
+  @state() embeddedPlazaDetailError: string | null = null;
+  @state() embeddedPlazaRecommendOpen = false;
+  @state() embeddedPlazaHardware: import("./controllers/model-recommendation.ts").LocalHardwareProfile | null = null;
+  @state() embeddedPlazaChatModel: import("./controllers/embedded-models.ts").EmbeddedModelEntry | null = null;
+  @state() embeddedPlazaChatMessages: import("./controllers/embedded-chat-test.ts").PlazaChatMessage[] = [];
+  @state() embeddedPlazaChatInput = "";
+  @state() embeddedPlazaChatLoading = false;
+  @state() embeddedPlazaChatError: string | null = null;
   @state() modelLibrarySelectedProvider: string | null = null;
   @state() skillsSelectedSkillKey: string | null = null;
   @state() skillsSkillDocContent: string | null = null;
@@ -651,8 +675,16 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
   @state() aboutUninstallMode: "program" | "full" = "program";
   @state() aboutUninstallLoading = false;
   @state() aboutUninstallError: string | null = null;
-  @state() aboutClearWorkspaceLoading = false;
+  aboutClearWorkspaceLoading = false;
   @state() aboutClearWorkspaceError: string | null = null;
+
+  @state() appUpdateModalOpen = false;
+  @state() appUpdateCheckLoading = false;
+  @state() appUpdateInstalling = false;
+  @state() appUpdateInfo: import("./controllers/app-update.ts").AppUpdateCheckResult | null = null;
+  @state() appUpdateInstallProgress: import("./controllers/app-update.ts").AppUpdateProgress | null = null;
+  @state() appUpdateError: string | null = null;
+  @state() appUpdateManualHint: string | null = null;
 
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
@@ -1150,6 +1182,37 @@ export class OpenClawApp extends LitElement implements NativeDialogInvoker {
       return;
     }
     this.getDesktopRuntime()?.Quit?.();
+  }
+
+  handleAppUpdateCheckClick() {
+    void handleManualAppUpdateCheck(this as unknown as AppViewState);
+  }
+
+  handleAppUpdateModalClose() {
+    closeAppUpdateModal(this as unknown as AppViewState);
+  }
+
+  handleAppUpdateSkipClick() {
+    void handleAppUpdateSkip(this as unknown as AppViewState);
+  }
+
+  handleAppUpdateInstallClick() {
+    void handleAppUpdateInstall(this as unknown as AppViewState);
+  }
+
+  handleAppUpdateCopyManualHintClick() {
+    void copyAppUpdateManualHint(this as unknown as AppViewState);
+  }
+
+  handleAppUpdateOpenDownloadClick() {
+    const url = this.appUpdateInfo?.downloadUrl?.trim();
+    if (!url) {
+      return;
+    }
+    void openExternalUrl(url, {
+      gatewayHost: this.settings.gatewayUrl,
+      gatewayToken: this.settings.token,
+    });
   }
 
   handleTopbarDoubleClick(event: MouseEvent) {
