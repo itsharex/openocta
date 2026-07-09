@@ -476,6 +476,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("OPTIONS /api/desktop/update/skip", s.handleDesktopUpdateOptions)
 	s.mux.HandleFunc("OPTIONS /api/desktop/update/install", s.handleDesktopUpdateOptions)
 	s.mux.HandleFunc("OPTIONS /api/desktop/update/status", s.handleDesktopUpdateOptions)
+	s.mux.HandleFunc("GET /api/embedded-models/recommendations", s.requireGatewayToken(s.handleEmbeddedModelsRecommendations))
+	s.mux.HandleFunc("POST /api/embedded-models/recommendations", s.requireGatewayToken(s.handleEmbeddedModelsRecommendations))
 	s.mux.HandleFunc("GET /api/embedded-models/catalog", s.requireGatewayToken(s.handleEmbeddedModelsCatalog))
 	s.mux.HandleFunc("GET /api/embedded-models/model-info", s.requireGatewayToken(s.handleEmbeddedModelsModelInfo))
 	s.mux.HandleFunc("POST /api/embedded-models/download", s.requireGatewayToken(s.handleEmbeddedModelsDownloadStart))

@@ -57,6 +57,6 @@ func installedLinuxPackage(kind string) bool {
 }
 
 func fileExists(path string) bool {
-	st, err := os.Stat(path)
+	_, err := os.Stat(path)
 	return err == nil
 }

@@ -28,13 +28,14 @@ import {
   formatContextLength,
   formatParamsB,
   groupByTier,
-  recommendModels,
+  resolvePlazaRecommendations,
   TIER_DESCRIPTIONS,
   TIER_LABELS,
   TIER_ORDER,
   type LocalHardwareProfile,
   type ModelRecommendation,
   type ModelTier,
+  type ServerModelRecommendation,
 } from "../controllers/model-recommendation.ts";
 import { plazaDoc } from "../data/plaza-model-docs.ts";
 import { renderPlazaManualImportModal } from "../components/plaza-manual-import-modal.ts";
@@ -56,6 +57,8 @@ export type ModelPlazaProps = {
   recommendOpen: boolean;
   manualImportOpen: boolean;
   hardware: LocalHardwareProfile | null;
+  serverRecommendations: ServerModelRecommendation[] | null;
+  recommendationsLoading: boolean;
   onRefresh: () => void;
   onDownload: (modelId: string) => void;
   onCancelDownload: () => void;
@@ -378,12 +381,30 @@ function renderRecommendBanner(
     >
       <div class="plaza-recommend-banner__body">
         <strong>尚未安装本地模型</strong>
-        <p>根据当前设备资源，推荐优先安装：
+        <p>根据${props.hardware?.serverSide ? "Gateway 服务器" : "当前设备"}资源，推荐优先安装：
           ${topRecs.slice(0, 3).map((r, i) => html`${i > 0 ? "、" : ""}${r.model.name}（${r.tier} 级）`)}</p>
       </div>
       <span class="plaza-recommend-banner__cta">查看推荐说明 →</span>
     </div>
   `;
+}
+
+function hardwareHintText(hw: LocalHardwareProfile): string {
+  if (hw.serverSide) {
+    return hw.detected
+      ? "已自动检测 Gateway 服务器硬件，可手动调整以模拟其他配置。"
+      : "未能完整识别服务器 GPU，请手动填写参数后重新计算推荐。";
+  }
+  return hw.detected
+    ? "未连接 Gateway，使用浏览器本机估算（仅供参考）。"
+    : "未连接 Gateway 且未能识别本机 GPU，推荐结果仅供参考。";
+}
+
+function resolveRecommendations(
+  props: ModelPlazaProps,
+  hw: LocalHardwareProfile,
+): ModelRecommendation[] {
+  return resolvePlazaRecommendations(props.models, hw, props.serverRecommendations);
 }
 
 function renderHardwareSummaryBar(hw: LocalHardwareProfile, onChange: (hw: LocalHardwareProfile) => void) {
@@ -456,7 +477,7 @@ function renderHardwareSummaryBar(hw: LocalHardwareProfile, onChange: (hw: Local
         </label>
       </div>
       <p class="plaza-hw-summary__hint muted">
-        ${hw.detected ? "已自动检测本机配置，可手动调整以模拟其他硬件。" : "未能完整识别 GPU，请手动填写参数。"}
+        ${hardwareHintText(hw)}
       </p>
     </div>
   `;
@@ -553,7 +574,7 @@ function renderRecommendGuideModal(props: ModelPlazaProps) {
     return nothing;
   }
   const hw = props.hardware ?? detectLocalHardware();
-  const recommendations = recommendModels(props.models, hw);
+  const recommendations = resolveRecommendations(props, hw);
   const exportText = buildTierListText(recommendations, hw);
 
   return html`
@@ -565,7 +586,7 @@ function renderRecommendGuideModal(props: ModelPlazaProps) {
         <div class="emp-detail-modal__header">
           <div>
             <h2>模型推荐说明</h2>
-            <p class="plaza-detail-sub">当前设备资源、评分标准与 S–F 分级一览</p>
+            <p class="plaza-detail-sub">${hw.serverSide ? "Gateway 服务器资源" : "当前设备资源（离线估算）"}、评分标准与 S–F 分级一览</p>
           </div>
           <button class="emp-detail-modal__close" type="button" aria-label="关闭" @click=${props.onCloseRecommend}>
             ${icons.x}
@@ -573,7 +594,9 @@ function renderRecommendGuideModal(props: ModelPlazaProps) {
         </div>
         <div class="emp-detail-modal__body plaza-guide-modal__body">
           <section class="plaza-guide-section">
-            <h3 class="plaza-guide-section__title">当前机器资源</h3>
+            <h3 class="plaza-guide-section__title">
+              ${hw.serverSide ? "Gateway 服务器资源" : "当前设备资源（离线估算）"}
+            </h3>
             ${renderHardwareSummaryBar(hw, props.onHardwareChange)}
           </section>
           ${renderScoringCriteria()}
@@ -681,7 +704,7 @@ function renderDetailModal(props: ModelPlazaProps) {
     return nothing;
   }
   const hw = props.hardware ?? detectLocalHardware();
-  const rec = recommendModels([model], hw)[0];
+  const rec = resolveRecommendations(props, hw).find((r) => r.model.id === model.id);
   const sizeLabel = formatModelSize(totalModelSize(model.files));
   const info = props.detailInfo;
   const useCases = useCaseLabels(model);
@@ -1002,7 +1025,7 @@ function renderPlazaChatTestModal(props: ModelPlazaProps) {
 export function renderModelPlaza(props: ModelPlazaProps) {
   const hasInstalled = props.models.some((m) => m.installed);
   const hw = props.hardware ?? detectLocalHardware();
-  const recommendations = recommendModels(props.models, hw);
+  const recommendations = resolveRecommendations(props, hw);
   const recById = new Map(recommendations.map((r) => [r.model.id, r]));
   const sortedModels = [...props.models].sort((a, b) => {
     const sa = recById.get(a.id)?.score ?? 0;
@@ -1017,6 +1040,8 @@ export function renderModelPlaza(props: ModelPlazaProps) {
   const bannerRecs = installRecs.length > 0 ? installRecs : recommendations.filter((r) => r.tier !== "F");
   const showRecommendBanner = !hasInstalled && !props.loading && bannerRecs.length > 0;
   const runningCount = props.models.filter((m) => m.running).length;
+  const sortLabel = hw.serverSide ? "Gateway 服务器推荐得分" : "本机估算推荐得分";
+  const adaptLabel = hw.serverSide ? "服务器适配情况" : "本机适配情况（离线估算）";
 
   return html`
     <main class="emp-page">
@@ -1027,11 +1052,11 @@ export function renderModelPlaza(props: ModelPlazaProps) {
               <div class="plaza-toolbar">
                 <div class="embedded-model-intro">
                   <p class="embedded-model-intro__lead">
-                    共 ${props.models.length} 个模型，已按本机推荐得分排序。点击行查看详情。
+                    共 ${props.models.length} 个模型，已按${sortLabel}排序。点击行查看详情。
                   </p>
                   <p class="embedded-model-intro__tips">
                     建议优先选用推荐等级较高（S / A / B）的模型，对话与推理更稳定。参数量过小的模型、或不支持
-                    thinking 的模型，推理能力有限，复杂问题与长对话体验可能较差；可按需查看右上角「推荐说明」了解评分标准与本机适配情况。
+                    thinking 的模型，推理能力有限，复杂问题与长对话体验可能较差；可按需查看右上角「推荐说明」了解评分标准与${adaptLabel}。
                     也可自行下载 GGUF 手动导入本地模型，详见
                     <button class="plaza-manual-import-link" type="button" @click=${props.onOpenManualImport}>
                       手动导入说明

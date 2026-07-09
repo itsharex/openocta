@@ -1,4 +1,8 @@
 import { gatewayHttpBase } from "../gateway-url.ts";
+import type {
+  EmbeddedRecommendationsResult,
+  LocalHardwareProfile,
+} from "./model-recommendation.ts";
 
 export type EmbeddedModelProgress = {
   phase?: string;
@@ -324,4 +328,51 @@ export function totalModelSize(files?: EmbeddedModelFile[]): number {
     return 0;
   }
   return files.reduce((sum, f) => sum + (f.size ?? 0), 0);
+}
+
+export async function fetchEmbeddedRecommendations(opts: {
+  gatewayHost: string;
+  token: string;
+  /** When set, recalculates recommendations with manual hardware overrides. */
+  hardwareOverride?: LocalHardwareProfile | null;
+}): Promise<{ ok: boolean; data?: EmbeddedRecommendationsResult; error?: string }> {
+  const base = apiBase(opts.gatewayHost);
+  if (!base) {
+    return { ok: false, error: "未配置网关地址（Gateway URL）" };
+  }
+  let res: Response;
+  try {
+    if (opts.hardwareOverride) {
+      const hw = opts.hardwareOverride;
+      res = await fetch(`${base}/api/embedded-models/recommendations`, {
+        method: "POST",
+        headers: { ...authHeaders(opts.token), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gpuName: hw.gpuName,
+          vramGb: hw.vramGb,
+          ramGb: hw.ramGb,
+          cpuCores: hw.cpuCores,
+          bandwidthGbs: hw.bandwidthGbs,
+          isAppleSilicon: hw.isAppleSilicon,
+        }),
+      });
+    } else {
+      res = await fetch(`${base}/api/embedded-models/recommendations`, {
+        method: "GET",
+        headers: authHeaders(opts.token),
+      });
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  let data: EmbeddedRecommendationsResult = {};
+  try {
+    data = (await res.json()) as EmbeddedRecommendationsResult;
+  } catch {
+    // ignore
+  }
+  if (!res.ok || data.ok === false) {
+    return { ok: false, error: data.message ?? `请求失败（HTTP ${res.status}）`, data };
+  }
+  return { ok: true, data };
 }

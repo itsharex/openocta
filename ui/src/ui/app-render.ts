@@ -3816,6 +3816,8 @@ export function renderApp(state: AppViewState) {
                 embeddedPlazaRecommendOpen: state.embeddedPlazaRecommendOpen,
                 embeddedPlazaManualImportOpen: state.embeddedPlazaManualImportOpen,
                 embeddedPlazaHardware: state.embeddedPlazaHardware,
+                embeddedPlazaServerRecommendations: state.embeddedPlazaServerRecommendations,
+                embeddedPlazaRecommendationsLoading: state.embeddedPlazaRecommendationsLoading,
                 embeddedPlazaChatModel: state.embeddedPlazaChatModel,
                 embeddedPlazaChatMessages: state.embeddedPlazaChatMessages,
                 embeddedPlazaChatInput: state.embeddedPlazaChatInput,

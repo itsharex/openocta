@@ -30,6 +30,9 @@ func EnsureLibraries(env func(string) string) error {
 	} else if runtime.GOOS == "darwin" {
 		processor = "metal"
 	}
+	if len(resolveGitHubProxies(env)) > 0 {
+		return getLlamaLibraries(runtime.GOARCH, runtime.GOOS, processor, "latest", libDir, env)
+	}
 	return download.Get(runtime.GOARCH, runtime.GOOS, processor, "latest", libDir)
 }
 

@@ -1,7 +1,7 @@
 import type { EmbeddedModelEntry } from "./embedded-models.ts";
 import { totalModelSize } from "./embedded-models.ts";
 
-/** Hardware profile for local model recommendation (inspired by CanIRun.ai). */
+/** Hardware profile for model recommendation (inspired by CanIRun.ai). */
 export type LocalHardwareProfile = {
   gpuName: string;
   vramGb: number;
@@ -10,6 +10,26 @@ export type LocalHardwareProfile = {
   bandwidthGbs: number;
   isAppleSilicon: boolean;
   detected: boolean;
+  /** True when profile comes from Gateway server detection. */
+  serverSide?: boolean;
+};
+
+export type ServerModelRecommendation = {
+  modelId: string;
+  score: number;
+  tier: ModelTier;
+  tierLabel: string;
+  fitStatus: ModelFitStatus;
+  vramGb: number;
+  tokensPerSec: number;
+  memoryPct: number;
+};
+
+export type EmbeddedRecommendationsResult = {
+  ok?: boolean;
+  message?: string;
+  hardware?: LocalHardwareProfile;
+  recommendations?: ServerModelRecommendation[];
 };
 
 export type ModelTier = "S" | "A" | "B" | "C" | "D" | "F";
@@ -268,6 +288,47 @@ export function recommendModels(
       };
     })
     .sort((a, b) => b.score - a.score);
+}
+
+/** Merge server-side recommendation rows with the local model catalog. */
+export function mergeServerRecommendations(
+  models: EmbeddedModelEntry[],
+  serverRecs: ServerModelRecommendation[],
+): ModelRecommendation[] {
+  const modelById = new Map(models.map((m) => [m.id, m]));
+  const out: ModelRecommendation[] = [];
+  for (const rec of serverRecs) {
+    const model = modelById.get(rec.modelId);
+    if (!model) {
+      continue;
+    }
+    out.push({
+      model,
+      score: rec.score,
+      tier: rec.tier,
+      tierLabel: rec.tierLabel,
+      fitStatus: rec.fitStatus,
+      vramGb: rec.vramGb,
+      tokensPerSec: rec.tokensPerSec,
+      memoryPct: rec.memoryPct,
+    });
+  }
+  return out;
+}
+
+export function resolvePlazaRecommendations(
+  models: EmbeddedModelEntry[],
+  hw: LocalHardwareProfile | null,
+  serverRecs: ServerModelRecommendation[] | null,
+): ModelRecommendation[] {
+  if (serverRecs && serverRecs.length > 0) {
+    const merged = mergeServerRecommendations(models, serverRecs);
+    if (merged.length > 0) {
+      return merged;
+    }
+  }
+  const profile = hw ?? detectLocalHardware();
+  return recommendModels(models, profile);
 }
 
 export function formatContextLength(n?: number): string {

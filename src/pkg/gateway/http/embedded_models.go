@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/openocta/openocta/pkg/embeddedmodels"
@@ -61,6 +63,88 @@ func (s *Server) handleEmbeddedModelsModelInfo(w http.ResponseWriter, r *http.Re
 		"license":     detail.License,
 		"error":       detail.Error,
 	})
+}
+
+func (s *Server) handleEmbeddedModelsRecommendations(w http.ResponseWriter, r *http.Request) {
+	setSiteProxyCORSHeaders(w)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "message": "仅支持 GET 或 POST"})
+		return
+	}
+
+	var override *embeddedmodels.HardwareProfile
+	if r.Method == http.MethodPost {
+		var body embeddedmodels.HardwareProfile
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			override = &body
+		}
+	} else {
+		q := r.URL.Query()
+		if hasAnyHardwareQuery(q) {
+			override = &embeddedmodels.HardwareProfile{}
+			if v := strings.TrimSpace(q.Get("gpuName")); v != "" {
+				override.GPUName = v
+			}
+			if v, ok := parseOptionalFloat(q.Get("vramGb")); ok {
+				override.VramGb = v
+			}
+			if v, ok := parseOptionalFloat(q.Get("ramGb")); ok {
+				override.RamGb = v
+			}
+			if v, ok := parseOptionalInt(q.Get("cpuCores")); ok {
+				override.CPUCores = v
+			}
+			if v, ok := parseOptionalFloat(q.Get("bandwidthGbs")); ok {
+				override.BandwidthGbs = v
+			}
+			if strings.EqualFold(strings.TrimSpace(q.Get("isAppleSilicon")), "true") ||
+				q.Get("isAppleSilicon") == "1" {
+				override.IsAppleSilicon = true
+			}
+		}
+	}
+
+	result := embeddedmodels.BuildRecommendations(os.Getenv, override)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":              true,
+		"hardware":        result.Hardware,
+		"recommendations": result.Recommendations,
+	})
+}
+
+func hasAnyHardwareQuery(q url.Values) bool {
+	for _, key := range []string{"gpuName", "vramGb", "ramGb", "cpuCores", "bandwidthGbs", "isAppleSilicon"} {
+		if strings.TrimSpace(q.Get(key)) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func parseOptionalFloat(raw string) (float64, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v <= 0 {
+		return 0, false
+	}
+	return v, true
+}
+
+func parseOptionalInt(raw string) (int, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return 0, false
+	}
+	return v, true
 }
 
 func (s *Server) handleEmbeddedModelsCatalog(w http.ResponseWriter, r *http.Request) {
