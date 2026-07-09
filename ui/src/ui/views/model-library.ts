@@ -52,6 +52,8 @@ export type ModelLibraryProps = ModelsProps & {
   embeddedPlazaRecommendOpen?: boolean;
   embeddedPlazaManualImportOpen?: boolean;
   embeddedPlazaHardware?: import("../controllers/model-recommendation.ts").LocalHardwareProfile | null;
+  embeddedPlazaServerRecommendations?: import("../controllers/model-recommendation.ts").ServerModelRecommendation[] | null;
+  embeddedPlazaRecommendationsLoading?: boolean;
   onEmbeddedSelectModel?: (model: EmbeddedModelEntry | null) => void;
   onEmbeddedOpenRecommend?: () => void;
   onEmbeddedCloseRecommend?: () => void;
@@ -326,6 +328,8 @@ export function renderModelLibrary(props: ModelLibraryProps) {
         recommendOpen: props.embeddedPlazaRecommendOpen ?? false,
         manualImportOpen: props.embeddedPlazaManualImportOpen ?? false,
         hardware: props.embeddedPlazaHardware ?? null,
+        serverRecommendations: props.embeddedPlazaServerRecommendations ?? null,
+        recommendationsLoading: props.embeddedPlazaRecommendationsLoading ?? false,
         onRefresh: () => props.onEmbeddedRefresh?.(),
         onDownload: (id) => props.onEmbeddedDownload?.(id),
         onCancelDownload: () => props.onEmbeddedCancelDownload?.(),

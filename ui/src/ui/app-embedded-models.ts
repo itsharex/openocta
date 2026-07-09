@@ -4,6 +4,7 @@ import {
   deleteEmbeddedModel,
   fetchEmbeddedDownloadStatus,
   fetchEmbeddedModelsCatalog,
+  fetchEmbeddedRecommendations,
   startEmbeddedModelDownload,
   startEmbeddedModelRuntime,
   stopEmbeddedModelRuntime,
@@ -18,6 +19,7 @@ import {
 import {
   detectLocalHardware,
   type LocalHardwareProfile,
+  type ServerModelRecommendation,
 } from "./controllers/model-recommendation.ts";
 import { buildPlazaModelList, defaultPlazaModelList } from "./data/plaza-catalog.ts";
 import { saveConfigPatch } from "./controllers/config.ts";
@@ -73,6 +75,36 @@ function syncEmbeddedPlazaChatModel(state: Host) {
   }
 }
 
+async function loadEmbeddedRecommendations(state: Host, hardwareOverride?: LocalHardwareProfile | null) {
+  if (!state.connected) {
+    state.embeddedPlazaServerRecommendations = null;
+    if (!state.embeddedPlazaHardware) {
+      state.embeddedPlazaHardware = detectLocalHardware();
+    }
+    return;
+  }
+  state.embeddedPlazaRecommendationsLoading = true;
+  try {
+    const res = await fetchEmbeddedRecommendations({
+      ...gatewayOpts(state),
+      hardwareOverride: hardwareOverride ?? undefined,
+    });
+    if (!res.ok || !res.data) {
+      state.embeddedPlazaServerRecommendations = null;
+      if (!state.embeddedPlazaHardware) {
+        state.embeddedPlazaHardware = detectLocalHardware();
+      }
+      return;
+    }
+    if (res.data.hardware) {
+      state.embeddedPlazaHardware = { ...res.data.hardware, serverSide: true };
+    }
+    state.embeddedPlazaServerRecommendations = res.data.recommendations ?? null;
+  } finally {
+    state.embeddedPlazaRecommendationsLoading = false;
+  }
+}
+
 export async function loadEmbeddedModels(state: Host) {
   state.embeddedModelsLoading = true;
   state.embeddedModelsError = null;
@@ -98,6 +130,7 @@ export async function loadEmbeddedModels(state: Host) {
       state.embeddedDownloadStatus = dl;
       startEmbeddedDownloadPolling(state);
     }
+    await loadEmbeddedRecommendations(state);
   } finally {
     state.embeddedModelsLoading = false;
   }
@@ -224,8 +257,11 @@ export function installedEmbeddedModels(state: Host): EmbeddedModelEntry[] {
 }
 
 export function openEmbeddedPlazaRecommend(state: Host) {
-  if (!state.embeddedPlazaHardware) {
+  if (!state.connected && !state.embeddedPlazaHardware) {
     state.embeddedPlazaHardware = detectLocalHardware();
+  }
+  if (state.connected) {
+    void loadEmbeddedRecommendations(state);
   }
   state.embeddedPlazaRecommendOpen = true;
 }
@@ -244,6 +280,9 @@ export function closeEmbeddedPlazaManualImport(state: Host) {
 
 export function setEmbeddedPlazaHardware(state: Host, hw: LocalHardwareProfile) {
   state.embeddedPlazaHardware = hw;
+  if (state.connected) {
+    void loadEmbeddedRecommendations(state, hw);
+  }
 }
 
 export function selectEmbeddedPlazaModel(state: Host, model: EmbeddedModelEntry | null) {
@@ -254,7 +293,7 @@ export function selectEmbeddedPlazaModel(state: Host, model: EmbeddedModelEntry 
   if (!model) {
     return;
   }
-  if (!state.embeddedPlazaHardware) {
+  if (!state.embeddedPlazaHardware && !state.connected) {
     state.embeddedPlazaHardware = detectLocalHardware();
   }
   state.embeddedPlazaDetailInfo = buildLocalPlazaModelDetail(model);
@@ -333,4 +372,4 @@ export async function sendEmbeddedPlazaChatTest(state: Host) {
   }];
 }
 
-export type { EmbeddedModelEntry, EmbeddedDownloadStatus, LocalHardwareProfile, PlazaChatMessage, PlazaModelDetailInfo };
+export type { EmbeddedModelEntry, EmbeddedDownloadStatus, LocalHardwareProfile, PlazaChatMessage, PlazaModelDetailInfo, ServerModelRecommendation };
