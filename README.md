@@ -148,8 +148,13 @@ OpenOcta/
 
 ---
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=openocta/openocta&type=Date&legend=top-left&theme=dark&token=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">
+  <a href="https://www.star-history.com/#openocta/openocta&Date">
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=openocta/openocta&type=Date&legend=top-left&token=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">
+  </a>
+</picture>
 
-[![Star History Chart](https://api.star-history.com/svg?repos=openocta/openocta&type=Date&legend=top-left)](https://www.star-history.com/#openocta/openocta&Date)
 
 ## 版权声明
 
