@@ -149,7 +149,7 @@ OpenOcta/
 ---
 
 
-[![Star History Chart](https://www.star-history.com/?type=date&repos=openocta%2Fopenocta)](https://www.star-history.com/?type=date&repos=openocta%2Fopenocta)
+[![Star History Chart](https://www.star-history.com/?repos=openocta%2Fopenocta&type=date&legend=top-left)](https://www.star-history.com/?repos=openocta%2Fopenocta&type=date&legend=top-left)
 
 
 ## 版权声明
