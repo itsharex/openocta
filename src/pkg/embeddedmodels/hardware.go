@@ -1,10 +1,21 @@
 package embeddedmodels
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+)
+
+const hardwareDetectCacheTTL = 60 * time.Second
+
+var (
+	hardwareDetectMu    sync.Mutex
+	hardwareDetectCache HardwareProfile
+	hardwareDetectAt    time.Time
 )
 
 // HardwareProfile describes the machine running embedded models (Gateway host).
@@ -81,7 +92,20 @@ func lookupGpuSpec(gpuName string) (gpuSpec, bool, bool) {
 }
 
 // DetectServerHardware probes the Gateway host for CPU, RAM, and GPU resources.
+// Results are cached briefly to avoid repeated subprocess calls (notably nvidia-smi on Windows).
 func DetectServerHardware() HardwareProfile {
+	hardwareDetectMu.Lock()
+	defer hardwareDetectMu.Unlock()
+	if !hardwareDetectAt.IsZero() && time.Since(hardwareDetectAt) < hardwareDetectCacheTTL {
+		return hardwareDetectCache
+	}
+	hw := detectServerHardwareUncached()
+	hardwareDetectCache = hw
+	hardwareDetectAt = time.Now()
+	return hw
+}
+
+func detectServerHardwareUncached() HardwareProfile {
 	cpuCores := runtime.NumCPU()
 	ramGb := detectSystemRAMGb()
 	gpuName, vramFromTool := detectGPUNameAndVRAM()
@@ -184,8 +208,33 @@ func detectSystemRAMGb() float64 {
 				}
 			}
 		}
+	case "windows":
+		return detectPlatformRAMGb()
 	}
 	return 0
+}
+
+func resolveNvidiaSMIPath() string {
+	if path, err := exec.LookPath("nvidia-smi"); err == nil {
+		return path
+	}
+	if runtime.GOOS == "windows" {
+		const defaultPath = `C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe`
+		if _, err := os.Stat(defaultPath); err == nil {
+			return defaultPath
+		}
+	}
+	return ""
+}
+
+func runNvidiaSMI(args ...string) ([]byte, error) {
+	path := resolveNvidiaSMIPath()
+	if path == "" {
+		return nil, exec.ErrNotFound
+	}
+	cmd := exec.Command(path, args...)
+	applyExecNoWindow(cmd)
+	return cmd.Output()
 }
 
 func detectGPUNameAndVRAM() (name string, vramGb float64) {
@@ -202,10 +251,10 @@ func detectGPUNameAndVRAM() (name string, vramGb float64) {
 		}
 	}
 
-	if out, err := exec.Command("nvidia-smi",
+	if out, err := runNvidiaSMI(
 		"--query-gpu=name,memory.total",
 		"--format=csv,noheader,nounits",
-	).Output(); err == nil {
+	); err == nil {
 		line := strings.TrimSpace(strings.Split(string(out), "\n")[0])
 		parts := strings.Split(line, ",")
 		if len(parts) >= 2 {

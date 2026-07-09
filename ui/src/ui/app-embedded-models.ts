@@ -30,6 +30,9 @@ import {
 import { nativeAlert, nativeConfirm } from "./native-dialog-bridge.ts";
 
 let downloadPollTimer: number | null = null;
+let hardwareDebounceTimer: number | null = null;
+
+const HARDWARE_RECOMMEND_DEBOUNCE_MS = 400;
 
 type Host = AppViewState;
 
@@ -280,9 +283,19 @@ export function closeEmbeddedPlazaManualImport(state: Host) {
 
 export function setEmbeddedPlazaHardware(state: Host, hw: LocalHardwareProfile) {
   state.embeddedPlazaHardware = hw;
-  if (state.connected) {
-    void loadEmbeddedRecommendations(state, hw);
+  if (!state.connected) {
+    return;
   }
+  if (hardwareDebounceTimer != null) {
+    window.clearTimeout(hardwareDebounceTimer);
+  }
+  hardwareDebounceTimer = window.setTimeout(() => {
+    hardwareDebounceTimer = null;
+    const current = state.embeddedPlazaHardware;
+    if (current) {
+      void loadEmbeddedRecommendations(state, current);
+    }
+  }, HARDWARE_RECOMMEND_DEBOUNCE_MS);
 }
 
 export function selectEmbeddedPlazaModel(state: Host, model: EmbeddedModelEntry | null) {
