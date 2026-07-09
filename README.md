@@ -148,7 +148,8 @@ OpenOcta/
 
 ---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=openocta/openocta&type=Date)](https://star-history.com/#openocta/openocta&Date)
+
+[![Star History Chart](https://www.star-history.com/?type=date&repos=openocta%2Fopenocta)](https://www.star-history.com/?type=date&repos=openocta%2Fopenocta)
 
 
 ## 版权声明
