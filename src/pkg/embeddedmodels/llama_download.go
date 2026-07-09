@@ -18,6 +18,18 @@ import (
 	"github.com/hybridgroup/yzma/pkg/download"
 )
 
+// windowsCudaVersions lists CUDA runtime versions to try for Windows prebuilt
+// llama.cpp binaries, newest first (ggml-org/llama.cpp release asset names).
+var windowsCudaVersions = []string{"13.3", "12.4"}
+
+func windowsCudaLlamaZip(version, cudaVer string) string {
+	return fmt.Sprintf("llama-%s-bin-win-cuda-%s-x64.zip", version, cudaVer)
+}
+
+func windowsCudaCudartZip(cudaVer string) string {
+	return fmt.Sprintf("cudart-llama-bin-win-cuda-%s-x64.zip", cudaVer)
+}
+
 // getLlamaLibraries downloads llama.cpp prebuilt binaries, routing github.com URLs through a proxy when configured.
 // Logic mirrors yzma/pkg/download v1.18.0 GetWithContext with proxy URL rewriting.
 func getLlamaLibraries(architecture, operatingSystem, processor, version, dest string, env func(string) string) error {
@@ -60,10 +72,19 @@ func getLlamaLibrariesWithContext(ctx context.Context, architecture, operatingSy
 	}
 
 	if operatingSystem == "windows" && processor == "cuda" && arch.Equal(download.AMD64) {
-		cudartURL := fmt.Sprintf("%s/cudart-llama-bin-win-cuda-13.1-x64.zip", location)
-		if err := fetchLlamaArtifact(ctx, cudartURL, dest, env); err != nil {
-			return err
+		err := downloadWindowsCudaLlama(ctx, location, version, dest, env)
+		if err == nil {
+			return nil
 		}
+		if autoVersion && errors.Is(err, download.ErrFileNotFound) {
+			prevVersion, prevErr := download.LlamaPreviousVersion()
+			if prevErr != nil {
+				return err
+			}
+			prevLocation := fmt.Sprintf("https://github.com/ggml-org/llama.cpp/releases/download/%s", prevVersion)
+			return downloadWindowsCudaLlama(ctx, prevLocation, prevVersion, dest, env)
+		}
+		return err
 	}
 
 	rawURL := fmt.Sprintf("%s/%s", location, filename)
@@ -203,7 +224,7 @@ func llamaReleaseURL(arch download.Arch, os download.OS, prcssr download.Process
 			if arch.Equal(download.ARM64) {
 				return "", "", errors.New("precompiled binaries for Windows ARM64 CUDA are not available")
 			}
-			filename = fmt.Sprintf("llama-%s-bin-win-cuda-13.1-x64.zip", version)
+			filename = windowsCudaLlamaZip(version, windowsCudaVersions[0])
 		case download.Vulkan:
 			if arch.Equal(download.ARM64) {
 				return "", "", errors.New("precompiled binaries for Windows ARM64 Vulkan are not available")
@@ -223,6 +244,31 @@ func llamaReleaseURL(arch download.Arch, os download.OS, prcssr download.Process
 	}
 
 	return location, filename, nil
+}
+
+func downloadWindowsCudaLlama(ctx context.Context, location, version, dest string, env func(string) string) error {
+	cudaVer, err := fetchWindowsCudaCudart(ctx, location, dest, env)
+	if err != nil {
+		return err
+	}
+	rawURL := fmt.Sprintf("%s/%s", location, windowsCudaLlamaZip(version, cudaVer))
+	return fetchLlamaArtifact(ctx, rawURL, dest, env)
+}
+
+func fetchWindowsCudaCudart(ctx context.Context, location, dest string, env func(string) string) (string, error) {
+	var attempts []string
+	for _, cudaVer := range windowsCudaVersions {
+		rawURL := fmt.Sprintf("%s/%s", location, windowsCudaCudartZip(cudaVer))
+		err := fetchLlamaArtifact(ctx, rawURL, dest, env)
+		if err == nil {
+			return cudaVer, nil
+		}
+		attempts = append(attempts, fmt.Sprintf("cuda-%s: %v", cudaVer, err))
+		if !errors.Is(err, download.ErrFileNotFound) {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("no windows cudart package found (tried %v): %s", windowsCudaVersions, strings.Join(attempts, "; "))
 }
 
 func fetchLlamaArtifact(ctx context.Context, rawURL, dest string, env func(string) string) error {
