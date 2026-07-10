@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/forks/openocta/openocta?style=flat&logo=github" alt="GitHub forks">
   </a>
   <a href="https://github.com/openocta/openocta/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/openocta/openocta" alt="License GPLv3">
+    <img src="https://img.shields.io/github/license/openocta/openocta" alt="License  Apache-2.0">
   </a>
   <a href="https://github.com/openocta/openocta/releases/latest">
     <img src="https://img.shields.io/github/v/release/openocta/openocta?label=release" alt="Latest release">
@@ -66,7 +66,7 @@
 
 🧠 **Four-tier memory + L4 evolution** — Knowledge Vault learns your preferences over time ([docs](./docs/knowledge-vault.md)).
 
-<img src="./imgs/flag-cn.svg" alt="" width="18" height="12"> **Open source from China** — maintained by a Chinese team, 100% GPLv3 — China's first open-source personal desktop AI agent.
+<img src="./imgs/flag-cn.svg" alt="" width="18" height="12"> **Open source from China** — maintained by a Chinese team, 100%  Apache-2.0 — China's first open-source personal desktop AI agent.
 
 ---
 
@@ -210,7 +210,7 @@ Restart the client, then try in **Chat**:
 |---|---|
 | **Personal desktop** | Built for your PC — files, terminal, browser, and local projects, not just a chat box |
 | **Self-developed Go runtime** | Gateway, Agent, Channels fully built in Go; **single binary**, no Node/Python in production |
-| **China's first open source** | Maintained by a Chinese team; 100% GPLv3 — auditable, forkable, intranet-deployable |
+| **China's first open source** | Maintained by a Chinese team; 100%  Apache-2.0 — auditable, forkable, intranet-deployable |
 | **IM remote control** | Drive tasks from WeChat, WeCom, DingTalk, Feishu, and more |
 | **Lightweight** | ~30MB installers, low memory footprint for 24/7 use |
 | **Skills & MCP** | Built-in tools, MCP servers, and a marketplace for digital employees |
@@ -341,9 +341,4 @@ OpenOcta/
 
 ## License
 
-This project is licensed under **GPLv3**.
-
-- Do not replace OpenOcta logo or copyright notices
-- Derivative works must comply with GPLv3 obligations
-
-Commercial licensing: **sales@databuff.com**
+This project is licensed under ** Apache-2.0**.
