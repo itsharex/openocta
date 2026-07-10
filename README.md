@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./imgs/hero-octopus-mascot.png" alt="" width="60" height="68">
+  <img src="./imgs/readmePIC/QQ20260710-140337.png" alt="" width="250" height="320">
 </p>
 
 <p align="center">
