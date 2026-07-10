@@ -9,9 +9,6 @@
   <a href="https://github.com/openocta/openocta/forks">
     <img src="https://img.shields.io/github/forks/openocta/openocta?style=flat&logo=github" alt="GitHub forks">
   </a>
-  <a href="https://github.com/openocta/openocta/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/openocta/openocta" alt="License  Apache-2.0">
-  </a>
   <a href="https://github.com/openocta/openocta/releases/latest">
     <img src="https://img.shields.io/github/v/release/openocta/openocta?label=release" alt="Latest release">
   </a>
