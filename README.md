@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/forks/openocta/openocta?style=flat&logo=github" alt="GitHub forks">
   </a>
   <a href="https://github.com/openocta/openocta/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/openocta/openocta" alt="License GPLv3">
+    <img src="https://img.shields.io/github/license/openocta/openocta" alt="License Apache-2.0">
   </a>
   <a href="https://github.com/openocta/openocta/releases/latest">
     <img src="https://img.shields.io/github/v/release/openocta/openocta?label=release" alt="Latest release">
@@ -48,7 +48,7 @@
 
 ---
 
-## ✨ 特性
+## ✨ 关键特性
 
 🖥️ **个人桌面级**：为个人电脑设计，连接文件、终端、浏览器与本地项目 — 不止于聊天窗口。
 
@@ -66,7 +66,7 @@
 
 🧠 **四级记忆 + L4 进化**：Knowledge Vault 本地知识库自主沉淀偏好 — 越用越懂你（[说明](./docs/knowledge-vault.md)）。
 
-<img src="./imgs/flag-cn.svg" alt="" width="18" height="12"> **国产开源**：国内团队维护，100% 开源（GPLv3）— 中国首个开源个人桌面级智能体。
+<img src="./imgs/flag-cn.svg" alt="" width="18" height="12"> **国产开源**：国内团队维护，100% 开源（ Apache-2.0）— 中国首个开源个人桌面级智能体。
 
 ---
 
@@ -210,7 +210,7 @@ OpenOcta 面向**个人桌面**：双击安装、完整客户端 UI、本土 IM 
 |---|---|
 | **个人桌面级** | 为个人电脑设计，连接文件、终端、浏览器与本地项目，而非仅停留在聊天窗口 |
 | **运行时 Go 自研** | Gateway、Agent、Channels 等核心能力均为 Go **完全自研**；单一二进制即可运行，生产环境无需 Node / Python |
-| **中国首个开源** | 国内团队维护，100% 开源（GPLv3）；代码可审、可改、可内网部署 |
+| **中国首个开源** | 国内团队维护，100% 开源（ Apache-2.0）；代码可审、可改、可内网部署 |
 | **IM 远程指挥** | 支持微信、企业微信、钉钉、飞书等通道，随时随地向 Agent 下达任务 |
 | **极致轻量** | 安装包约 30MB 级，运行时内存占用低，适合 7×24 长期驻留 |
 | **Skills & MCP** | 内置工具 + MCP 协议 + 技能市场，可按场景扩展数字员工能力 |
@@ -346,9 +346,4 @@ OpenOcta/
 
 ## 版权与许可
 
-本仓库遵循 **GPLv3** 开源协议。
-
-- 不得替换或修改 OpenOcta 的 Logo 与版权信息
-- 基于本项目的衍生作品须遵守 GPLv3 开源义务
-
-如需商业授权，请联系：**sales@databuff.com**
+本仓库遵循 ** Apache-2.0** 开源协议。
