@@ -31,9 +31,6 @@
 
 <p align="center">
   <a href="https://openocta.com">官网</a> ·
-  <a href="https://resource.openocta.com">技能 / MCP / 数字员工</a> ·
-  <a href="https://github.com/openocta/openocta/issues">Issues</a> ·
-  <a href="./CONTRIBUTING.md">贡献</a> ·
   <a href="README.en.md">English</a>
 </p>
 
