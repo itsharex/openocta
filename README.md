@@ -19,19 +19,16 @@
   <b>OpenOcta 八爪鱼</b> — <b>中国首个开源个人桌面级智能体</b>
 </p>
 
-<p align="center">
-  <sub>双击安装 · 本机运行 · 毫秒启动 · 数据留在本机</sub>
-</p>
 
-<p align="center">
-  <a href="https://github.com/openocta/openocta/stargazers"><img src="https://img.shields.io/badge/⭐-Star-24ba51?style=for-the-badge" alt="Star"></a>
-  <a href="https://github.com/openocta/openocta/releases/latest"><img src="https://img.shields.io/badge/📥-下载_Release-2563eb?style=for-the-badge" alt="Download Release"></a>
-  <a href="https://openocta.com/#download"><img src="https://img.shields.io/badge/🖥️-官网安装包-6366f1?style=for-the-badge" alt="官网下载"></a>
-</p>
+
+
 
 <p align="center">
   <a href="https://openocta.com">官网</a> ·
   <a href="README.en.md">English</a>
+</p>
+<p align="center">
+  <sub>双击安装 · 本机运行 · 毫秒启动 · 数据留在本机</sub>
 </p>
 
 **OpenOcta 八爪鱼** 是中国首个开源的个人桌面级 AI 智能体，电脑端双击安装，一个运行在你自己电脑上、由你完全掌控的 Agent，用自然语言即可实现电脑办公、IT运维、推广运营、经营分析、软件测试。
