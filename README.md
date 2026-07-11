@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <b>OpenOcta</b> — <b>China's First Open-Source Personal Desktop AI Agent</b>
+  <b>OpenOcta</b> — <b>An Open-Source Personal Desktop AI Agent</b>
 </p>
 
 
@@ -30,7 +30,7 @@
   <sub>Double-click install · run locally · instant boot · your data stays on your machine</sub>
 </p>
 
-**OpenOcta** is China's first open-source personal desktop AI agent. Double-click to install on your PC — an Agent that runs on your own machine under your full control. Use natural language for office work, IT ops, marketing, business analysis, and software testing.
+**OpenOcta** is an open-source personal desktop AI agent. Double-click to install on your PC — an Agent that runs on your own machine under your full control. Use natural language for office work, IT ops, marketing, business analysis, and software testing.
 
 **Latest [v1.0.5](https://github.com/openocta/openocta/releases/tag/v1.0.5)** (2026-07-02) — all-platform installers · fix for tool-call chat history · single Go binary with embedded Control UI
 
