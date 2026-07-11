@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://openocta.com">Website</a> ·
-  <a href="README.md">简体中文</a>
+  <a href="README.cn.md">简体中文</a>
 </p>
 <p align="center">
   <sub>Double-click install · run locally · instant boot · your data stays on your machine</sub>
