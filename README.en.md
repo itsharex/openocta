@@ -19,22 +19,15 @@
   <b>OpenOcta</b> — <b>China's First Open-Source Personal Desktop AI Agent</b>
 </p>
 
-<p align="center">
-  <sub>Double-click install · run locally · instant boot · your data stays on your machine</sub>
-</p>
 
-<p align="center">
-  <a href="https://github.com/openocta/openocta/stargazers"><img src="https://img.shields.io/badge/⭐-Star-24ba51?style=for-the-badge" alt="Star"></a>
-  <a href="https://github.com/openocta/openocta/releases/latest"><img src="https://img.shields.io/badge/📥-Download_Release-2563eb?style=for-the-badge" alt="Download Release"></a>
-  <a href="https://openocta.com/#download"><img src="https://img.shields.io/badge/🖥️-Desktop_Installer-6366f1?style=for-the-badge" alt="Website download"></a>
-</p>
+
 
 <p align="center">
   <a href="https://openocta.com">Website</a> ·
-  <a href="https://resource.openocta.com">Skills / MCP / Agents</a> ·
-  <a href="https://github.com/openocta/openocta/issues">Issues</a> ·
-  <a href="./CONTRIBUTING.md">Contribute</a> ·
   <a href="README.md">简体中文</a>
+</p>
+<p align="center">
+  <sub>Double-click install · run locally · instant boot · your data stays on your machine</sub>
 </p>
 
 **OpenOcta** is China's first open-source personal desktop AI agent. Double-click to install on your PC — an Agent that runs on your own machine under your full control. Use natural language for office work, IT ops, marketing, business analysis, and software testing.
