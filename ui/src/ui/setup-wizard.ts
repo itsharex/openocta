@@ -46,6 +46,9 @@ export type SetupWizardEnvironmentComponentId = "chromium";
 
 export type SetupWizardResourceTab = "skills" | "employees" | "mcp" | "channels";
 
+/** 安装引导「配置模型」步骤的分类 Tab */
+export type SetupWizardModelTab = "public" | "local" | "embedded";
+
 export type SetupWizardTaskStatus = "pending" | "running" | "waiting" | "done" | "failed" | "skipped";
 
 export type SetupWizardScenarioEnvPrompt = {

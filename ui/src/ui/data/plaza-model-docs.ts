@@ -91,6 +91,11 @@ MoE（混合专家）：总参数量大，但每次只激活部分专家。质�
 
 评分权重：速度 55% + 内存 55% + 参数量质量加成；内存紧张时会降档。`,
   },
+  runScore: {
+    id: "runScore",
+    title: "运行评分",
+    body: `评分与评级越高，在本机运行效果越好。详情见推荐说明。`,
+  },
   quantizationOptions: {
     id: "quantizationOptions",
     title: "量化选项表",

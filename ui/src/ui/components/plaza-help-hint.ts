@@ -1,6 +1,31 @@
 import { html, type TemplateResult } from "lit";
 import { icons } from "../icons.js";
 
+function positionPlazaHint(hint: HTMLElement, tooltip: HTMLElement) {
+  const rect = hint.getBoundingClientRect();
+  const margin = 8;
+  tooltip.classList.add("is-visible");
+
+  const tooltipWidth = tooltip.offsetWidth;
+  const tooltipHeight = tooltip.offsetHeight;
+
+  let left = rect.left;
+  if (left + tooltipWidth > window.innerWidth - margin) {
+    left = rect.right - tooltipWidth;
+  }
+  if (left < margin) {
+    left = margin;
+  }
+
+  let top = rect.bottom + 6;
+  if (top + tooltipHeight > window.innerHeight - margin) {
+    top = Math.max(margin, rect.top - tooltipHeight - 6);
+  }
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
 function showPlazaHint(e: Event) {
   const hint = (e.currentTarget as HTMLElement).closest(".plaza-help-hint");
   if (!hint) {
@@ -10,10 +35,7 @@ function showPlazaHint(e: Event) {
   if (!tooltip) {
     return;
   }
-  const rect = hint.getBoundingClientRect();
-  tooltip.style.left = `${rect.left}px`;
-  tooltip.style.top = `${rect.bottom + 6}px`;
-  tooltip.classList.add("is-visible");
+  positionPlazaHint(hint, tooltip);
 }
 
 function hidePlazaHint(e: Event) {
@@ -33,7 +55,14 @@ function hidePlazaHint(e: Event) {
 }
 
 /** 带悬浮说明的问号图标，tooltip 使用 fixed 定位以跳出 modal 裁剪 */
-export function renderPlazaHelpHint(text: string, label?: string): TemplateResult {
+export function renderPlazaHelpHint(
+  text: string,
+  label?: string,
+  options?: { nowrap?: boolean },
+): TemplateResult {
+  const tooltipClass = options?.nowrap
+    ? "plaza-help-hint__tooltip plaza-help-hint__tooltip--nowrap"
+    : "plaza-help-hint__tooltip";
   return html`
     <span
       class="plaza-help-hint"
@@ -43,7 +72,7 @@ export function renderPlazaHelpHint(text: string, label?: string): TemplateResul
     >
       ${icons.helpCircle}
       <span
-        class="plaza-help-hint__tooltip"
+        class=${tooltipClass}
         @mouseenter=${showPlazaHint}
         @mouseleave=${hidePlazaHint}
       >${text}</span>

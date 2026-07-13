@@ -11,6 +11,7 @@ import {
   setupWizardStepDescription,
   setupWizardStepLabel,
   setupWizardStepSubtitle,
+  type SetupWizardModelTab,
   type SetupWizardResourceTab,
   type SetupWizardScenarioRunRecord,
   type SetupWizardScenarioEnvPrompt,
@@ -28,9 +29,14 @@ import { renderWeWorkQrModal } from "./channels.wework.ts";
 import { renderWeixinQrModal } from "./channels.weixin.ts";
 import {
   getWizardModelLibraryEntries,
-  type ModelLibraryCategory,
   type ModelLibraryProviderEntry,
 } from "./model-library.ts";
+import { renderModelPlaza, type ModelPlazaProps } from "./model-plaza.ts";
+import type { EmbeddedModelEntry } from "../controllers/embedded-models.ts";
+import type { PlazaChatMessage } from "../controllers/embedded-chat-test.ts";
+import type { PlazaModelDetailInfo } from "../controllers/plaza-model-detail.ts";
+import type { LocalHardwareProfile, ServerModelRecommendation } from "../controllers/model-recommendation.ts";
+import type { EmbeddedModelProgress } from "../controllers/embedded-models.ts";
 import { getModelsForProvider, renderModelsOverlays, type ModelsProps, type ModelProvider } from "./models.ts";
 import { resolveModelProviderLogo } from "./model-provider-logos.js";
 
@@ -44,11 +50,32 @@ export type SetupWizardProps = {
   resourceTab: SetupWizardResourceTab;
   providers: Record<string, ModelProvider>;
   modelSearchQuery: string;
-  modelCategory: ModelLibraryCategory;
+  modelTab: SetupWizardModelTab;
   enabledProviderKeys: Set<string>;
   defaultModelRef: string | null;
   modelsLoading: boolean;
   modelsProps: ModelsProps;
+  embeddedModels: EmbeddedModelEntry[];
+  embeddedModelsLoading: boolean;
+  embeddedModelsError: string | null;
+  embeddedModelsBusyId: string | null;
+  embeddedDownloadProgress: EmbeddedModelProgress | null;
+  embeddedDownloadingModelId: string | null;
+  embeddedPlazaDetailModel: EmbeddedModelEntry | null;
+  embeddedPlazaDetailInfo: PlazaModelDetailInfo | null;
+  embeddedPlazaDetailLoading: boolean;
+  embeddedPlazaDetailError: string | null;
+  embeddedPlazaRecommendOpen: boolean;
+  embeddedPlazaManualImportOpen: boolean;
+  embeddedPlazaHardware: LocalHardwareProfile | null;
+  embeddedPlazaServerRecommendations: ServerModelRecommendation[] | null;
+  embeddedPlazaRecommendationsLoading: boolean;
+  embeddedPlazaChatModel: EmbeddedModelEntry | null;
+  embeddedPlazaChatMessages: PlazaChatMessage[];
+  embeddedPlazaChatInput: string;
+  embeddedPlazaChatLoading: boolean;
+  embeddedPlazaChatError: string | null;
+  gatewayHost: string;
   resourcesLoading: boolean;
   resourcesError: string | null;
   skillItems: SkillListItem[];
@@ -105,11 +132,27 @@ export type SetupWizardProps = {
   weixinQrModalScanned: boolean;
   onResourceTabChange: (tab: SetupWizardResourceTab) => void;
   onModelSearchChange: (query: string) => void;
-  onModelCategoryChange: (category: ModelLibraryCategory) => void;
+  onModelTabChange: (tab: SetupWizardModelTab) => void;
   onModelProviderToggle: (key: string, enabled: boolean) => void;
   onModelBaseUrlChange: (key: string, baseUrl: string) => void;
   onModelApiKeyChange: (key: string, apiKey: string) => void;
   onModelConfigure: (key: string) => void;
+  onEmbeddedRefresh: () => void;
+  onEmbeddedDownload: (modelId: string) => void;
+  onEmbeddedCancelDownload: () => void;
+  onEmbeddedStart: (model: EmbeddedModelEntry) => void;
+  onEmbeddedStop: (modelId: string) => void;
+  onEmbeddedDelete: (model: EmbeddedModelEntry) => void;
+  onEmbeddedSelectModel: (model: EmbeddedModelEntry | null) => void;
+  onEmbeddedOpenRecommend: () => void;
+  onEmbeddedCloseRecommend: () => void;
+  onEmbeddedOpenManualImport: () => void;
+  onEmbeddedCloseManualImport: () => void;
+  onEmbeddedHardwareChange: (hw: LocalHardwareProfile) => void;
+  onEmbeddedChat: (model: EmbeddedModelEntry) => void;
+  onEmbeddedCloseChat: () => void;
+  onEmbeddedChatInput: (value: string) => void;
+  onEmbeddedSendChat: () => void;
   onSkillQueryChange: (query: string) => void;
   onEmployeeQueryChange: (query: string) => void;
   onMcpQueryChange: (query: string) => void;
@@ -395,132 +438,197 @@ function renderEnvironmentStep(props: SetupWizardProps) {
   `;
 }
 
+const MODEL_TABS: { id: SetupWizardModelTab; label: string }[] = [
+  { id: "embedded", label: "本机模型" },
+  { id: "public", label: "公有模型" },
+  { id: "local", label: "本地模型" },
+];
+
+function buildWizardEmbeddedPlazaProps(props: SetupWizardProps): ModelPlazaProps {
+  return {
+    models: props.embeddedModels,
+    loading: props.embeddedModelsLoading,
+    error: props.embeddedModelsError,
+    busyId: props.embeddedModelsBusyId,
+    downloadProgress: props.embeddedDownloadProgress,
+    downloadingModelId: props.embeddedDownloadingModelId,
+    detailModel: props.embeddedPlazaDetailModel,
+    detailInfo: props.embeddedPlazaDetailInfo,
+    detailLoading: props.embeddedPlazaDetailLoading,
+    detailError: props.embeddedPlazaDetailError,
+    recommendOpen: props.embeddedPlazaRecommendOpen,
+    manualImportOpen: props.embeddedPlazaManualImportOpen,
+    hardware: props.embeddedPlazaHardware,
+    serverRecommendations: props.embeddedPlazaServerRecommendations,
+    recommendationsLoading: props.embeddedPlazaRecommendationsLoading,
+    onRefresh: props.onEmbeddedRefresh,
+    onDownload: props.onEmbeddedDownload,
+    onCancelDownload: props.onEmbeddedCancelDownload,
+    onStart: props.onEmbeddedStart,
+    onStop: props.onEmbeddedStop,
+    onDelete: props.onEmbeddedDelete,
+    onChat: props.onEmbeddedChat,
+    onSelectModel: props.onEmbeddedSelectModel,
+    onOpenRecommend: props.onEmbeddedOpenRecommend,
+    onCloseRecommend: props.onEmbeddedCloseRecommend,
+    onOpenManualImport: props.onEmbeddedOpenManualImport,
+    onCloseManualImport: props.onEmbeddedCloseManualImport,
+    onHardwareChange: props.onEmbeddedHardwareChange,
+    gatewayHost: props.gatewayHost,
+    chatModel: props.embeddedPlazaChatModel,
+    chatMessages: props.embeddedPlazaChatMessages,
+    chatInput: props.embeddedPlazaChatInput,
+    chatLoading: props.embeddedPlazaChatLoading,
+    chatError: props.embeddedPlazaChatError,
+    onCloseChat: props.onEmbeddedCloseChat,
+    onChatInput: props.onEmbeddedChatInput,
+    onSendChat: props.onEmbeddedSendChat,
+    showPageHeader: false,
+  };
+}
+
+function renderWizardProviderModels(props: SetupWizardProps, entries: ModelLibraryProviderEntry[]) {
+  if (props.modelsLoading) {
+    return html`<p class="setup-wizard__hint">加载模型配置中…</p>`;
+  }
+  if (entries.length === 0) {
+    return html`<p class="setup-wizard__empty">暂无匹配的模型，请添加或调整搜索。</p>`;
+  }
+  return html`
+    <div class="setup-wizard__model-grid">
+      ${entries.map((entry: ModelLibraryProviderEntry) => {
+        const logoUrl = resolveModelProviderLogo(
+          entry.key,
+          entry.displayName,
+          entry.baseUrl,
+          entry.builtin,
+        );
+        const enabled = props.enabledProviderKeys.has(entry.key);
+        const displayUrl = entry.baseUrl && entry.baseUrl !== "(官方)" ? entry.baseUrl : "";
+        const apiKey = props.providers[entry.key]?.apiKey ?? "";
+        const models = getModelsForProvider(entry.key, props.providers[entry.key]);
+        return html`
+          <div class="setup-wizard__model-card ${enabled ? "is-enabled" : ""}">
+            <div class="setup-wizard__model-card-top">
+              <div class="setup-wizard__model-card-brand">
+                ${logoUrl
+                  ? html`<img src="${logoUrl}" alt="" class="provider-logo" />`
+                  : icons.modelCube}
+                <strong>${entry.displayName}</strong>
+              </div>
+              ${renderSwitch(
+                enabled,
+                (next) => props.onModelProviderToggle(entry.key, next),
+                `启用 ${entry.displayName}`,
+              )}
+            </div>
+            <div class="setup-wizard__model-field">
+              <div class="setup-wizard__model-field-label"><span>Base URL</span></div>
+              <input
+                class="setup-wizard__input"
+                type="text"
+                placeholder="Base URL"
+                .value=${displayUrl}
+                ?disabled=${!enabled}
+                @input=${(e: Event) =>
+                  props.onModelBaseUrlChange(entry.key, (e.target as HTMLInputElement).value)}
+              />
+            </div>
+            <div class="setup-wizard__model-field">
+              <div class="setup-wizard__model-field-label"><span>API Key</span></div>
+              <input
+                class="setup-wizard__input"
+                type="password"
+                placeholder="sk-... 或 $ENV_VAR"
+                .value=${apiKey}
+                ?disabled=${!enabled}
+                @input=${(e: Event) =>
+                  props.onModelApiKeyChange(entry.key, (e.target as HTMLInputElement).value)}
+              />
+            </div>
+            <div class="setup-wizard__model-card-actions">
+              <button
+                type="button"
+                class="setup-wizard__link-btn"
+                ?disabled=${!enabled}
+                @click=${() => props.onModelConfigure(entry.key)}
+              >
+                配置模型
+              </button>
+              ${entry.isDefault
+                ? html`<span class="setup-wizard__model-tag">默认模型</span>`
+                : enabled && models.length > 0
+                  ? html`
+                      <button
+                        type="button"
+                        class="setup-wizard__link-btn"
+                        @click=${() => props.modelsProps.onUseModelClick(entry.key)}
+                      >
+                        设为默认
+                      </button>
+                    `
+                  : nothing}
+              ${enabled
+                ? html`<span class="setup-wizard__model-count">${models.length} 个模型</span>`
+                : nothing}
+            </div>
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
 function renderModelStep(props: SetupWizardProps) {
-  const entries = getWizardModelLibraryEntries(
+  const tab = props.modelTab;
+  const providerEntries = getWizardModelLibraryEntries(
     props.providers,
     props.modelSearchQuery,
     props.defaultModelRef,
-  ).filter(
-    (entry) => props.modelCategory === "__all__" || entry.category === props.modelCategory,
-  );
+  ).filter((entry) => entry.category === tab);
 
   return html`
     <div class="setup-wizard__section">
-      <div class="setup-wizard__toolbar setup-wizard__toolbar--models">
-        <select
-          class="setup-wizard__select"
-          .value=${props.modelCategory}
-          ?disabled=${props.modelsLoading}
-          @change=${(e: Event) =>
-            props.onModelCategoryChange((e.target as HTMLSelectElement).value as ModelLibraryCategory)}
-        >
-          <option value="__all__">全部模型</option>
-          <option value="public">公有模型</option>
-          <option value="local">本地模型</option>
-        </select>
-        ${renderWizardSearch("搜索", props.modelSearchQuery, props.onModelSearchChange, props.modelsLoading)}
-        <button
-          type="button"
-          class="btn setup-wizard__btn-primary"
-          ?disabled=${props.modelsLoading}
-          @click=${props.modelsProps.onAddProvider}
-        >
-          添加厂商
-        </button>
+      <div class="setup-wizard__tabs" role="tablist">
+        ${MODEL_TABS.map((t) => html`
+          <button
+            type="button"
+            role="tab"
+            class="setup-wizard__tab ${tab === t.id ? "active" : ""}"
+            aria-selected=${tab === t.id ? "true" : "false"}
+            @click=${() => props.onModelTabChange(t.id)}
+          >
+            ${t.label}
+          </button>
+        `)}
       </div>
-      ${props.modelsLoading
-        ? html`<p class="setup-wizard__hint">加载模型配置中…</p>`
-        : entries.length === 0
-          ? html`<p class="setup-wizard__empty">暂无匹配的模型，请添加或调整搜索。</p>`
+      <div class="setup-wizard__toolbar setup-wizard__toolbar--models">
+        ${renderWizardSearch(
+          "搜索模型",
+          props.modelSearchQuery,
+          props.onModelSearchChange,
+          tab === "embedded" ? props.embeddedModelsLoading : props.modelsLoading,
+        )}
+        ${tab === "embedded"
+          ? nothing
           : html`
-              <div class="setup-wizard__model-grid">
-                ${entries.map((entry: ModelLibraryProviderEntry) => {
-                  const logoUrl = resolveModelProviderLogo(
-                    entry.key,
-                    entry.displayName,
-                    entry.baseUrl,
-                    entry.builtin,
-                  );
-                  const enabled = props.enabledProviderKeys.has(entry.key);
-                  const displayUrl =
-                    entry.baseUrl && entry.baseUrl !== "(官方)" ? entry.baseUrl : "";
-                  const apiKey = props.providers[entry.key]?.apiKey ?? "";
-                  const models = getModelsForProvider(entry.key, props.providers[entry.key]);
-                  return html`
-                    <div class="setup-wizard__model-card ${enabled ? "is-enabled" : ""}">
-                      <div class="setup-wizard__model-card-top">
-                        <div class="setup-wizard__model-card-brand">
-                          ${logoUrl
-                            ? html`<img src="${logoUrl}" alt="" class="provider-logo" />`
-                            : icons.modelCube}
-                          <strong>${entry.displayName}</strong>
-                        </div>
-                        ${renderSwitch(
-                          enabled,
-                          (next) => props.onModelProviderToggle(entry.key, next),
-                          `启用 ${entry.displayName}`,
-                        )}
-                      </div>
-                      <div class="setup-wizard__model-field">
-                        <div class="setup-wizard__model-field-label"><span>Base URL</span></div>
-                        <input
-                          class="setup-wizard__input"
-                          type="text"
-                          placeholder="Base URL"
-                          .value=${displayUrl}
-                          ?disabled=${!enabled}
-                          @input=${(e: Event) =>
-                            props.onModelBaseUrlChange(
-                              entry.key,
-                              (e.target as HTMLInputElement).value,
-                            )}
-                        />
-                      </div>
-                      <div class="setup-wizard__model-field">
-                        <div class="setup-wizard__model-field-label"><span>API Key</span></div>
-                        <input
-                          class="setup-wizard__input"
-                          type="password"
-                          placeholder="sk-... 或 $ENV_VAR"
-                          .value=${apiKey}
-                          ?disabled=${!enabled}
-                          @input=${(e: Event) =>
-                            props.onModelApiKeyChange(entry.key, (e.target as HTMLInputElement).value)}
-                        />
-                      </div>
-                      <div class="setup-wizard__model-card-actions">
-                        <button
-                          type="button"
-                          class="setup-wizard__link-btn"
-                          ?disabled=${!enabled}
-                          @click=${() => props.onModelConfigure(entry.key)}
-                        >
-                          配置模型
-                        </button>
-                        ${entry.isDefault
-                          ? html`<span class="setup-wizard__model-tag">默认模型</span>`
-                          : enabled && models.length > 0
-                            ? html`
-                                <button
-                                  type="button"
-                                  class="setup-wizard__link-btn"
-                                  @click=${() => props.modelsProps.onUseModelClick(entry.key)}
-                                >
-                                  设为默认
-                                </button>
-                              `
-                            : nothing}
-                        ${enabled
-                          ? html`
-                              <span class="setup-wizard__model-count">${models.length} 个模型</span>
-                            `
-                          : nothing}
-                      </div>
-                    </div>
-                  `;
-                })}
-              </div>
+              <button
+                type="button"
+                class="btn setup-wizard__btn-primary"
+                ?disabled=${props.modelsLoading}
+                @click=${props.modelsProps.onAddProvider}
+              >
+                添加厂商
+              </button>
             `}
+      </div>
+      ${tab === "embedded"
+        ? html`
+            <div class="setup-wizard__embedded-plaza">
+              ${renderModelPlaza(buildWizardEmbeddedPlazaProps(props))}
+            </div>
+          `
+        : renderWizardProviderModels(props, providerEntries)}
     </div>
   `;
 }

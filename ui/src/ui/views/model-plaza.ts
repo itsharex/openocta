@@ -81,7 +81,23 @@ export type ModelPlazaProps = {
   onCloseChat: () => void;
   onChatInput: (value: string) => void;
   onSendChat: () => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  /** 主模型库页展示标题与右上角搜索；引导内嵌时为 false */
+  showPageHeader?: boolean;
+  pageTitle?: string;
 };
+
+export function filterEmbeddedModelsByQuery(models: EmbeddedModelEntry[], query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return models;
+  }
+  return models.filter((m) => {
+    const haystack = `${m.name} ${m.description ?? ""} ${m.id} ${m.provider ?? ""}`.toLowerCase();
+    return haystack.includes(q);
+  });
+}
 
 function formatProgressBytes(bytes?: number): string {
   if (!bytes || bytes <= 0) {
@@ -208,6 +224,167 @@ function renderCapabilityIcons(model: EmbeddedModelEntry) {
   `;
 }
 
+function renderPlazaCell(className: string, content: unknown) {
+  const hasContent = content !== null && content !== undefined && content !== nothing && content !== "" && content !== "—";
+  return html`
+    <div class="plaza-list__cell ${className}">
+      ${hasContent ? content : html`<span class="plaza-list__cell-empty">—</span>`}
+    </div>
+  `;
+}
+
+function renderPlazaActionSlot(content: unknown) {
+  return html`
+    <div class="plaza-list__action-slot">
+      ${content ? content : html`<span class="plaza-list__action-slot-empty" aria-hidden="true"></span>`}
+    </div>
+  `;
+}
+
+function renderPlazaScoreHeader() {
+  return html`
+    <div class="plaza-list__head-score" @click=${(e: Event) => e.stopPropagation()}>
+      <span class="plaza-list__head-label">运行评分</span>
+      ${renderPlazaHelpHint(plazaDoc("runScore").body, "运行评分", { nowrap: true })}
+    </div>
+  `;
+}
+
+function renderPlazaScoreCell(rec?: ModelRecommendation) {
+  if (!rec) {
+    return nothing;
+  }
+  return html`
+    <div class="plaza-list__score-group">
+      <span class="plaza-list__score-num ${tierScoreClass(rec.tier)}" title="运行评分">
+        ${rec.score}
+      </span>
+      <span
+        class="plaza-list__tier-chip ${tierClass(rec.tier)}"
+        title="${TIER_LABELS[rec.tier]}（推荐等级 ${rec.tier}）"
+      >${rec.tier}</span>
+    </div>
+  `;
+}
+
+function renderPlazaRowActions(
+  props: ModelPlazaProps,
+  model: EmbeddedModelEntry,
+  isBusy: boolean,
+  isDownloading: boolean,
+) {
+  const stopClick = (e: Event) => e.stopPropagation();
+
+  if (!model.installed) {
+    if (model.downloadable === false) {
+      return html`
+        <div class="plaza-list__actions" @click=${stopClick}>
+          ${renderPlazaActionSlot(nothing)}
+          ${renderPlazaActionSlot(
+            model.hfUrl
+              ? html`
+                  <a
+                    class="market-card-icon-btn"
+                    href=${model.hfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="在 HuggingFace 查看"
+                    @click=${stopClick}
+                  >${icons.link}</a>
+                `
+              : html`<span class="plaza-list__hf-hint" title="HF 源仓库">HF</span>`,
+          )}
+        </div>
+      `;
+    }
+    return html`
+      <div class="plaza-list__actions" @click=${stopClick}>
+        ${renderPlazaActionSlot(nothing)}
+        ${renderPlazaActionSlot(html`
+          <button
+            class="market-card-icon-btn primary"
+            type="button"
+            title=${isDownloading ? "下载中" : "下载内嵌模型"}
+            ?disabled=${props.loading || isBusy || Boolean(props.downloadingModelId)}
+            @click=${() => props.onDownload(model.id)}
+          >${isDownloading ? icons.loader2 : icons.download}</button>
+        `)}
+      </div>
+    `;
+  }
+
+  if (model.running) {
+    return html`
+      <div class="plaza-list__actions" @click=${stopClick}>
+        ${renderPlazaActionSlot(
+          model.kind !== "embedding"
+            ? html`
+                <button
+                  class="market-card-icon-btn primary"
+                  type="button"
+                  title="测试对话"
+                  ?disabled=${isBusy}
+                  @click=${() => props.onChat(model)}
+                >${icons.plazaChat}</button>
+              `
+            : nothing,
+        )}
+        ${renderPlazaActionSlot(html`
+          <button
+            class="market-card-icon-btn"
+            type="button"
+            title="停止"
+            ?disabled=${isBusy}
+            @click=${() => props.onStop(model.id)}
+          >${icons.powerOff}</button>
+        `)}
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="plaza-list__actions" @click=${stopClick}>
+      ${renderPlazaActionSlot(html`
+        <button
+          class="market-card-icon-btn primary"
+          type="button"
+          title="启动"
+          ?disabled=${isBusy}
+          @click=${() => props.onStart(model)}
+        >${icons.power}</button>
+      `)}
+      ${renderPlazaActionSlot(html`
+        <button
+          class="market-card-icon-btn danger"
+          type="button"
+          title="删除"
+          ?disabled=${isBusy}
+          @click=${() => props.onDelete(model)}
+        >${icons.trash}</button>
+      `)}
+    </div>
+  `;
+}
+
+function renderPlazaListHeader() {
+  return html`
+    <div class="plaza-list__row plaza-list__row--header" aria-hidden="true">
+      <div class="plaza-list__identity">
+        <span class="plaza-list__head-label">模型</span>
+      </div>
+      ${renderPlazaCell("plaza-list__cell--released", html`<span class="plaza-list__head-label">发布</span>`)}
+      ${renderPlazaCell("plaza-list__cell--size", html`<span class="plaza-list__head-label">体积 / 内存</span>`)}
+      ${renderPlazaCell("plaza-list__cell--ctx", html`<span class="plaza-list__head-label">上下文</span>`)}
+      ${renderPlazaCell("plaza-list__cell--quant", html`<span class="plaza-list__head-label">量化</span>`)}
+      ${renderPlazaCell("plaza-list__cell--speed", html`<span class="plaza-list__head-label">推理速度</span>`)}
+      ${renderPlazaCell("plaza-list__cell--score", renderPlazaScoreHeader())}
+      <div class="plaza-list__head-actions">
+        <span class="plaza-list__head-label">操作</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderModelRow(props: ModelPlazaProps, model: EmbeddedModelEntry, rec?: ModelRecommendation) {
   const sizeBytes = totalModelSize(model.files);
   const sizeLabel = formatModelSize(sizeBytes);
@@ -257,9 +434,13 @@ function renderModelRow(props: ModelPlazaProps, model: EmbeddedModelEntry, rec?:
         <p class="plaza-list__desc">${model.description}</p>
       </div>
 
-      <div class="plaza-list__stats">
-        ${releasedAgo ? html`<span class="plaza-list__stat plaza-list__stat--muted">${releasedAgo}</span>` : nothing}
-        ${sizeGb
+      ${renderPlazaCell(
+        "plaza-list__cell--released",
+        releasedAgo ? html`<span class="plaza-list__stat plaza-list__stat--muted">${releasedAgo}</span>` : nothing,
+      )}
+      ${renderPlazaCell(
+        "plaza-list__cell--size",
+        sizeGb
           ? html`
               <span class="plaza-list__stat plaza-list__stat--vram">
                 ${sizeGb} GB
@@ -270,93 +451,27 @@ function renderModelRow(props: ModelPlazaProps, model: EmbeddedModelEntry, rec?:
             `
           : sizeLabel
             ? html`<span class="plaza-list__stat">${sizeLabel}</span>`
-            : nothing}
-        ${ctxLabel !== "—" ? html`<span class="plaza-list__stat">${ctxLabel}</span>` : nothing}
-        ${model.quantization
+            : nothing,
+      )}
+      ${renderPlazaCell(
+        "plaza-list__cell--ctx",
+        ctxLabel !== "—" ? html`<span class="plaza-list__stat">${ctxLabel}</span>` : nothing,
+      )}
+      ${renderPlazaCell(
+        "plaza-list__cell--quant",
+        model.quantization
           ? html`<span class="plaza-list__stat plaza-list__stat--muted">${model.quantization}</span>`
-          : nothing}
-        ${rec && rec.tokensPerSec > 0
+          : nothing,
+      )}
+      ${renderPlazaCell(
+        "plaza-list__cell--speed",
+        rec && rec.tokensPerSec > 0
           ? html`<span class="plaza-list__stat plaza-list__stat--speed">~${rec.tokensPerSec} tok/s</span>`
-          : nothing}
-        ${rec
-          ? html`
-              <div class=${tierScoreClass(rec.tier)} title="${TIER_LABELS[rec.tier]}">
-                <span class="plaza-score__label">${TIER_LABELS[rec.tier]}</span>
-                <span class="plaza-score__value">${rec.score}/100</span>
-              </div>
-            `
-          : nothing}
-      </div>
+          : nothing,
+      )}
+      ${renderPlazaCell("plaza-list__cell--score", renderPlazaScoreCell(rec))}
 
-      <div class="plaza-list__actions models-provider-actions" @click=${(e: Event) => e.stopPropagation()}>
-        ${!model.installed
-          ? model.downloadable === false
-            ? html`
-                <span
-                  class="plaza-catalog-only-hint"
-                  title="该模型 HuggingFace 源仓库暂无 GGUF 包，请打开详情查看 HF 链接"
-                  >HF 源仓库</span
-                >
-                ${model.hfUrl
-                  ? html`
-                      <a
-                        class="market-card-icon-btn"
-                        href=${model.hfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="在 HuggingFace 查看"
-                        @click=${(e: Event) => e.stopPropagation()}
-                      >${icons.link}</a>
-                    `
-                  : nothing}
-              `
-            : html`
-                <button
-                  class="market-card-icon-btn primary"
-                  type="button"
-                  title=${isDownloading ? "下载中" : "下载内嵌模型"}
-                  ?disabled=${props.loading || isBusy || Boolean(props.downloadingModelId)}
-                  @click=${() => props.onDownload(model.id)}
-                >${isDownloading ? icons.loader2 : icons.download}</button>
-              `
-          : model.running
-            ? html`
-                ${model.kind !== "embedding"
-                  ? html`
-                      <button
-                        class="market-card-icon-btn primary"
-                        type="button"
-                        title="测试对话"
-                        ?disabled=${isBusy}
-                        @click=${() => props.onChat(model)}
-                      >${icons.plazaChat}</button>
-                    `
-                  : nothing}
-                <button
-                  class="market-card-icon-btn"
-                  type="button"
-                  title="停止"
-                  ?disabled=${isBusy}
-                  @click=${() => props.onStop(model.id)}
-                >${icons.powerOff}</button>
-              `
-            : html`
-                <button
-                  class="market-card-icon-btn primary"
-                  type="button"
-                  title="启动"
-                  ?disabled=${isBusy}
-                  @click=${() => props.onStart(model)}
-                >${icons.power}</button>
-                <button
-                  class="market-card-icon-btn danger"
-                  type="button"
-                  title="删除"
-                  ?disabled=${isBusy}
-                  @click=${() => props.onDelete(model)}
-                >${icons.trash}</button>
-              `}
-      </div>
+      ${renderPlazaRowActions(props, model, isBusy, isDownloading)}
       ${isDownloading ? renderProgressBar(props.downloadProgress, true) : nothing}
     </div>
   `;
@@ -1023,11 +1138,14 @@ function renderPlazaChatTestModal(props: ModelPlazaProps) {
 }
 
 export function renderModelPlaza(props: ModelPlazaProps) {
+  const showPageHeader = props.showPageHeader ?? true;
+  const searchQuery = props.searchQuery ?? "";
+  const visibleModels = filterEmbeddedModelsByQuery(props.models, searchQuery);
   const hasInstalled = props.models.some((m) => m.installed);
   const hw = props.hardware ?? detectLocalHardware();
   const recommendations = resolveRecommendations(props, hw);
   const recById = new Map(recommendations.map((r) => [r.model.id, r]));
-  const sortedModels = [...props.models].sort((a, b) => {
+  const sortedModels = [...visibleModels].sort((a, b) => {
     const sa = recById.get(a.id)?.score ?? 0;
     const sb = recById.get(b.id)?.score ?? 0;
     if (sb !== sa) {
@@ -1041,7 +1159,50 @@ export function renderModelPlaza(props: ModelPlazaProps) {
   const showRecommendBanner = !hasInstalled && !props.loading && bannerRecs.length > 0;
   const runningCount = props.models.filter((m) => m.running).length;
   const sortLabel = hw.serverSide ? "Gateway 服务器推荐得分" : "本机估算推荐得分";
-  const adaptLabel = hw.serverSide ? "服务器适配情况" : "本机适配情况（离线估算）";
+  const pageTitle = props.pageTitle ?? "本机模型";
+
+  const toolbarActions = html`
+    <div class="${showPageHeader ? "emp-toolbar__actions" : "plaza-toolbar__actions"}">
+      ${showPageHeader
+        ? html`
+            <div class="emp-search">
+              <span class="input"><input
+                class="emp-search__input"
+                type="text"
+                placeholder="搜索"
+                .value=${searchQuery}
+                ?disabled=${props.loading}
+                @input=${(e: Event) => props.onSearchChange?.((e.target as HTMLInputElement).value)}
+              /></span>
+              <span class="emp-search__icon" aria-hidden="true">${icons.search}</span>
+            </div>
+          `
+        : nothing}
+      <button class="btn" type="button" ?disabled=${props.loading} @click=${props.onRefresh}>刷新</button>
+      ${props.downloadingModelId
+        ? html`
+            <button class="btn btn--danger" type="button" @click=${props.onCancelDownload}>取消下载</button>
+          `
+        : nothing}
+    </div>
+  `;
+
+  const introBlock = html`
+    <div class="embedded-model-intro">
+      <p class="embedded-model-intro__lead">
+        共 ${visibleModels.length} 个模型，已按${sortLabel}排序，点击行查看详情。
+      </p>
+      <p class="embedded-model-intro__tips">
+        优先选 S / A / B 级模型；详情见
+        <button class="plaza-manual-import-link" type="button" @click=${props.onOpenRecommend}>
+          推荐说明
+        </button>，GGUF 手动导入见
+        <button class="plaza-manual-import-link" type="button" @click=${props.onOpenManualImport}>
+          手动导入说明
+        </button>。
+      </p>
+    </div>
+  `;
 
   return html`
     <main class="emp-page">
@@ -1049,40 +1210,61 @@ export function renderModelPlaza(props: ModelPlazaProps) {
         <div class="emp-content">
           <div class="emp-main">
             <div class="emp-main__body">
-              <div class="plaza-toolbar">
-                <div class="embedded-model-intro">
-                  <p class="embedded-model-intro__lead">
-                    共 ${props.models.length} 个模型，已按${sortLabel}排序。点击行查看详情。
-                  </p>
-                  <p class="embedded-model-intro__tips">
-                    建议优先选用推荐等级较高（S / A / B）的模型，对话与推理更稳定。参数量过小的模型、或不支持
-                    thinking 的模型，推理能力有限，复杂问题与长对话体验可能较差；可按需查看右上角「推荐说明」了解评分标准与${adaptLabel}。
-                    也可自行下载 GGUF 手动导入本地模型，详见
-                    <button class="plaza-manual-import-link" type="button" @click=${props.onOpenManualImport}>
-                      手动导入说明
-                    </button>。
-                  </p>
-                </div>
-                <div class="plaza-toolbar__actions">
-                  <button class="btn" type="button" ?disabled=${props.loading} @click=${props.onRefresh}>刷新</button>
-                  <button class="btn" type="button" @click=${props.onOpenManualImport}>手动导入</button>
-                  <button class="btn primary" type="button" @click=${props.onOpenRecommend}>推荐说明</button>
-                  ${props.downloadingModelId
-                    ? html`
-                        <button class="btn btn--danger" type="button" @click=${props.onCancelDownload}>取消下载</button>
-                      `
-                    : nothing}
-                </div>
-              </div>
-              ${props.error ? html`<div class="emp-empty embedded-model-error">${props.error}</div>` : nothing}
-              ${renderMultiModelPerfWarning(runningCount)}
-              ${props.loading && props.models.length === 0
-                ? html`<div class="emp-loading">加载中…</div>`
-                : nothing}
-              ${showRecommendBanner ? renderRecommendBanner(props, bannerRecs) : nothing}
-              <div class="plaza-list">
-                ${sortedModels.map((m) => renderModelRow(props, m, recById.get(m.id)))}
-              </div>
+              ${showPageHeader
+                ? toolbarActions
+                : html`
+                    <div class="plaza-toolbar">
+                      ${introBlock}
+                      ${toolbarActions}
+                    </div>
+                  `}
+              ${showPageHeader
+                ? html`
+                    <div class="emp-sections">
+                      <div class="emp-section">
+                        <div class="emp-section__header">
+                          <h3 class="emp-section__title">${pageTitle}</h3>
+                        </div>
+                        ${introBlock}
+                        ${props.error ? html`<div class="emp-empty embedded-model-error">${props.error}</div>` : nothing}
+                        ${renderMultiModelPerfWarning(runningCount)}
+                        ${props.loading && props.models.length === 0
+                          ? html`<div class="emp-loading">加载中…</div>`
+                          : nothing}
+                        ${!props.loading && visibleModels.length === 0
+                          ? html`<div class="emp-empty">暂无匹配的模型</div>`
+                          : nothing}
+                        ${showRecommendBanner ? renderRecommendBanner(props, bannerRecs) : nothing}
+                        ${visibleModels.length > 0
+                          ? html`
+                              <div class="plaza-list">
+                                ${renderPlazaListHeader()}
+                                ${sortedModels.map((m) => renderModelRow(props, m, recById.get(m.id)))}
+                              </div>
+                            `
+                          : nothing}
+                      </div>
+                    </div>
+                  `
+                : html`
+                    ${props.error ? html`<div class="emp-empty embedded-model-error">${props.error}</div>` : nothing}
+                    ${renderMultiModelPerfWarning(runningCount)}
+                    ${props.loading && props.models.length === 0
+                      ? html`<div class="emp-loading">加载中…</div>`
+                      : nothing}
+                    ${!props.loading && visibleModels.length === 0
+                      ? html`<div class="emp-empty">暂无匹配的模型</div>`
+                      : nothing}
+                    ${showRecommendBanner ? renderRecommendBanner(props, bannerRecs) : nothing}
+                    ${visibleModels.length > 0
+                      ? html`
+                          <div class="plaza-list">
+                            ${renderPlazaListHeader()}
+                            ${sortedModels.map((m) => renderModelRow(props, m, recById.get(m.id)))}
+                          </div>
+                        `
+                      : nothing}
+                  `}
             </div>
           </div>
         </div>

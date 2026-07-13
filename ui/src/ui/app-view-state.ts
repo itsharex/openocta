@@ -45,7 +45,7 @@ export type AppViewState = {
   setupWizardSession: import("./setup-wizard.ts").SetupWizardSession;
   setupWizardResourceTab: import("./setup-wizard.ts").SetupWizardResourceTab;
   setupWizardModelSearchQuery: string;
-  setupWizardModelCategory: import("./views/model-library.ts").ModelLibraryCategory;
+  setupWizardModelTab: import("./setup-wizard.ts").SetupWizardModelTab;
   setupWizardEnabledProviders: Set<string>;
   setupWizardResourcesLoading: boolean;
   setupWizardResourcesError: string | null;

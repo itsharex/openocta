@@ -54,9 +54,36 @@ import {
   handleModelsUseModelModalClose,
 } from "./app-models.ts";
 import { BUILTIN_PROVIDERS, parseModelRef } from "./views/models-builtin.ts";
-import type { ModelLibraryCategory } from "./views/model-library.ts";
+import {
+  closeEmbeddedPlazaChatTest,
+  closeEmbeddedPlazaManualImport,
+  closeEmbeddedPlazaRecommend,
+  embeddedDownloadProgress,
+  handleEmbeddedDownloadCancel,
+  handleEmbeddedModelDelete,
+  handleEmbeddedModelDownload,
+  handleEmbeddedModelStart,
+  handleEmbeddedModelStop,
+  loadEmbeddedModels,
+  openEmbeddedPlazaChatTest,
+  openEmbeddedPlazaManualImport,
+  openEmbeddedPlazaRecommend,
+  selectEmbeddedPlazaModel,
+  sendEmbeddedPlazaChatTest,
+  setEmbeddedPlazaChatInput,
+  setEmbeddedPlazaHardware,
+} from "./app-embedded-models.ts";
+import type { SetupWizardModelTab } from "./setup-wizard.ts";
+import { filterEmbeddedModelsByQuery } from "./views/model-plaza.ts";
 
 let scenarioEnvPromptResolver: ((value: string | null) => void) | null = null;
+
+export function ensureSetupWizardEmbeddedModels(state: AppViewState) {
+  if (!state.connected) {
+    return;
+  }
+  void loadEmbeddedModels(state);
+}
 
 function wizardGatewayOpts(state: AppViewState) {
   return {
@@ -231,7 +258,7 @@ export function setupWizardContinueScenarioEnv(state: AppViewState) {
   }
 }
 
-const WIZARD_CHANNEL_IDS = ["feishu", "dingtalk", "wework", "weixin", "qq"] as const;
+const WIZARD_CHANNEL_IDS = ["weixin", "feishu", "dingtalk", "wework", "qq"] as const;
 
 const WIZARD_CHANNEL_LABELS: Record<string, string> = {
   feishu: "飞书",
@@ -439,6 +466,9 @@ export function refreshSetupWizardFromConfig(state: AppViewState) {
   seedSetupWizardEnabledProviders(state);
   syncSetupWizardModelsSession(state);
   syncSetupWizardChannelsSession(state);
+  if (currentStepId(state) === "models") {
+    ensureSetupWizardEmbeddedModels(state);
+  }
 }
 
 export function handleSetupWizardModelToggle(state: AppViewState, key: string, enabled: boolean) {
@@ -628,6 +658,9 @@ export function setupWizardNext(state: AppViewState, fromSkip = false) {
   }
   state.setupWizardStepIndex += 1;
   const nextStep = currentStepId(state);
+  if (nextStep === "models") {
+    ensureSetupWizardEmbeddedModels(state);
+  }
   if (nextStep === "environment") {
     void loadSetupWizardBrowserStatus(state);
   }
@@ -646,6 +679,9 @@ export function setupWizardBack(state: AppViewState) {
     return;
   }
   state.setupWizardStepIndex -= 1;
+  if (currentStepId(state) === "models") {
+    ensureSetupWizardEmbeddedModels(state);
+  }
 }
 
 export async function setupWizardRunScenarios(state: AppViewState) {
@@ -841,11 +877,34 @@ export function buildSetupWizardProps(state: AppViewState): SetupWizardProps {
     resourceTab: state.setupWizardResourceTab,
     providers: modelProviders,
     modelSearchQuery: state.setupWizardModelSearchQuery,
-    modelCategory: state.setupWizardModelCategory,
+    modelTab: state.setupWizardModelTab,
     enabledProviderKeys: state.setupWizardEnabledProviders,
     defaultModelRef,
     modelsLoading: state.configLoading,
     modelsProps: buildSetupWizardModelsProps(state),
+    embeddedModels: filterEmbeddedModelsByQuery(state.embeddedModels, state.setupWizardModelSearchQuery),
+    embeddedModelsLoading: state.embeddedModelsLoading,
+    embeddedModelsError: state.embeddedModelsError,
+    embeddedModelsBusyId: state.embeddedModelsBusyId,
+    embeddedDownloadProgress: embeddedDownloadProgress(state),
+    embeddedDownloadingModelId: state.embeddedDownloadStatus?.downloading
+      ? (state.embeddedDownloadStatus.modelId ?? null)
+      : null,
+    embeddedPlazaDetailModel: state.embeddedPlazaDetailModel,
+    embeddedPlazaDetailInfo: state.embeddedPlazaDetailInfo,
+    embeddedPlazaDetailLoading: state.embeddedPlazaDetailLoading,
+    embeddedPlazaDetailError: state.embeddedPlazaDetailError,
+    embeddedPlazaRecommendOpen: state.embeddedPlazaRecommendOpen,
+    embeddedPlazaManualImportOpen: state.embeddedPlazaManualImportOpen,
+    embeddedPlazaHardware: state.embeddedPlazaHardware,
+    embeddedPlazaServerRecommendations: state.embeddedPlazaServerRecommendations,
+    embeddedPlazaRecommendationsLoading: state.embeddedPlazaRecommendationsLoading,
+    embeddedPlazaChatModel: state.embeddedPlazaChatModel,
+    embeddedPlazaChatMessages: state.embeddedPlazaChatMessages,
+    embeddedPlazaChatInput: state.embeddedPlazaChatInput,
+    embeddedPlazaChatLoading: state.embeddedPlazaChatLoading,
+    embeddedPlazaChatError: state.embeddedPlazaChatError,
+    gatewayHost: state.settings?.gatewayUrl?.trim() ?? "",
     resourcesLoading: state.setupWizardResourcesLoading,
     resourcesError: state.setupWizardResourcesError,
     skillItems: state.setupWizardSkillItems,
@@ -899,9 +958,28 @@ export function buildSetupWizardProps(state: AppViewState): SetupWizardProps {
     onModelSearchChange: (query) => {
       state.setupWizardModelSearchQuery = query;
     },
-    onModelCategoryChange: (category: ModelLibraryCategory) => {
-      state.setupWizardModelCategory = category;
+    onModelTabChange: (tab: SetupWizardModelTab) => {
+      state.setupWizardModelTab = tab;
+      if (tab === "embedded") {
+        ensureSetupWizardEmbeddedModels(state);
+      }
     },
+    onEmbeddedRefresh: () => void loadEmbeddedModels(state),
+    onEmbeddedDownload: (id) => void handleEmbeddedModelDownload(state, id),
+    onEmbeddedCancelDownload: () => void handleEmbeddedDownloadCancel(state),
+    onEmbeddedStart: (m) => void handleEmbeddedModelStart(state, m),
+    onEmbeddedStop: (id) => void handleEmbeddedModelStop(state, id),
+    onEmbeddedDelete: (m) => void handleEmbeddedModelDelete(state, m),
+    onEmbeddedSelectModel: (m) => selectEmbeddedPlazaModel(state, m),
+    onEmbeddedOpenRecommend: () => openEmbeddedPlazaRecommend(state),
+    onEmbeddedCloseRecommend: () => closeEmbeddedPlazaRecommend(state),
+    onEmbeddedOpenManualImport: () => openEmbeddedPlazaManualImport(state),
+    onEmbeddedCloseManualImport: () => closeEmbeddedPlazaManualImport(state),
+    onEmbeddedHardwareChange: (hw) => setEmbeddedPlazaHardware(state, hw),
+    onEmbeddedChat: (m) => openEmbeddedPlazaChatTest(state, m),
+    onEmbeddedCloseChat: () => closeEmbeddedPlazaChatTest(state),
+    onEmbeddedChatInput: (v) => setEmbeddedPlazaChatInput(state, v),
+    onEmbeddedSendChat: () => void sendEmbeddedPlazaChatTest(state),
     onModelProviderToggle: (key, enabled) => handleSetupWizardModelToggle(state, key, enabled),
     onModelBaseUrlChange: (key, baseUrl) => handleSetupWizardModelBaseUrlChange(state, key, baseUrl),
     onModelApiKeyChange: (key, apiKey) => handleSetupWizardModelApiKeyChange(state, key, apiKey),
@@ -1072,7 +1150,7 @@ export function initSetupWizardSession(state: AppViewState) {
   state.setupWizardStepIndex = 0;
   state.setupWizardResourceTab = "skills";
   state.setupWizardModelSearchQuery = "";
-  state.setupWizardModelCategory = "__all__";
+  state.setupWizardModelTab = "embedded";
   state.setupWizardSkillQuery = "";
   state.setupWizardEmployeeQuery = "";
   state.setupWizardMcpQuery = "";
@@ -1095,4 +1173,5 @@ export function initSetupWizardSession(state: AppViewState) {
   state.setupWizardBrowserInstallProgress = null;
   stopSetupWizardBrowserPoll(state);
   void loadSetupWizardBrowserStatus(state);
+  ensureSetupWizardEmbeddedModels(state);
 }

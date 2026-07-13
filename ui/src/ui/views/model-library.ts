@@ -352,6 +352,8 @@ export function renderModelLibrary(props: ModelLibraryProps) {
         onCloseChat: () => props.onEmbeddedCloseChat?.(),
         onChatInput: (v) => props.onEmbeddedChatInput?.(v),
         onSendChat: () => props.onEmbeddedSendChat?.(),
+        searchQuery: props.providerSearchQuery,
+        onSearchChange: (q) => props.onProviderSearchChange(q),
       })}
       ${renderModelsOverlays(props)}
     `;
