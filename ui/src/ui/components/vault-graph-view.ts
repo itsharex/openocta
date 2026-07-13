@@ -20,6 +20,7 @@ export class VaultGraphView extends LitElement {
   @state() private panX = 0;
   @state() private panY = 0;
   @state() private dragging = false;
+  @state() private hoveredPath: string | null = null;
   private dragStart = { x: 0, y: 0, panX: 0, panY: 0 };
   private viewportEl: HTMLElement | null = null;
 
@@ -89,6 +90,17 @@ export class VaultGraphView extends LitElement {
     this.zoomAt(x, y, Math.max(0.25, this.scale / 1.2));
   }
 
+  private edgeHighlighted(source: string, target: string) {
+    const focus = this.selectedPath ?? this.hoveredPath;
+    if (!focus) return false;
+    return source === focus || target === focus;
+  }
+
+  private nodeLabel(title: string, path: string) {
+    const text = title || path;
+    return this.scale >= 1.5 ? text : truncate(text, 10);
+  }
+
   render() {
     if (this.loading) {
       return html`<div class="kv-graph__empty">加载图谱…</div>`;
@@ -103,6 +115,7 @@ export class VaultGraphView extends LitElement {
     const layout = layoutVaultGraph(graph.nodes, graph.edges, width, height, this.selectedPath);
     const byPath = new Map(layout.map((n) => [n.path, n]));
     const isolated = graph.edges.length === 0;
+    const showFullLabels = this.scale >= 1.5;
 
     return html`
       <div class="kv-graph">
@@ -111,7 +124,7 @@ export class VaultGraphView extends LitElement {
           <button type="button" class="btn btn--ghost btn--sm" @click=${() => this.zoomOut()} aria-label="缩小">−</button>
           <button type="button" class="btn btn--ghost btn--sm" @click=${() => this.zoomIn()} aria-label="放大">+</button>
           <button type="button" class="btn btn--ghost btn--sm" @click=${() => this.resetView()}>重置视图</button>
-          <span class="kv-graph__hint muted">滚轮以视口中心缩放 · 拖拽平移</span>
+          <span class="kv-graph__hint muted">滚轮以视口中心缩放 · 拖拽平移 · 点击节点打开笔记</span>
         </div>
         <div
           class="kv-graph__viewport ${this.dragging ? "kv-graph__viewport--dragging" : ""}"
@@ -141,8 +154,9 @@ export class VaultGraphView extends LitElement {
                 const a = byPath.get(e.source);
                 const b = byPath.get(e.target);
                 if (!a || !b) return nothing;
+                const hl = this.edgeHighlighted(e.source, e.target);
                 return svg`<line
-                  class="kv-graph__edge kv-graph__edge--${e.kind}"
+                  class="kv-graph__edge kv-graph__edge--${e.kind} ${hl ? "kv-graph__edge--highlight" : ""}"
                   x1="${a.x}"
                   y1="${a.y}"
                   x2="${b.x}"
@@ -151,11 +165,20 @@ export class VaultGraphView extends LitElement {
               })}
               ${layout.map((n) => {
                 const selected = n.path === this.selectedPath;
+                const hovered = n.path === this.hoveredPath;
+                const label = this.nodeLabel(n.title || n.path, n.path);
                 return svg`<g
-                  class="kv-graph__node ${isolated ? "kv-graph__node--isolated" : ""} ${selected ? "kv-graph__node--selected" : ""}"
+                  class="kv-graph__node ${isolated ? "kv-graph__node--isolated" : ""} ${selected ? "kv-graph__node--selected" : ""} ${hovered ? "kv-graph__node--hover" : ""}"
                   transform="translate(${n.x} ${n.y})"
                   @click=${() => this.onSelectFile?.(n.path)}
+                  @mouseenter=${() => {
+                    this.hoveredPath = n.path;
+                  }}
+                  @mouseleave=${() => {
+                    if (this.hoveredPath === n.path) this.hoveredPath = null;
+                  }}
                 >
+                  <title>${n.title || n.path}</title>
                   <circle
                     class="kv-graph__node-circle"
                     r="${NODE_RADIUS}"
@@ -163,8 +186,13 @@ export class VaultGraphView extends LitElement {
                     stroke="#6366f1"
                     stroke-width="2"
                   />
-                  <text class="kv-graph__node-label" text-anchor="middle" dy="4" fill="currentColor">
-                    ${truncate(n.title || n.path, 10)}
+                  <text
+                    class="kv-graph__node-label ${showFullLabels ? "kv-graph__node-label--full" : ""}"
+                    text-anchor="middle"
+                    dy="4"
+                    fill="currentColor"
+                  >
+                    ${label}
                   </text>
                 </g>`;
               })}
