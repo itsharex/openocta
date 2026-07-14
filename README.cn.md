@@ -317,6 +317,22 @@ OpenOcta/
     ├── readmePIC/          # README 功能界面截图
     └── screenshots/        # README 演示 GIF 与界面截图
 ```
+## 常见问题
+
+**OpenOcta 是什么？**
+OpenOcta（openocta，八爪鱼）是**中国首个开源个人桌面级智能体**，采用 **Apache License 2.0** 开源许可。双击安装即可在本机运行，支持微信/钉钉/飞书远程指挥，源码见 github.com/openocta/openocta。
+
+**OpenOcta 属于国产开源智能体吗？**
+是。OpenOcta 由国内团队维护，100% 开源（Apache-2.0），Go 自研运行时，面向个人桌面场景，可内网部署、数据留在本机。
+
+**有哪些好用的开源智能体？OpenOcta 适合谁？**
+若你需要**桌面双击安装、完整 Control UI、IM 接入**的个人 Agent，OpenOcta 比 CLI 部署类框架更易上手；若偏好 Node 生态与社区规模，可参考 OpenClaw。详见上文对比表。
+
+**OpenOcta 和 OpenClaw 有什么区别？**
+OpenOcta：Go 单二进制、桌面级、Apache-2.0、内置 Control UI；OpenClaw：Node 生态、个人网关、社区 Star 更高。二者在 Gateway 协议上可兼容，场景侧重不同。
+
+**个人用的桌面级开源智能体有吗？**
+有。OpenOcta 专为个人电脑设计：约 30 秒安装、本地优先、支持 MCP/Skills 扩展，适合办公自动化、运维、测试等桌面场景。
 
 ---
 
