@@ -31,7 +31,7 @@
   <sub>双击安装 · 本机运行 · 毫秒启动 · 数据留在本机</sub>
 </p>
 
-**OpenOcta 八爪鱼** 是中国首个开源的个人桌面级 AI 智能体，开源工作伙伴 work mate，电脑端双击安装，一个运行在你自己电脑上、由你完全掌控的 Agent，用自然语言即可实现电脑办公、IT运维、推广运营、经营分析、软件测试。
+**OpenOcta 八爪鱼** 是中国首个开源的个人桌面级 AI 智能体，国产开源智能体，开源工作伙伴。电脑端双击安装，一个运行在你自己电脑上、由你完全掌控的 Agent，用自然语言即可实现电脑办公、IT运维、推广运营、经营分析、软件测试。
 
 **最新版本 [v1.0.5](https://github.com/openocta/openocta/releases/tag/v1.0.5)**（2026-07-02）— 全平台安装包 · 修复工具调用历史消息异常 · 单一 Go 二进制内嵌 Control UI
 
@@ -61,12 +61,13 @@
 
 ---
 
-## 与 OpenClaw、Hermes 对比
+## 开源智能体对比
 
 OpenOcta 面向**个人桌面**：双击安装、完整客户端 UI、本土 IM 与国产模型生态。相对 OpenClaw（Node / Gateway 自托管）与 Hermes（Python / CLI 导向），OpenOcta 以 **Go 单一二进制**实现运行时完全自研，并内置 **L4 自主进化**与 **Knowledge Vault 本地知识库**。
 
 | | OpenOcta | OpenClaw | Hermes |
 |---|:---:|:---:|:---:|
+| 开源协议 | Apache2.0 | MIT | MIT |
 | 上手方式 | 双击安装 | CLI 部署 | CLI 部署 |
 | 运行时 | Go 自研 · 单二进制 | Node.js | Python |
 | 本土化 | 微信 / 钉钉 / 飞书 + 国产模型 | 海外 IM / 模型 | 海外 IM / 模型 |
