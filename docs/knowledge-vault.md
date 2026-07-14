@@ -136,10 +136,7 @@ flowchart LR
 
 ### 6.4 在 OpenOcta 界面中浏览
 
-顶栏 **知识库** 标签页提供：
-
-- **文档**：左侧文件树 + Markdown 预览/编辑（Obsidian 风格布局）
-- **图谱**：基于 `[[双链]]` 与 Markdown 链接的文档关系图
+顶栏 **知识库** 标签页提供 Obsidian 风格工作台（文档 / 图谱 / 全文搜索 / 同步索引等）。**操作步骤与界面说明**见 **[知识库用户使用手册](./knowledge-vault-user-guide.md)**。
 
 需 Gateway 已连接；Vault 路径与 Agent 运行时一致。
 
@@ -300,6 +297,7 @@ OpenOcta 存在多种「记忆」相关能力，职责不同，**请勿混淆**�
 
 ## 十三、相关文档
 
+- **[知识库用户使用手册](./knowledge-vault-user-guide.md)** — 界面操作、快捷键、同步索引、FAQ（**推荐终端用户阅读**）
 - [配置说明](./configuration.md) — Gateway 与 Agent 全局配置
 - [环境变量说明](./environment-variables.md) — 运行时环境变量
 - [工具说明](./tools.md) / [OpenOcta 扩展工具](./tools-openocta.md) — 工具总览
